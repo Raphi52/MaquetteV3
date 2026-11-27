@@ -1,0 +1,162 @@
+# Les gestes de EcrivainReversementsInpi (« Reversements INPI », PROC_INPIPAY). Le rejet est reserve a l'equipe Amitel
+# (OPE_RESULTATS.cs:50-53) ; l'agent du banc ne l'est pas. Jumeau accepte : aucun sur ce banc -- le rendre Amitel changerait l'agent de
+# tous les autres jeux (meme reserve que PROC_ACTREJ.gestes) ; il se joue a l'ecran, sur la copie de developpement (agent Amitel).
+geste: Agir Rejeter
+ids: 2206001
+resultat: refuse
+message: Le rejet d'un fichier de reversements est réservé à l'équipe Amitel.
+---
+# « Valider » (OPE_VALIDATION.cs:67-205), blocs 2 a 16 (le bloc 1 est le rejet). Chaque refus a pour jumeau accepte le bloc 15
+# (PAY12-001), ou le meme controle passe.
+# 2. Aucun fichier coche.
+geste: Agir Valider
+resultat: refuse
+message: Aucun fichier de reversements coché : rien n'est validé.
+---
+# 3. Deux fichiers : la V2 valide la ligne choisie (OPE_RESULTATS.cs:104-107, :222-229).
+geste: Agir Valider
+ids: 2206001,2206002
+valeur: Montant du virement = 245,50
+valeur: Mode de paiement = L12VICB
+resultat: refuse
+message: Un seul fichier de reversements se valide à la fois : RIG v2 valide la ligne choisie.
+---
+# 4. Un fichier deja valide : le menu n'est actif que sur « A valider » (:71).
+geste: Agir Valider
+ids: 2206003
+valeur: Montant du virement = 50,00
+valeur: Mode de paiement = L12VICB
+resultat: refuse
+message: Le fichier de reversements n°PAY12-003 n'est plus à valider : seul un fichier « A Valider » se valide.
+---
+# 5. Montant du virement nul (OPE_RELEVE_BANCAIRE.cs:49-50).
+geste: Agir Valider
+ids: 2206001
+valeur: Montant du virement = 0
+valeur: Mode de paiement = L12VICB
+resultat: refuse
+message: Le montant du virement est incorrect
+---
+# 6. Montant du virement different du total des reversements, INPIRV_TOTAL_HANDLING_FEE = 245,50 (:51-52).
+geste: Agir Valider
+ids: 2206001
+valeur: Montant du virement = 245,00
+valeur: Mode de paiement = L12VICB
+resultat: refuse
+message: Le montant du virement est différent de celui des reversements.
+---
+# 7. Date sur le releve posterieure a maintenant (:54-55). Jumeau : le bloc 15, date vide = maintenant (:75).
+geste: Agir Valider
+ids: 2206001
+valeur: Montant du virement = 245,50
+valeur: Mode de paiement = L12VICB
+valeur: Date sur le relevé = 31/12/2099
+resultat: refuse
+message: La date du virement ne peut pas être supérieure à la date du jour
+---
+# 8. Date sur le releve anterieure de plus d'un mois (:57-58).
+geste: Agir Valider
+ids: 2206001
+valeur: Montant du virement = 245,50
+valeur: Mode de paiement = L12VICB
+valeur: Date sur le relevé = 01/01/2000
+resultat: refuse
+message: La date du virement ne peut pas être inférieure de plus d'un mois à la date du jour
+---
+# 9. Un mode de type REG : exclu de la liste (TypesPaiementAExclure, :65 ; ULT_COMBO_MODE_PAIEMENT.cs:23-27) -- « Valeur inexistante ».
+geste: Agir Valider
+ids: 2206001
+valeur: Montant du virement = 245,50
+valeur: Mode de paiement = L12REGI
+resultat: refuse
+message: Mode de paiement : Valeur inexistante
+---
+# 10. Mode vide : le defaut de la V2, le reglage INPIPAY_MODE_PAIEMENT (absent du banc), sinon VICB (:69-74) -- absent de la liste du banc.
+geste: Agir Valider
+ids: 2206001
+valeur: Montant du virement = 245,50
+resultat: refuse
+message: Mode de paiement : Valeur inexistante
+---
+# 11. PAY12-005 : aucun reversement n'a de demande -> pas d'arrivee (_GetIdArrivee, :187-205 ; :76-78).
+geste: Agir Valider
+ids: 2206005
+valeur: Montant du virement = 30,00
+valeur: Mode de paiement = L12VICB
+resultat: refuse
+message: L'id d'arrivee n'a pas pu être déterminé.
+---
+# 12. PAY12-006 : la demande du numero national J12INPI0006 n'a pas de facture (:146-149).
+geste: Agir Valider
+ids: 2206006
+valeur: Montant du virement = 25,00
+valeur: Mode de paiement = L12VICB
+resultat: refuse
+message: Aucune facture n'est associée au numéro national J12INPI0006 (D12INPI0006)
+---
+# 13. PAY12-007 : 60,00 de reversements pour un fichier de 50,00 (:174-177).
+geste: Agir Valider
+ids: 2206007
+valeur: Montant du virement = 50,00
+valeur: Mode de paiement = L12VICB
+resultat: refuse
+message: Le montant total des ventilations ne correspond pas au montant global.
+---
+# 14. PAY12-008 : A12INPI0404 (un DAS : ni « ENT », « J », « CAE » ni « K ») n'a aucune dematerialisation (Demat.cs:232-238).
+geste: Agir Valider
+ids: 2206008
+valeur: Montant du virement = 15,00
+valeur: Mode de paiement = L12VICB
+resultat: refuse
+message: Aucun DAS n'a été trouvé à partir du numéro national A12INPI0404
+---
+# 15. PAY12-001 ACCEPTE : l'encaissement de 245,50 (le total du fichier), a la date de maintenant (date vide), arrivee de la demande
+# D12INPI0001 (2206190), deux ventilations -- ENT12INPI0001 : 145,50 sur l'affaire 2206101 au client de sa derniere facture
+# (2204201) ; A12INPI0002 : 100,00 sur 2206102 au client de SA derniere facture F12P003 (2204202), pas celui de la facture de la
+# demande du numero (F12P002, 2204201). ENT12INPI0404 (0,00) est ignore. Le fichier passe a l'etat 2 sans demande (journal des gestes).
+# Le titre de plus de 32 caracteres n'est pas un refus : la V2 le tronque (VerifieLongueurMax(true), :101).
+geste: Agir Valider
+ids: 2206001
+valeur: Montant du virement = 245,50
+valeur: Mode de paiement = L12VICB
+valeur: N° de titre = VIR12-001-REFERENCE-BANCAIRE-TRES-LONGUE
+resultat: fait
+message: Fichier de reversements n°PAY12-001 validé dans la base du greffe : encaissement INPI de 245,50 € (L12VICB), 2 ventilations par numéro national. Le mode de paiement n'est pas enregistré comme défaut du greffe (réglage INPIPAY_MODE_PAIEMENT, non écrit par la V3).
+lignes:
+Reversement INPI PAY12-002 | extraction du {J-20} au {J-13} · 1 reversement · 80,00 € | Virements INPI | AFaire | []
+Reversement INPI PAY12-005 | extraction du {J-9} au {J-8} · 1 reversement · 30,00 € | Virements INPI | AFaire | []
+Reversement INPI PAY12-006 | extraction du {J-8} au {J-7} · 1 reversement · 25,00 € | Virements INPI | AFaire | []
+Reversement INPI PAY12-007 | extraction du {J-7} au {J-6} · 1 reversement · 50,00 € | Virements INPI | AFaire | []
+Reversement INPI PAY12-008 | extraction du {J-6} au {J-5} · 2 reversements · 15,00 € | Virements INPI | AFaire | []
+controle: SELECT INPIRV_ETAT_TRAITEMENT FROM v2.INPI_REVERSEMENTS WHERE INPIRV_ID_INPIRV = 2206001 => 2
+controle: SELECT CAST(INPIRV_MONTANT_VALIDATION AS decimal(19,2)) FROM v2.INPI_REVERSEMENTS WHERE INPIRV_ID_INPIRV = 2206001 => 245.50
+controle: SELECT INPIRV_ID_UTLST FROM v2.INPI_REVERSEMENTS WHERE INPIRV_ID_INPIRV = 2206001 => 2000901
+controle: SELECT COUNT(*) FROM v2.INPI_REVERSEMENTS WHERE INPIRV_ID_INPIRV = 2206001 AND INPIRV_DATE_TRAITEMENT IS NOT NULL AND INPIRV_ID_DMND IS NULL => 1
+# L'encaissement : relu par le lien du fichier (INPIRV_ID_ENCMT), montants en decimal exact.
+controle: SELECT CAST(e.ENCMT_MONTANT AS decimal(19,2)) FROM v2.ENCAISSEMENT AS e INNER JOIN v2.INPI_REVERSEMENTS AS r ON r.INPIRV_ID_ENCMT = e.ENCMT_ID_ENCMT WHERE r.INPIRV_ID_INPIRV = 2206001 => 245.50
+controle: SELECT e.ENCMT_MODE_PAIEMENT + '|' + e.ENCMT_NUMERO_TITRE + '|' + e.ENCMT_DESIGNATION_PAYEUR + '|' + e.ENCMT_EXT_SOURCE + '|' + e.ENCMT_EXT_ID FROM v2.ENCAISSEMENT AS e INNER JOIN v2.INPI_REVERSEMENTS AS r ON r.INPIRV_ID_ENCMT = e.ENCMT_ID_ENCMT WHERE r.INPIRV_ID_INPIRV = 2206001 => L12VICB|VIR12-001-REFERENCE-BANCAIRE-TRE|INPI|INPI|PAY12-001
+controle: SELECT e.ENCMT_COMMENTAIRE FROM v2.ENCAISSEMENT AS e INNER JOIN v2.INPI_REVERSEMENTS AS r ON r.INPIRV_ID_ENCMT = e.ENCMT_ID_ENCMT WHERE r.INPIRV_ID_INPIRV = 2206001 => Période du 01/10/2026 au 31/10/2026 Virement n°PAY12-001
+controle: SELECT CONVERT(varchar(19), e.ENCMT_EXT_DATE, 120) FROM v2.ENCAISSEMENT AS e INNER JOIN v2.INPI_REVERSEMENTS AS r ON r.INPIRV_ID_ENCMT = e.ENCMT_ID_ENCMT WHERE r.INPIRV_ID_INPIRV = 2206001 => 2026-11-02 10:00:00
+controle: SELECT CONCAT(e.ENCMT_ID_ARRV, '|', e.ENCMT_ID_UTLST, '|', LEN(e.ENCMT_GUID), '|', CASE WHEN e.ENCMT_GUID = UPPER(e.ENCMT_GUID) COLLATE Latin1_General_CS_AS THEN 'MAJ' ELSE 'min' END) FROM v2.ENCAISSEMENT AS e INNER JOIN v2.INPI_REVERSEMENTS AS r ON r.INPIRV_ID_ENCMT = e.ENCMT_ID_ENCMT WHERE r.INPIRV_ID_INPIRV = 2206001 => 2206190|2000901|36|MAJ
+controle: SELECT COUNT(*) FROM v2.ENCAISSEMENT AS e INNER JOIN v2.INPI_REVERSEMENTS AS r ON r.INPIRV_ID_ENCMT = e.ENCMT_ID_ENCMT WHERE r.INPIRV_ID_INPIRV = 2206001 AND DATEDIFF(DAY, e.ENCMT_DATE_ENCAISSEMENT, GETDATE()) = 0 => 1
+# Les ventilations : une par numero national, a la date de l'encaissement ; leur somme est le total du fichier.
+controle: SELECT COUNT(*) FROM v2.VENTILATION AS v INNER JOIN v2.INPI_REVERSEMENTS AS r ON r.INPIRV_ID_ENCMT = v.VENTI_ID_ENCMT WHERE r.INPIRV_ID_INPIRV = 2206001 => 2
+controle: SELECT CAST(SUM(v.VENTI_MONTANT) AS decimal(19,2)) FROM v2.VENTILATION AS v INNER JOIN v2.INPI_REVERSEMENTS AS r ON r.INPIRV_ID_ENCMT = v.VENTI_ID_ENCMT WHERE r.INPIRV_ID_INPIRV = 2206001 => 245.50
+controle: SELECT CAST(v.VENTI_MONTANT AS decimal(19,2)) FROM v2.VENTILATION AS v INNER JOIN v2.INPI_REVERSEMENTS AS r ON r.INPIRV_ID_ENCMT = v.VENTI_ID_ENCMT WHERE r.INPIRV_ID_INPIRV = 2206001 AND v.VENTI_ID_AFFRE = 2206101 AND v.VENTI_ID_CLIEN = 2204201 => 145.50
+controle: SELECT CAST(v.VENTI_MONTANT AS decimal(19,2)) FROM v2.VENTILATION AS v INNER JOIN v2.INPI_REVERSEMENTS AS r ON r.INPIRV_ID_ENCMT = v.VENTI_ID_ENCMT WHERE r.INPIRV_ID_INPIRV = 2206001 AND v.VENTI_ID_AFFRE = 2206102 AND v.VENTI_ID_CLIEN = 2204202 => 100.00
+controle: SELECT COUNT(*) FROM v2.VENTILATION AS v INNER JOIN v2.ENCAISSEMENT AS e ON e.ENCMT_ID_ENCMT = v.VENTI_ID_ENCMT INNER JOIN v2.INPI_REVERSEMENTS AS r ON r.INPIRV_ID_ENCMT = e.ENCMT_ID_ENCMT WHERE r.INPIRV_ID_INPIRV = 2206001 AND v.VENTI_DATE_VENTILATION = e.ENCMT_DATE_ENCAISSEMENT => 2
+# La note interne des affaires (:166-169) ; 2206106 (PAY12-006, refuse) reste intacte.
+controle: SELECT AFFRE_NOTE_INTERNE FROM v2.AFFAIRE WHERE AFFRE_ID_AFFRE = 2206101 => Commandes n° : 501, 502
+controle: SELECT AFFRE_NOTE_INTERNE FROM v2.AFFAIRE WHERE AFFRE_ID_AFFRE = 2206102 => NOTE INPI Commandes n° : 503
+controle: SELECT COUNT(*) FROM v2.AFFAIRE WHERE AFFRE_ID_AFFRE = 2206106 AND AFFRE_NOTE_INTERNE IS NULL => 1
+# Le solde relu tombe juste : chaque affaire est soldee, ses factures (145,50 ; 60,00 + 40,00) moins ses ventilations = 0,00.
+controle: SELECT CAST((SELECT SUM(f.FACTU_MONTANT_TTC) FROM v2.FACTURE AS f INNER JOIN v2.DEMANDE AS d ON d.DMND_NUM_DEMANDE = f.FACTU_NUM_DEMANDE WHERE d.DMND_ID_AFFRE = 2206101) - (SELECT SUM(VENTI_MONTANT) FROM v2.VENTILATION WHERE VENTI_ID_AFFRE = 2206101) AS decimal(19,2)) => 0.00
+controle: SELECT CAST((SELECT SUM(f.FACTU_MONTANT_TTC) FROM v2.FACTURE AS f INNER JOIN v2.DEMANDE AS d ON d.DMND_NUM_DEMANDE = f.FACTU_NUM_DEMANDE WHERE d.DMND_ID_AFFRE = 2206102) - (SELECT SUM(VENTI_MONTANT) FROM v2.VENTILATION WHERE VENTI_ID_AFFRE = 2206102) AS decimal(19,2)) => 0.00
+---
+# 16. Le meme fichier, revalide : il n'est plus « A valider » (jumeau accepte : le bloc 15, meme fichier avant).
+geste: Agir Valider
+ids: 2206001
+valeur: Montant du virement = 245,50
+valeur: Mode de paiement = L12VICB
+resultat: refuse
+message: Le fichier de reversements n°PAY12-001 n'est plus à valider : seul un fichier « A Valider » se valide.

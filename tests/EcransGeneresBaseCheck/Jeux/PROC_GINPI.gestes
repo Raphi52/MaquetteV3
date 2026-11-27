@@ -1,0 +1,23 @@
+# Les gestes de EcrivainFormalitesInpi (« Formalites INPI », PROC_GINPI), sur les lignes de PROC_GINPI.sql. Chaque refus a son jumeau
+# accepte : bloc 3.
+# 1. Deux affaires d'un coup : le menu de RIG v2 vise la ligne choisie (DataGridViewResultat.cs:150-153).
+geste: Agir Régulariser l'anomalie
+ids: 2205301,2205302
+resultat: refuse
+message: Une anomalie se régularise sur une affaire à la fois : le menu de RIG v2 vise la ligne choisie.
+---
+# 2. Une affaire soldee : la V2 ne propose pas le menu (DataGridViewResultat.cs:135-145).
+geste: Agir Régulariser l'anomalie
+ids: 2205303
+resultat: refuse
+message: Affaire n° 2205303 : « Régulariser l'anomalie » ne vaut que pour une affaire « En attente de paiement de l'INPI » ou « Paiement INPI partiel » (le menu de RIG v2).
+---
+# 3. Le paiement partiel : le montant attendu de l'INPI prend le montant recu (DataGridViewResultat.cs:159-160) ; l'affaire n'est plus
+# une anomalie de l'ouverture (recu = attendu) et sort de la liste.
+geste: Agir Régulariser l'anomalie
+ids: 2205302
+resultat: fait
+message: Anomalie régularisée avec succès. Affaire n° 2205302 : le montant attendu de l'INPI passe de 100,00 € à 40,00 €.
+lignes:
+Affaire n° 2205301 | facture F12G001 · liaison L12GLIA001 · attendu 120,00 € · reçu INPI 0,00 € · solde -120,00 € · En attente de paiement de l'INPI | Formalités payantes | EnCours | []
+controle: SELECT CAST(AFFRE_INPI_MONTANT_TTC AS decimal(19,2)) FROM v2.AFFAIRE WHERE AFFRE_ID_AFFRE = 2205302 => 40.00

@@ -9,8 +9,13 @@ import { contexteDossier } from '../test/dossier'
 import { oublierVuesDeSession } from '../composants/ListeModerne'
 import { EcranGenere } from './EcranGenere'
 import { EcranOnglets, type ProprietesEcranOnglets } from './EcranOnglets'
+import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
 
-afterEach(() => { cleanup(); oublierVuesDeSession() })
+afterEach(() => { cleanup(); oublierVuesDeSession(); retirerFauxPont() })
+
+// Fiche client et Clients lisent leur liste par le pont (lot 14) : sans serveur, le mode « demo » et leurs exemples.
+const sansServeur = () => installerFauxPont({ 'EcranClients.Clients': () => Demo, 'EcranFicheClient.Clients': () => Demo })
+const Demo = { mode: 'demo', message: null, clients: [], total: 0 }
 
 // L'ECRAN REUNI EN ONGLETS (Pont/MenuAccueil.cs, EntreeMenu.EnOnglets) : les deux ecrans des
 // clients, tels que la vue du C# les envoie (Pont/PlanTravailVue.cs, OngletsReunisVue).
@@ -30,8 +35,10 @@ const panneau = (nom: string) => document.querySelector<HTMLElement>(`[role="tab
 const raisonSociale = () => (within(panneau('Fiche client')).getByLabelText('Raison sociale') as HTMLInputElement).value
 
 describe('EcranOnglets, monte par l\'aiguillage', () => {
-  it('montre un onglet par ecran reuni, l\'onglet demande actif, et l\'ecran d\'origine tel quel', () => {
+  it('montre un onglet par ecran reuni, l\'onglet demande actif, et l\'ecran d\'origine tel quel', async () => {
+    sansServeur()
     render(<Aiguillage proc={reunion(clients('PROC_FCLIENT'))} plan={vi.fn<GestePlan>()} />)
+    await vi.waitFor(() => expect(within(panneau('Fiche client')).queryByLabelText('Raison sociale')).not.toBeNull())
     expect(screen.getByRole('tablist').getAttribute('aria-label')).toBe('Comptes clients')
     expect(screen.getAllByRole('tab').map((t) => [t.textContent, t.getAttribute('aria-selected')]))
       .toEqual([['Clients', 'false'], ['Fiche client', 'true']])
@@ -41,9 +48,11 @@ describe('EcranOnglets, monte par l\'aiguillage', () => {
     expect(panneau('Clients')).toBeNull()
   })
 
-  it('un clic renvoie l\'onglet au plan ; l\'onglet quitte reste monte, cache, avec ce qu\'on y a saisi', () => {
+  it('un clic renvoie l\'onglet au plan ; l\'onglet quitte reste monte, cache, avec ce qu\'on y a saisi', async () => {
+    sansServeur()
     const plan = vi.fn<GestePlan>()
     const { rerender } = render(<Aiguillage proc={reunion(clients('PROC_FCLIENT'))} plan={plan} />)
+    await vi.waitFor(() => expect(within(panneau('Fiche client')).queryByLabelText('Choisir un client')).not.toBeNull())
     fireEvent.change(within(panneau('Fiche client')).getByLabelText('Choisir un client'), { target: { value: 'DUPONT' } })
 
     fireEvent.click(onglet('Fiche client'))
@@ -55,7 +64,7 @@ describe('EcranOnglets, monte par l\'aiguillage', () => {
     rerender(<Aiguillage proc={reunion(clients('PROC_GCLIENT'))} plan={plan} />)
     expect(onglet('Clients').getAttribute('aria-selected')).toBe('true')
     expect(panneau('Clients').hidden).toBe(false)
-    expect(panneau('Clients').querySelector('.rig-lm-synthese')!.textContent).toBe('6 clients sur 6 · 4 actifs')
+    await vi.waitFor(() => expect(panneau('Clients').querySelector('.rig-lm-synthese')!.textContent).toBe('6 clients sur 6 · 4 actifs'))
     expect(panneau('Fiche client').hidden).toBe(true)
 
     // Retour sur la fiche (une « Fiche client » cherchee, par exemple) : le client choisi est toujours la.

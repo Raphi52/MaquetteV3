@@ -2,6 +2,10 @@
 # PROC_VNOTIF.sql, Program.cs, PROC_CHM.sql), par numero de PC decroissant (sans numero : en dernier), puis ses extensions
 # (DEBITEUR_AUTRE) par numero d'ordre. Principal : PRCLL_NOM_DEBITEUR_PRINCIPAL (« ALPHA PRINCIPAL », 1400101), sinon le nom de
 # l'affaire (OPE_DEBITEUR.cs:92-94) ; en lecture (EnAttente). Extensions : lien en clair (LIEN_PRINCIPALE), « Enregistré » (Validee).
+# Les PC L12PC000* sont celles de PROC_ADDCREANCE.sql (lot 12, creances) : cet ecran lit toutes les PC, elles viennent en tete.
+PC VERROUILLEE GAMMA | PC L12PC0003 · débiteur principal · sans extension | Débiteur principal | EnAttente | []
+PC CREANCES BETA | PC L12PC0002 · débiteur principal · sans extension | Débiteur principal | EnAttente | []
+PC CREANCES ALPHA | PC L12PC0001 · débiteur principal · sans extension | Débiteur principal | EnAttente | []
 MPC ZETA | PC 2027P16106 · débiteur principal · sans extension | Débiteur principal | EnAttente | []
 MPC EPSILON | PC 2027P16105 · débiteur principal · sans extension | Débiteur principal | EnAttente | []
 MPC DELTA | PC 2027P16104 · débiteur principal · sans extension | Débiteur principal | EnAttente | []

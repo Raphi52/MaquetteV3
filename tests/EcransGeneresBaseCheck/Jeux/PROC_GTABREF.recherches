@@ -1,0 +1,20 @@
+# « Tables de référence » : le texte cherche « code libelle » (la colonne RECHERCHE de FactoryHelper.TEXTE_REQUETE_VALEUR, l. 9).
+texte: BANC CITE
+lignes:
+ZONE BANC CITEE | code GZ1 · PC_ETAT_ZONE | Zones à afficher selon l’état de la procédure collective | Validee | []
+TYPE BANC CITE | code GT1 · TYPE_DEPOT_AJMJ | Types des dépôts envoyés par les AJMJ | Validee | []
+---
+# Le critere « Table » : la table par son nom de liste.
+critere: Table = TYPE_DEPOT_AJMJ
+lignes:
+TYPE BANC CITE | code GT1 · TYPE_DEPOT_AJMJ | Types des dépôts envoyés par les AJMJ | Validee | []
+TYPE BANC LIBRE | code GT2 · TYPE_DEPOT_AJMJ | Types des dépôts envoyés par les AJMJ | Validee | []
+---
+# Le critere « Code ».
+critere: Code = G14H
+lignes:
+ETAT BANC HISTO | code G14H · PC_ETAT | État de la procédure collective | Validee | []
+---
+# Le critere « Libellé » : aucun code ne porte ce mot.
+critere: Libellé = INTROUVABLE
+lignes:

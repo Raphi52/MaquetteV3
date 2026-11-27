@@ -1,0 +1,5 @@
+# « Modifier une créance » (LecteurModificationCreance) sur PROC_ADDCREANCE.sql : une ligne par creance PC, les PC les plus
+# recemment ouvertes d'abord (2016 puis 2015 ; la PC de 2005 n'a pas de creance PC). La PC 2202003 est tenue par la demande
+# 2202401 en cours (sequenceur 2P) : EnAttente « Verrouillée par un autre » ; jumeau libre : 2202201 (PC 2202001), AFaire.
+PC L12PC0003, créance n° 1 | CREANCIER VERROU F · PC VERROUILLEE GAMMA · admis 75,50 € · verrouillée par une autre demande | Admissions | EnAttente | []
+PC L12PC0001, créance n° 1 | CREANCIER INTEGRE A · PC CREANCES ALPHA · admis 1 000,00 € | Admissions | AFaire | []

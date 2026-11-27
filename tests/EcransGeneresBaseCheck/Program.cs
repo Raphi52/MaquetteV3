@@ -480,6 +480,21 @@ Exiger(vueRegistres.Mode == "base" && vueRegistres.Plafonnees.Length == 0 && vue
        && vueRegistres.Lignes.Length == registresComplets.Lignes.Count,
     $"pont, PROC_REGJUD par la route : registres complets, aucun registre coupe ({string.Join(", ", vueRegistres.Plafonnees)} ; {vueRegistres.Message})");
 
+// « Tables de référence » : UN PLAFOND PAR TABLE (LecteurTablesReference.Requete). fix-ok: controle final du lot 14 (3e reprise,
+// 27/11/2026) -- un plafond commun aux trois tables (TOP sur leur union) cachait 21 des 128 types de depot AJMJ de la copie de dev
+// sans le dire (89 + 4 + 107 = 200 « sur 221 », capture 05) ; RIG v2 ouvre chaque table a part, en entier (OPE_SELECTION_TABLE,
+// FactoryHelper.TEXTE_REQUETE_VALEUR sans TOP). Plafond 1 : le premier code de chaque table et le total de chacune.
+var groupesTabref = CatalogueGenere.Descripteur("PROC_GTABREF")!.Groupes;
+var tablesCompletes = await Lire("PROC_GTABREF");
+var tablesPlafond1 = await Lire("PROC_GTABREF", plafond: 1);
+var codesParTable = tablesCompletes.Lignes.GroupBy(l => l.Groupe).ToDictionary(g => g.Key, g => g.Count());
+Exiger(groupesTabref.All(codesParTable.ContainsKey) && codesParTable.Values.All(n => n > 1)
+       && tablesPlafond1.Lignes.Select(Texte).SequenceEqual(tablesCompletes.Lignes.GroupBy(l => l.Groupe).Select(g => Texte(g.First())))
+       && tablesPlafond1.Total == tablesCompletes.Total && tablesPlafond1.TotalParGroupe is { } totauxTabref
+       && groupesTabref.All(g => totauxTabref.GetValueOrDefault(g) == codesParTable[g]),
+    $"PROC_GTABREF, plafond 1 : le premier code de chaque table et le total de chacune ({string.Join(", ", tablesPlafond1.Lignes.Select(l => l.Groupe))} ; " +
+    $"totaux {string.Join(", ", tablesPlafond1.TotalParGroupe?.Select(t => $"{t.Key} {t.Value}") ?? [])})");
+
 // L'ecran reuni des radiations d'office (« Relances et injonctions ») a TOUS ses membres branches depuis le lot 1 du plan
 // plan-f7ba4de2 : lu APRES les jeux, parce que les lecteurs des relances et injonctions lisent des colonnes que seuls
 // leurs jeux ajoutent aux tables du banc. Le mode « mixte » reste controle plus haut par l'ecran reuni de PROC_DCA.
@@ -582,6 +597,25 @@ if (Environment.GetEnvironmentVariable("RIGV3_BANC_GARDER") is { Length: > 0 } g
     while (File.Exists(garde)) await Task.Delay(1000);
     return 3;
 }
+
+// « Releve de compte » (PROC_RELCLI) SANS le droit comptable : le premier controle de RIG v2 (PROC_RELCLI.cs:72-73, la fonction
+// EXPCOMPTA par les roles de l'agent ; EcrivainRelevesClients.cs). Le droit que PROC_RELCLI.sql donne au role de l'agent du banc est
+// retire, le geste du bloc 3 de PROC_RELCLI.gestes est joue tel quel : refus au message de RIG v2, aucun solde ecrit, journal inchange.
+// Le droit est remis AVANT la boucle des gestes : le bloc 3 lui-meme, joue ensuite dans le meme etat de base, est le jumeau accepte.
+await Sql("DELETE FROM soc.RoleFonction WHERE Role = 'BANC' AND Fonction = 'EXPCOMPTA'");
+var soldesAvantDroit = await Valeur("SELECT COUNT(*) FROM v2.CLIENT_SOLDE");
+var journalAvantDroit = await Valeur("SELECT COUNT(*) FROM soc.Journal");
+var reponseSansDroit = await http.PostAsJsonAsync(RoutesEcransGeneres.GestesPour(Greffe, "PROC_RELCLI"),
+    new GesteEcran(TypeGeste.Agir, ["2207212"], new Dictionary<string, string> { ["Date de début"] = "01/01/2000", ["Date de fin"] = "31/12/2099" })
+    { Nom = "Valider les soldes" }, json);
+var sansDroit = await reponseSansDroit.Content.ReadFromJsonAsync<ResultatGeste>(json);
+Exiger(reponseSansDroit.StatusCode == HttpStatusCode.UnprocessableEntity && sansDroit is { Fait: false }
+       && sansDroit.Message == "Droits insuffisants : seul un utilisateur ayant les droits comptables peut effectuer cette opération. " +
+                               "Si la validation de cette période est nécessaire, demandez à votre comptable d'effectuer l'opération."
+       && await Valeur("SELECT COUNT(*) FROM v2.CLIENT_SOLDE") == soldesAvantDroit
+       && await Valeur("SELECT COUNT(*) FROM soc.Journal") == journalAvantDroit,
+    $"PROC_RELCLI, Valider les soldes SANS le droit EXPCOMPTA : refus de RIG v2, aucun solde ni trace ({(int)reponseSansDroit.StatusCode} « {sansDroit?.Message} »)");
+await Sql("INSERT INTO soc.RoleFonction (Role, Fonction) VALUES ('BANC', 'EXPCOMPTA')");
 
 // Les GESTES (<PROCEDURE>.gestes), joues par la route POST, dans l'ordre.
 foreach (var fichier in Directory.GetFiles(dossierJeux, "*.gestes").Order(StringComparer.Ordinal))

@@ -202,6 +202,21 @@ export interface DescripteurEcranVue {
   /** Une Operation qui vise UN seul objet, que la fiche RIG v2 RECOIT d'un autre ecran : aucune liste, il se designe par
    * son numero dans le seul critere. */
   objetUnique?: boolean
+  /** Un Referentiel dont la fiche RIG v2 n'ajoute pas de ligne (faux) : pas de bouton « Ajouter ». Absent = vrai. */
+  ajout?: boolean
+  /** Un Referentiel dont la fiche RIG v2 ne supprime pas de ligne (faux) : pas de « Supprimer » au menu de ligne. Absent = vrai. */
+  suppression?: boolean
+  /** Un Referentiel dont la fiche RIG v2 DUPLIQUE une ligne : « Dupliquer » au menu de ligne ouvre une ligne neuve pre-remplie,
+   * sa premiere cellule (la cle) vide ; Enregistrer l'envoie en Ajouter, ids = [la ligne copiee]. Absent = faux. */
+  duplication?: boolean
+  /** Un Referentiel : par groupe, les titres des sections dont les champs se saisissent sous une ligne neuve de ce groupe
+   * (Ajouter dans son onglet, Dupliquer une de ses lignes), envoyes en « Section › Libelle ». Absent : les colonnes seules. */
+  sectionsAjout?: Record<string, string[]>
+  /** Un Referentiel dont les lignes ont chacune le formulaire de leur groupe : par groupe, les sections montrees sous une ligne
+   * ouverte en modification (les champs que la fiche dit modifiables, hors colonnes, s'y saisissent). Groupe absent : toutes. */
+  sectionsParGroupe?: Record<string, string[]>
+  /** Un Referentiel : les groupes ou RIG v2 ne fait que modifier -- ni Ajouter dans leur onglet, ni Supprimer ni Dupliquer. */
+  groupesModificationSeule?: string[]
   /** Le RESULTAT d'une operation sur un objet unique : montre apres le geste, et des l'ouverture d'un objet deja traite. */
   resultat?: MarcheEcranVue[]
   /** Le titre de la section dessinee en EXTRAIT KBIS (composants/ApercuKbis.tsx) au lieu de ses champs ; PROC_XEX seul. */
@@ -212,7 +227,12 @@ export type FormeEcranVue = 'File' | 'Consultation' | 'Fiche' | 'Saisie' | 'Refe
 /** Les types de champ, aux noms de TypeChamp (C#). */
 export type TypeChampVue = 'Texte' | 'Zone' | 'Date' | 'Periode' | 'Nombre' | 'Montant' | 'Case' | 'Liste' | 'Tableau'
 /** Un champ de la fiche RIG v2 : son libelle, son type, les valeurs d'une liste. */
-export interface ChampEcranVue { libelle: string; type: TypeChampVue; options: string[] }
+/** visibleSi : le champ ne se montre que quand cette case de sa section est cochee (decochee, il se vide) ; bloqueSi : cette
+ * case cochee, il se montre sans se saisir -- les regles d'affichage de la fiche RIG v2 (ChampEcran.VisibleSi / BloqueSi).
+ * fix-ok: controle final du lot 14 (27/11/2026, 4e reprise) -- sans elles, « Résolution du plan », « Code clôture » et « À sauver »
+ * d'un etat de PC s'affichaient et se saisissaient toujours ; ReferentielParGroupe.test.tsx rouge (3 tests) sans la regle. */
+/** exclut : une case qui, cochee, decoche ces cases de sa section (ChampEcran.Exclut ; OPE_AFFICHE_SQLBASE_PC_ETAT.cs:89-108). */
+export interface ChampEcranVue { libelle: string; type: TypeChampVue; options: string[]; visibleSi?: string | null; bloqueSi?: string | null; exclut?: string[] | null }
 /** Une tuile : son code (AFaire, EnCours, Validee, EnAttente, Rejetee) et son icone de l'accueil. */
 export interface EtatEcranVue { code: string; libelle: string; icone: string }
 /** Une etape (Saisie) ou une section (les autres formes). */

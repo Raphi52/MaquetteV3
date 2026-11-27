@@ -27,8 +27,8 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// L'id d'une ligne est « M-&lt;id&gt; », « J-&lt;id&gt; » ou « P-&lt;id&gt; » : les trois tables ont chacune leur numerotation.
 /// FICHE (l'apercu, avant confirmation) : « Liaisons reprises » -- pour un mandataire, ce qui le reference (Mandataire.GetLiaisonEntite,
 /// LiaisonsMandataire.cs) et les affaires ou il est avocat (le chemin des destinataires d'edition, .Mandataires.cs:417-430) : ce que la
-/// fusion reportera sur l'acteur garde. Pour un juge ou un mandataire PC, la fusion n'est pas reprise (EcrivainRapprochementActeurs.cs) :
-/// la fiche le dit.
+/// fusion reportera sur l'acteur garde. Pour un juge ou un mandataire PC, ses liaisons (LiaisonsActeur.cs, dans l'ordre de la fusion
+/// V2) et ses affaires (instances d'un juge, procedures collectives d'un mandataire PC).
 /// </summary>
 internal sealed class LecteurRapprochementActeurs : IRechercheEcran, IFicheEcran
 {
@@ -138,11 +138,32 @@ internal sealed class LecteurRapprochementActeurs : IRechercheEcran, IFicheEcran
             if (!await r.ReadAsync(ct)) return null;
             nomLu = FormeLigne.Texte(r, "Nom");
         }
+        // Un juge ou un mandataire PC : ses liaisons (LiaisonsActeur.cs) dans l'ordre de la fusion V2, et ses affaires (instances d'un juge,
+        // procedures collectives d'un mandataire PC) -- les memes que l'apercu de « Remplacer un acteur ».
         if (acteur.Groupe != Mandataires)
+        {
+            var (t, ordre) = EcrivainRapprochementActeurs.Fusion(acteur.Groupe);
+            var parLiaison = (await LiaisonsActeur.CompterAsync(t, (sql, p) => LectureV2.LireAsync(baseGreffe, sql, ct, p), acteur.Id, ct))
+                .ToDictionary(c => c.Liaison, c => c.Nombre);
+            var liees = ordre.Select(o => (o.Liaison.Libelle, Nombre: parLiaison[o.Liaison])).Where(c => c.Nombre > 0).ToArray();
+            var desAffaires = new List<string[]>();
+            await using (var r = await LectureV2.LireAsync(baseGreffe, LiaisonsActeur.RequeteAffaires(t), ct, new SqlParameter("@id", acteur.Id)))
+                while (await r.ReadAsync(ct)) desAffaires.Add([FormeLigne.Texte(r, "Numero"), FormeLigne.Texte(r, "Libelle")]);
             return new FicheEcran(Procedure, id, nomLu,
             [
-                new(SectionLiaisons, [new ChampFiche(ChampLiaisons, EcrivainRapprochementActeurs.NonRepris(acteur.Groupe)) { Colonnes = ["Liaison", "Nombre"] }]),
+                new(SectionLiaisons,
+                [
+                    new ChampFiche(ChampLiaisons, liees.Length == 0 ? "aucune liaison" : string.Join(", ", liees.Select(c => $"{c.Nombre} × {c.Libelle.ToLowerInvariant()}")))
+                    {
+                        Colonnes = ["Liaison", "Nombre"], Lignes = [.. liees.Select(c => new[] { c.Libelle, c.Nombre.ToString(CultureInfo.InvariantCulture) })],
+                    },
+                    new ChampFiche(ChampAffaires, desAffaires.Count == 0 ? "aucune affaire" : $"{desAffaires.Count} affaire{(desAffaires.Count > 1 ? "s" : "")}")
+                    {
+                        Colonnes = ["Numéro", "Affaire"], Lignes = [.. desAffaires],
+                    },
+                ]),
             ]);
+        }
         var comptes = await LiaisonsMandataire.CompterAsync((sql, p) => LectureV2.LireAsync(baseGreffe, sql, ct, p), acteur.Id, ct);
         var affaires = new List<string[]>();
         await using (var r = await LectureV2.LireAsync(baseGreffe, LiaisonsMandataire.RequeteAffaires, ct, new SqlParameter("@id", acteur.Id)))

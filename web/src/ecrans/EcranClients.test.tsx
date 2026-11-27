@@ -1,9 +1,20 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { EcranClients } from './EcranClients'
+import { EcranClients, type VueClients } from './EcranClients'
+import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
 import { oublierVuesDeSession } from '../composants/ListeModerne'
 
-afterEach(() => { cleanup(); oublierVuesDeSession() })
+afterEach(() => { cleanup(); oublierVuesDeSession(); retirerFauxPont() })
+
+// Sans serveur, le pont rend le mode « demo » : l'ecran montre ses clients d'exemple, marques (Pont/EcranClientsBase.cs).
+const Demo: VueClients = { mode: 'demo', message: null, clients: [], total: 0 }
+async function ouvrir(selectionner: (abrege: string) => void, v: VueClients = Demo) {
+  const pont = installerFauxPont({ 'EcranClients.Clients': () => v })
+  const r = render(<EcranClients selectionner={selectionner} />)
+  await vi.waitFor(() => expect(pont.appels).toHaveBeenCalledWith('EcranClients.Clients'))
+  await vi.waitFor(() => expect(r.container.querySelectorAll('tbody .rig-lm-identite__objet').length).toBeGreaterThan(0))
+  return r
+}
 
 // Valeurs attendues : celles de l'ecran Blazor (EcranClients.razor, 6 clients de demonstration).
 const lignes = (c: HTMLElement) =>
@@ -14,8 +25,8 @@ const abreges = (c: HTMLElement) =>
 const synthese = (c: HTMLElement) => c.querySelector('.rig-lm-synthese')!.textContent
 
 describe('EcranClients', () => {
-  it('affiche les six clients : avatar et nom, statut en point colore, type en pastille', () => {
-    const { container } = render(<EcranClients selectionner={vi.fn()} />)
+  it('affiche les six clients : avatar et nom, statut en point colore, type en pastille', async () => {
+    const { container } = await ouvrir(vi.fn())
     expect(synthese(container)).toBe('6 clients sur 6 · 4 actifs')
     // Avatar « LA » (ni SELARL ni & ne donnent d'initiale), nom, abrege · compte, puis Id, Groupe, Statut, Type.
     expect(lignes(container)[0]).toEqual(['LASELARL LEROY & ASSOCIESLEROY · C-000142', '1042', 'Mandataires', 'Actif', 'En compte'])
@@ -27,8 +38,8 @@ describe('EcranClients', () => {
     expect(container.querySelector('.rig-lm-pied')!.textContent).toContain('6 clients affiches')
   })
 
-  it('filtre par mot cle (sans casse) et par statut, et « Effacer » remet tout', () => {
-    const { container } = render(<EcranClients selectionner={vi.fn()} />)
+  it('filtre par mot cle (sans casse) et par statut, et « Effacer » remet tout', async () => {
+    const { container } = await ouvrir(vi.fn())
     fireEvent.change(screen.getByLabelText('Aller a un client…'), { target: { value: 'dup' } })
     expect(abreges(container)).toEqual(['DUPONT'])
 
@@ -44,15 +55,15 @@ describe('EcranClients', () => {
     expect(synthese(container)).toBe('6 clients sur 6 · 4 actifs')
   })
 
-  it('un clic sur une ligne remonte l\'abrege du client a Blazor', () => {
+  it('un clic sur une ligne remonte l\'abrege du client a Blazor', async () => {
     const selectionner = vi.fn()
-    const { container } = render(<EcranClients selectionner={selectionner} />)
+    const { container } = await ouvrir(selectionner)
     fireEvent.click(container.querySelectorAll('tbody tr')[2]!)
     expect(selectionner).toHaveBeenCalledWith('DUPONT')
   })
 
-  it('les cartes POSENT les criteres existants : Actifs, et un type par segment de la legende', () => {
-    const { container } = render(<EcranClients selectionner={vi.fn()} />)
+  it('les cartes POSENT les criteres existants : Actifs, et un type par segment de la legende', async () => {
+    const { container } = await ouvrir(vi.fn())
     const carteActifs = container.querySelector('.rig-lm-carte')!
     expect(carteActifs.textContent).toBe('Actifs4 sur 6')
     fireEvent.click(carteActifs)
@@ -68,8 +79,8 @@ describe('EcranClients', () => {
     expect(abreges(container)).toHaveLength(6)
   })
 
-  it('les vues POSENT leurs criteres et la puce active suit les criteres ; « + Nouvelle vue » garde les criteres pour la session', () => {
-    const premier = render(<EcranClients selectionner={vi.fn()} />)
+  it('les vues POSENT leurs criteres et la puce active suit les criteres ; « + Nouvelle vue » garde les criteres pour la session', async () => {
+    const premier = await ouvrir(vi.fn())
     const vue = (nom: RegExp) => screen.getByRole('button', { name: nom })
     expect(vue(/^Tous/).getAttribute('aria-pressed')).toBe('true')
     expect(vue(/^Bloques ou en sommeil/).textContent).toBe('Bloques ou en sommeil 2')
@@ -87,14 +98,14 @@ describe('EcranClients', () => {
     premier.unmount()
 
     // L'ecran rouvert la garde ; la choisir repose ses criteres.
-    const second = render(<EcranClients selectionner={vi.fn()} />)
+    const second = await ouvrir(vi.fn())
     fireEvent.click(vue(/^Bloques en compte/))
     expect(abreges(second.container)).toEqual(['DUPONT'])
   })
 
-  it('« Aller a un client… » EST le critere « Mot cle » (nom, abrege ou compte) : un seul champ, il pose les vues ; Ctrl K y pose le curseur ; Entree choisit le client reste seul', () => {
+  it('« Aller a un client… » EST le critere « Mot cle » (nom, abrege ou compte) : un seul champ, il pose les vues ; Ctrl K y pose le curseur ; Entree choisit le client reste seul', async () => {
     const selectionner = vi.fn()
-    const { container } = render(<EcranClients selectionner={selectionner} />)
+    const { container } = await ouvrir(selectionner)
     const champ = screen.getByLabelText('Aller a un client…') as HTMLInputElement
     const touche = new KeyboardEvent('keydown', { key: 'k', ctrlKey: true, bubbles: true, cancelable: true })
     window.dispatchEvent(touche)
@@ -120,5 +131,24 @@ describe('EcranClients', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Effacer' }))
     expect(champ.value).toBe('')
     expect(screen.getByRole('button', { name: /^Tous/ }).getAttribute('aria-pressed')).toBe('true')
+  })
+
+  // Branche sur la base (lot 14) : les clients du pont, filtres par les memes criteres ; aucun exemple, aucune note.
+  it('en base, les clients lus et eux seuls, filtres comme RIG v2', async () => {
+    const client = (id: number, abrege: string, statut: string, type: string) => ({ id, compte: 'C' + id, abrege, nom: abrege + ' SARL', groupe: 'Avocats', statut, type })
+    const { container } = await ouvrir(vi.fn(), { mode: 'serveur', message: null, total: 2,
+      clients: [client(7, 'CLA', 'Actif', 'En compte'), client(8, 'CLB', 'Bloque', 'Web')] })
+    expect(abreges(container)).toEqual(['CLA', 'CLB'])
+    expect(screen.queryByText(/LEROY/)).toBeNull()
+    expect(screen.queryByRole('note')).toBeNull()
+    fireEvent.click(screen.getAllByRole('button', { name: /^Actifs/ })[0]!)
+    expect(abreges(container)).toEqual(['CLA'])
+  })
+
+  // La liste lue est coupee (plafond du serveur) : l'ecran le dit au lieu de compter « 2 sur 2 ».
+  it('en base, une liste coupee au plafond le dit, avec le total de la base', async () => {
+    const client = (id: number, abrege: string) => ({ id, compte: 'C' + id, abrege, nom: abrege + ' SARL', groupe: 'Avocats', statut: 'Actif', type: 'En compte' })
+    await ouvrir(vi.fn(), { mode: 'serveur', message: null, total: 2568, clients: [client(7, 'CLA'), client(8, 'CLB')] })
+    expect(screen.getByRole('note').textContent).toContain('Les 2 premiers clients (par abrégé) sur 2568')
   })
 })

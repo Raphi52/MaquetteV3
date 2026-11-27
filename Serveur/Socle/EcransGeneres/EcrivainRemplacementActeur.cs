@@ -40,7 +40,7 @@ internal sealed class EcrivainRemplacementActeur : IEcrivainEcran
 
     internal const string AucuneMiseAJour = "Aucune mise à jour à faire";
 
-    private sealed record Acteur(int Id, string Nom, string Abrege, bool Actif)
+    internal sealed record Acteur(int Id, string Nom, string Abrege, bool Actif)
     {
         public string NomComplet => NomAbrege(Nom, Abrege);
     }
@@ -98,7 +98,7 @@ internal sealed class EcrivainRemplacementActeur : IEcrivainEcran
     private static string Couper(string texte) => texte.Length <= 200 ? texte : texte[..200];
 
     /// <summary>Le remplacant saisi : son numero, ou son abrege (le premier actif s'il y en a plusieurs) ; null s'il n'existe pas.</summary>
-    private static async Task<int?> ResoudreAsync(GesteEnCours geste, TypeActeur t, string saisie, CancellationToken ct)
+    internal static async Task<int?> ResoudreAsync(GesteEnCours geste, TypeActeur t, string saisie, CancellationToken ct)
     {
         // fix-ok: mesure au banc le 27/11/2026 -- l'intervenant PC n'a pas de colonne « actif » (Actif = « 1 », toujours proposable) et
         // une constante ne se trie pas (« A constant expression was encountered in the ORDER BY list », erreur 500 des blocs 7-8) ; l'autre
@@ -112,7 +112,7 @@ internal sealed class EcrivainRemplacementActeur : IEcrivainEcran
         return await r.ReadAsync(ct) ? r.GetInt32(0) : null;
     }
 
-    private static async Task<Acteur?> ActeurAsync(GesteEnCours geste, TypeActeur t, int id, CancellationToken ct)
+    internal static async Task<Acteur?> ActeurAsync(GesteEnCours geste, TypeActeur t, int id, CancellationToken ct)
     {
         await using var r = await geste.LireAsync($"""
             SELECT {t.Nom} AS Nom, ISNULL({t.Abrege}, '') AS Abrege, CAST({t.Actif} AS bit) AS Actif FROM v2.{t.Table} AS a WITH (UPDLOCK) WHERE a.{t.Cle} = @id
@@ -122,7 +122,7 @@ internal sealed class EcrivainRemplacementActeur : IEcrivainEcran
     }
 
     /// <summary>L'auteur de la trace (Utilisateur.NomPrenomAbregeUtilisateur, l. 528) : « Nom Prénom (ABREGE) » de l'agent, sinon son compte.</summary>
-    private static async Task<string> AuteurAsync(GesteEnCours geste, CancellationToken ct)
+    internal static async Task<string> AuteurAsync(GesteEnCours geste, CancellationToken ct)
     {
         await using var r = await geste.LireAsync("SELECT CONCAT(Nom, ' ', Prenom, ' (', Abrege, ')') FROM soc.Compte WHERE CompteWindows = @c", ct,
             new SqlParameter("@c", geste.Agent.CompteWindows));

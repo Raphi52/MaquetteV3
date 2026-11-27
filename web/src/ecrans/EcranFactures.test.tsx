@@ -9,8 +9,9 @@ afterEach(() => { cleanup(); retirerFauxPont() })
 
 // Les montants attendus sont ceux de la capture de l'ecran Blazor (18/11/2026) :
 // Total TTC 458,63 EUR, reste a encaisser 258,63 EUR pour 200 encaisses.
+// Sans serveur, le pont rend null pour l'accueil (Pont/EcranFactures.cs, DemandeDeAsync) : la demonstration reste.
 function ouvrir() {
-  installerFauxPont({ 'EcranFactures.DateDuJour': () => '2026-09-09' })
+  installerFauxPont({ 'EcranFactures.DateDuJour': () => '2026-09-09', 'EcranFactures.DemandeDe': () => null })
   return render(<EcranFactures />)
 }
 
@@ -152,6 +153,17 @@ describe('EcranFactures', () => {
     const { container } = ouvrir()
     const actions = container.querySelector('.rig-criteres__actions')!
     expect(actions.childNodes[1]?.textContent).toBe(' ')
+  })
+
+  // La regle du plan (« sans serveur : lignes d'exemple etiquetees ») : la facture de demonstration le dit, des l'ouverture.
+  it('la facture de demonstration est marquee « exemple »', async () => {
+    const { container } = ouvrir()
+    const note = screen.getByRole('note')
+    expect(note.querySelector('.rig-tcw__exemple')!.textContent).toBe('exemple')
+    expect(note.textContent).toContain('Lignes de facture de démonstration')
+    // Le pont a repondu « pas de serveur » (null) : la mention reste, la demonstration aussi.
+    await waitFor(() => expect(screen.getByRole('note')).toBeTruthy())
+    expect(compte(container)).toBe('5 articles · total TTC 458,63 € · reste a encaisser 258,63 €')
   })
 })
 
@@ -317,8 +329,117 @@ describe('EcranFactures ouvert depuis une affaire', () => {
     expect(screen.getByText(/Solde client/).textContent).toBe('Solde client 812,40 EUR')
   })
 
-  it('depuis l\'accueil, le pont n\'est pas interroge sur une affaire', () => {
+  // Depuis l'accueil, le pont est interroge SANS affaire (null) : il dit seulement si l'ecran est sur la base.
+  it('depuis l\'accueil, le pont n\'est pas interroge sur une affaire', async () => {
     const { pont } = ouvrirPour(null)
-    expect(pont.appels.mock.calls.map(([nom]) => nom)).toEqual(['EcranFactures.DateDuJour'])
+    await waitFor(() => expect(pont.appels).toHaveBeenCalledWith('EcranFactures.DemandeDe', null))
+    expect(pont.appels.mock.calls.filter(([nom]) => nom === 'EcranFactures.DemandeDe')).toEqual([['EcranFactures.DemandeDe', null]])
+  })
+
+  it('une facture d\'affaire tiree du tarif d\'exemple est marquee « exemple »', () => {
+    ouvrirPour(AmiensBillards)
+    expect(screen.getByRole('note').querySelector('.rig-tcw__exemple')).toBeTruthy()
+  })
+})
+
+// La demande et le client d'une affaire lus dans la base (plan « RIG v3 100 % fonctionnel », lot 12, Pont/EcranFactures.cs) : la fiche
+// du client de sa facture seule (aucune fiche de demonstration a cote) ; en panne, le motif et aucun client.
+describe('EcranFactures : demande du dossier lue dans la base', () => {
+  it('branche : numero de demande, client, adresse et solde du de la base ; Changer de client ne propose pas la demonstration', async () => {
+    installerFauxPont({
+      'EcranFactures.DateDuJour': () => '2026-11-27',
+      'EcranFactures.DemandeDe': () => ({ numero: 'D12FAC001', client: 'L12FAC', nom: 'CLIENT FACTURE BANC', adresse: '2 rue du Banc 80000 AMIENS',
+                                          solde: 42.5, mode: 'serveur', message: null }),
+    })
+    render(<EcranFactures dossier={contexteDossier({ numero: 'L12DOS01', nom: 'CLIENT FACTURE BANC' })} />)
+    await waitFor(() => expect(screen.getByDisplayValue('D12FAC001')).toBeTruthy())
+    expect(screen.getByDisplayValue('2 rue du Banc 80000 AMIENS')).toBeTruthy()
+    expect(screen.getByText('Solde client', { exact: false }).textContent).toContain('42,50')
+    expect(screen.queryByText('SELARL LEROY & ASSOCIES')).toBeNull()
+  })
+
+  it('en panne, le motif, et ni demande ni client de demonstration', async () => {
+    installerFauxPont({
+      'EcranFactures.DateDuJour': () => '2026-11-27',
+      'EcranFactures.DemandeDe': () => ({ numero: '', client: '', mode: 'erreur', message: 'La base du greffe 3801 ne répond pas.' }),
+    })
+    render(<EcranFactures dossier={contexteDossier({ numero: 'L12DOS01', nom: 'CLIENT FACTURE BANC' })} />)
+    expect((await screen.findByRole('alert')).textContent).toContain('La base du greffe 3801 ne répond pas.')
+    expect(screen.queryByText('SELARL LEROY & ASSOCIES')).toBeNull()
+  })
+
+  // Les articles de la facture lus dans v2.ARTICLE_UTILISE (LectureFactures.cs) : la grille les montre tels quels (montants de la
+  // LIGNE, prix UHT d'une unite), aucun article du tarif d'exemple. Deux articles LIBRE : chacun se retire seul (cle = ARTUT).
+  const ArticlesLus = [
+    { id: 2201601, code: 'IMM01', libelle: 'Immatriculation lue', quantite: 1, prixUht: 37.45, tauxTva: 20, bodacc: 105.9, inpi: 0, autre: 0, ttc: 150.84, commentaire: '' },
+    { id: 2201602, code: 'LIBRE', libelle: 'Article libre', quantite: 2, prixUht: 10, tauxTva: 20, bodacc: 0, inpi: 0, autre: 1.1, ttc: 25.1, commentaire: 'Copie' },
+    { id: 2201603, code: 'LIBRE', libelle: 'Article libre', quantite: 1, prixUht: 5, tauxTva: 20, bodacc: 0, inpi: 0, autre: 0, ttc: 6, commentaire: 'Second' },
+  ]
+
+  it('branche : les articles de la facture viennent de la base, sans mention « exemple » ni tarif d\'exemple', async () => {
+    installerFauxPont({
+      'EcranFactures.DateDuJour': () => '2026-11-27',
+      'EcranFactures.DemandeDe': () => ({ numero: 'D12FAC001', client: 'L12FAC', nom: 'CLIENT FACTURE BANC', adresse: '', solde: 0, mode: 'serveur',
+                                          message: null, facture: 'F12FAC01', articles: ArticlesLus }),
+    })
+    const { container } = render(<EcranFactures dossier={AmiensBillards} />)
+    await waitFor(() => expect(compte(container)).toBe('3 articles · total TTC 181,94 € · reste a encaisser 181,94 €'))
+    expect(screen.getByText('Articles de la facture F12FAC01')).toBeTruthy()
+    expect(lignes(container)).toEqual([
+      ['', 'Immatriculation lue · IMM01', '1', 'Retenu', '150,84 €', '', ''],
+      ['', 'Article libre · LIBRE', '2', 'Retenu', '25,10 €', 'Copie', ''],
+      ['', 'Article libre · LIBRE', '1', 'Retenu', '6,00 €', 'Second', ''],
+    ])
+    expect(container.textContent).not.toMatch(/194,85|Immatriculation societe|exemple|démonstration/)
+    expect(screen.queryByRole('note')).toBeNull()
+    fireEvent.click(screen.getByText('Second').closest('tr')!)
+    expect(compte(container)).toBe('3 articles · 1 retire · total TTC 175,94 € · reste a encaisser 175,94 €')
+    fireEvent.click(screen.getAllByRole('button', { name: 'Deplier la ligne' })[1]!)
+    expect([...container.querySelectorAll('.rig-lm-champ')].map((c) => c.textContent))
+      .toEqual(['Prix UHT10,00', 'Taux TVA20,0 %', 'BODACC0,00', 'INPI0,00', 'Autre1,10'])
+    sansRienDeLaDemo(container)
+  })
+
+  // Le jumeau de la demonstration de 004182 (IMM01 du tarif d'exemple) : sur la base, un dossier sans demande n'a rien a facturer.
+  it('branche, dossier sans demande dans la base : aucun article, pas le tarif d\'exemple', async () => {
+    installerFauxPont({
+      'EcranFactures.DateDuJour': () => '2026-11-27',
+      'EcranFactures.DemandeDe': () => ({ numero: '', client: '', mode: 'serveur', message: null, articles: [] }),
+    })
+    const { container } = render(<EcranFactures dossier={AmiensBillards} />)
+    await waitFor(() => expect(lignes(container)).toEqual([['Aucune demande pour ce dossier dans la base du greffe : rien a facturer.']]))
+    sansFactureNiEncaissement(container)
+    expect(screen.queryByRole('note')).toBeNull()
+    sansRienDeLaDemo(container)
+  })
+
+  // Objection du juge (lot 12) : en panne, les articles du tarif d'exemple restaient affiches.
+  it('en panne, aucun article du tarif d\'exemple ne reste', async () => {
+    installerFauxPont({
+      'EcranFactures.DateDuJour': () => '2026-11-27',
+      'EcranFactures.DemandeDe': () => ({ numero: '', client: '', mode: 'erreur', message: 'La base du greffe 3801 ne répond pas.', articles: [] }),
+    })
+    const { container } = render(<EcranFactures dossier={AmiensBillards} />)
+    await screen.findByRole('alert')
+    expect(lignes(container)).toEqual([['Aucun article : la base du greffe n\'a pas ete lue (motif ci-dessus).']])
+    expect(container.textContent).not.toMatch(/IMM01|194,85/)
+    sansFactureNiEncaissement(container)
+  })
+
+  // Objection du juge (lot 12) : depuis l'accueil, avec le serveur, la facture de demonstration s'affichait sans mention.
+  it('depuis l\'accueil avec un serveur : la facture vide de RIG v2, rien de la demonstration', async () => {
+    const pont = installerFauxPont({
+      'EcranFactures.DateDuJour': () => '2026-11-27',
+      'EcranFactures.DemandeDe': () => ({ numero: '', client: '', mode: 'serveur', message: null, articles: [] }),
+    })
+    const { container } = render(<EcranFactures />)
+    await waitFor(() => expect(compte(container)).toBe('Aucun article'))
+    expect(pont.appels).toHaveBeenCalledWith('EcranFactures.DemandeDe', null)
+    expect(lignes(container)).toEqual([['Facture vide : ouverte hors d\'un dossier, elle ne reprend aucune demande (RIG v2 l\'ouvre vide).']])
+    expect(valeur('N de demande')).toBe('')
+    expect(valeur('Abrege')).toBe('')
+    expect(screen.queryByRole('note')).toBeNull()
+    sansFactureNiEncaissement(container)
+    sansRienDeLaDemo(container)
   })
 })

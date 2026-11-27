@@ -100,7 +100,7 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             [
                 new MarcheEcran("Type d'acteur", "Un seul type à la fois : juges, mandataires ou mandataires PC. Les acteurs cochés sont ceux à supprimer ; cochez-les dans la grille, ils sont tous du même type.", false,
                     [Champ.Liste("Type d'acteur", "Juges", "Mandataires", "Mandataires PC")]),
-                new MarcheEcran("Acteur à garder", "Le numéro ou l'abrégé de l'acteur qui reprend les affaires : du même type, actif et répertorié (avec un abrégé), et non coché. Un mandataire actif qui a un numéro CNBF ne peut pas être supprimé.", true,
+                new MarcheEcran("Acteur à garder", "Le numéro ou l'abrégé de l'acteur qui reprend les affaires : du même type, répertorié (avec un abrégé), et non coché. Un mandataire actif qui a un numéro CNBF ne peut pas être supprimé, ni le juge par défaut des injonctions de payer.", true,
                     ["Acteur à garder"]),
                 new MarcheEcran("Liaisons reprises", "Ouvrez la ligne d'un acteur coché : ses liaisons et les affaires touchées passeront à l'acteur gardé, dans une seule transaction, puis il sera supprimé. ATTENTION CETTE OPERATION EST IRREVERSIBLE.", false,
                     [Champ.Tableau("Liaisons"), Champ.Tableau("Affaires touchées")]),
@@ -201,38 +201,35 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             // Bouton final cite par la fiche v2 : VALIDER, visible en phase Saisie (proc_cni.md, Detail OPE)
             Valider = "Valider",
             Rang = 7,
+            // Une ligne = une demande CNI (RIG v2 n'a pas de liste : LecteurNonInscrits.cs) ; « Valider » cree le non-inscrit, son
+            // entreprise, son etablissement et la demande, comme OPE_CNI.DoSauve (EcrivainNonInscrits.cs). Les champs et leurs obligations :
+            // OPE_CNI.Designer.cs:97-202 et _Rafraichir (OPE_CNI.cs:253-287).
             Etats = EtatsEcran.Trois("À saisir", "En saisie", "Créé"),
             Groupes = ["Personne physique", "Personne morale"],
             Marches =
             [
-                new MarcheEcran("Type et identité", "Le type (judiciaire, procédure collective, autre) et la civilité décident des champs : personne physique (nom de naissance, prénoms, nom d'usage) ou personne morale (dénomination, forme juridique).", true,
+                new MarcheEcran("Type et identité", "Le type et la civilité sont obligatoires ; la civilité décide de la nature. Personne physique : nom de naissance, prénoms et forme juridique obligatoires, et le nom d'usage pour « MME ». Personne morale : la dénomination. Un SIREN déjà connu du greffe refuse la création.", true,
                     ["Type de non-inscrit", "Civilité", "Nom de naissance", "Prénoms", "Nom d'usage", "Dénomination", "Forme juridique", "SIREN"]),
-                new MarcheEcran("Naissance", "Pour une personne physique : date, département, nationalité et pays de naissance. Le pays est la France par défaut.", false,
-                    ["Date de naissance", "Département", "Nationalité", "Pays de naissance"]),
-                new MarcheEcran("Adresse", "L'adresse est portée par l'établissement principal, créé si besoin. Le domicile se renseigne ici pour une personne physique.", true,
-                    ["Adresse", "Adresse de domicile", "Greffe (hors ressort)"]),
-                new MarcheEcran("Entreprise et établissements", "Une entreprise représentante est créée. Un second établissement est ajouté pour un type judiciaire ou une procédure collective.", false,
-                    ["Entreprise représentante", "Établissement secondaire"]),
-                new MarcheEcran("Enregistrement", "Le numéro de non-inscrit est attribué automatiquement pour l'année de travail. La demande prend le nom de la personne.", true,
-                    ["Numéro de non-inscrit"]),
+                new MarcheEcran("Naissance", "Pour une personne physique : date, département, nationalité et pays de naissance. Le pays est la France (FRA) par défaut.", false,
+                    [Champ.Date("Date de naissance"), "Département", "Nationalité", "Pays de naissance"]),
+                new MarcheEcran("Adresse", "L'adresse de l'établissement est obligatoire. Une entreprise représentante et l'établissement principal sont créés ; un type judiciaire (JUD) ou procédure collective (PCOL) a aussi un établissement « NQS ». Le numéro RGNI est donné pour l'année de la date de travail des non-inscrits.", true,
+                    ["Adresse", "Code postal", "Ville"]),
             ],
             Lignes =
             [
-                new LigneEcran("Mu Dorval", "Personne physique · judiciaire · naissance renseignée", "Personne physique", "Validee", [0, 1, 2, 4]),
-                new LigneEcran("Nu Lacroix", "Personne physique · procédure collective", "Personne physique", "Validee", [0, 2, 3, 4]),
-                new LigneEcran("Xi Pradel", "Personne physique · en saisie", "Personne physique", "EnCours", [0, 2]),
-                new LigneEcran("Omicron Vidal", "Personne physique · à saisir", "Personne physique", "AFaire", []),
-                new LigneEcran("Pi Services SARL", "Personne morale · créée", "Personne morale", "Validee", [0, 2, 3, 4]),
-                new LigneEcran("Rho Logistique SAS", "Personne morale · adresse à saisir", "Personne morale", "EnCours", [0]),
-                new LigneEcran("Sigma Transports", "Personne morale · à saisir", "Personne morale", "AFaire", []),
-                new LigneEcran("Tau Habitat SARL", "Personne morale · en saisie", "Personne morale", "EnCours", [0, 2]),
+                new LigneEcran("MR DORVAL Mu", "demande 2026DMD000101 · du 03/11/2026 · non-inscrit créé", "Personne physique", "Validee", [0, 2]),
+                new LigneEcran("MME LACROIX Nu", "demande 2026DMD000102 · du 05/11/2026 · non-inscrit créé", "Personne physique", "Validee", [0, 2]),
+                new LigneEcran("MR PRADEL Xi", "demande 2026DMD000103 · du 06/11/2026 · saisie interrompue", "Personne physique", "EnCours", [0]),
+                new LigneEcran("PI SERVICES", "demande 2026DMD000104 · du 07/11/2026 · non-inscrit créé", "Personne morale", "Validee", [0, 2]),
+                new LigneEcran("RHO LOGISTIQUE", "demande 2026DMD000105 · du 10/11/2026 · saisie interrompue", "Personne morale", "EnCours", [0]),
+                new LigneEcran("TAU HABITAT", "demande 2026DMD000106 · du 12/11/2026 · non-inscrit créé", "Personne morale", "Validee", [0, 2]),
             ],
         },
 
         new DescripteurEcran
         {
             Code = "PROC_GESTDATE", Titre = "Dates de travail", Sujet = "dates de travail",
-            Forme = FormeEcran.Referentiel,
+            Forme = FormeEcran.Referentiel, Ajout = false, Suppression = false,
             // Les dates ACTIVES de DATE_TRAVAIL (DateTravail.cs:48) et les champs de leur bloc V2 (OPE_DATE_TRAVAIL.cs:40-44). Lignes :
             // LecteurDatesTravail.cs ; gestes (Modifier seul, la V2 n'ajoute ni ne supprime) : EcrivainDatesTravail.cs. Groupes et etats :
             // le controle de la V2, pour WINS et DATW seulement (DoVerifier, l. 49-70).
@@ -338,38 +335,89 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         {
             Code = "PROC_GTABREF", Titre = "Tables de reference", Sujet = "codes de référence",
             Forme = FormeEcran.Referentiel,
-            // Colonnes : la valeur de la table, son code, sa table, son verrou (sections ci-dessous).
-            Colonnes = ["Libellé", "Code", "Table", Champ.Case("Verrou")],
+            // Les trois tables que RIG v2 ouvre (OPE_SELECTION_TABLE.cs:17-27 ; NATURE_AFFAIRE, CODE_ACTE_PROCE, JOURNAL_ANNONCES et
+            // JURIDICTION_EXTERIEURE y sont en commentaire), une par groupe, sous la description de leur CBO_TableRef (FactoryHelper.cs:66-109).
+            // Colonnes : la liste de la V2 (code, libelle, « (! Non saisissable) » : FactoryHelper.cs:4-9) et la table. Lignes :
+            // LecteurTablesReference.cs ; gestes (Modifier ; Ajouter un etat de PC, ou une zone avec ses champs ; Dupliquer un etat ou
+            // une zone ; Supprimer, refuse quand le code est cite) : EcrivainTablesReference.cs.
+            // fix-ok: mesure au banc le 27/11/2026 -- EcransGeneresBaseCheck « fautifs : Champs de la table > Régime… » (la fiche montrait
+            // des champs que les sections ne declaraient pas) et EcransGeneresCheck « 4 lignes de demonstration (6 a 15 attendues) » :
+            // une section par table, six exemples.
+            // fix-ok: mesure par le controle final du lot 14 (27/11/2026, reprise) -- la grille n'offrait ni « Ajouter une zone » ni
+            // « Dupliquer » (une ligne neuve n'envoyait que ses colonnes) : Duplication, SectionsAjout, et l'historique d'une zone a part.
+            // fix-ok: controle final du lot 14 (27/11/2026, 2e reprise) -- la fiche d'une zone montrait les sections des deux autres
+            // tables « Non lu », Modifier d'une zone ne prenait que libelle et case, et un type AJMJ offrait Supprimer / Dupliquer :
+            // SectionsParGroupe (le formulaire de chaque table) et GroupesModificationSeule (OPE_AFFICHE_REF_CFEC_AJMJ_TYPE_DEPOT.cs:31-33).
+            // fix-ok: controle final du lot 14 (27/11/2026, 3e reprise) -- un etat de PC refusait tous ses champs hors libelle et case,
+            // alors que seules les modalites AJ / PA recalculent (OPE_AFFICHE_SQLBASE_PC_ETAT.cs:112-114) : section « Champs d'un état
+            // de PC » typee (liste, cases) et saisie, ses regles dans EcrivainTablesReference.EtatAsync (banc PROC_GTABREF.gestes).
+            Colonnes = ["Code", "Libellé", "Table", Champ.Case("Utilisable en saisie")],
             Recherche = "Rechercher un code, un libellé, une table…",
             Criteres = ["Table", "Code", "Libellé"],
             // Bouton final cite par la fiche v2 : VALIDER (proc_gtabref.md, Detail OPE)
             Valider = "Valider",
             Rang = 7,
-            Etats = EtatsEcran.Trois("À compléter", "En cours", "Enregistré"),
-            Groupes = ["Procédures collectives", "Actes et natures", "Annonces et juridictions"],
+            Etats = EtatsEcran.Trois("Libellé à saisir", "Non saisissable", "Utilisable en saisie"),
+            Groupes = ["État de la procédure collective", "Zones à afficher selon l’état de la procédure collective", "Types des dépôts envoyés par les AJMJ"],
+            // « Dupliquer » (OPE_TABLE_REF_BUTTONS_BAR.cs:335, 355-370 ; SQLBase_Handler.Copie) et, pour une zone créée ou copiée
+            // dans son onglet, ses champs obligatoires (OPE_AFFICHE_SQLBASE_PC_ETAT_ZONE.Designer.cs:78-96).
+            Duplication = true,
+            SectionsAjout = new Dictionary<string, string[]> { ["Zones à afficher selon l’état de la procédure collective"] = ["Champs d'une zone"] },
+            // Le formulaire de chaque table sous sa ligne ouverte (« Enregistrement » est dans les colonnes) : ses champs modifiables
+            // dans RIG v2 s'y saisissent (une zone : tous, _PC_ETAT_ZONE.cs:75-95 ; un type AJMJ : l'evenement de procedure, :46).
+            SectionsParGroupe = new Dictionary<string, string[]>
+            {
+                ["État de la procédure collective"] = ["Champs d'un état de PC"],
+                ["Zones à afficher selon l’état de la procédure collective"] = ["Champs d'une zone", "Historique d'une zone"],
+                ["Types des dépôts envoyés par les AJMJ"] = ["Champs d'un type de dépôt"],
+            },
+            // RIG v2 cache NOUVEAU, SUPPRIMER et DUPLIQUER pour un type de depot AJMJ (OPE_AFFICHE_REF_CFEC_AJMJ_TYPE_DEPOT.cs:31-33).
+            GroupesModificationSeule = ["Types des dépôts envoyés par les AJMJ"],
             Sections =
             [
-                new MarcheEcran("Table", "Le code est choisi dans la table de référence voulue ; chaque table a ses propres champs.", true,
-                    ["Table"]),
-                new MarcheEcran("Code", "La clé (le code) ne peut pas être vide : elle sert de référence aux autres écrans.", true,
-                    ["Code"]),
-                new MarcheEcran("Libellé", "Le libellé et les champs propres à la table sont saisis ici.", true,
-                    ["Libellé", "Champs de la table"]),
-                new MarcheEcran("Copie et verrou", "Dupliquer recopie les champs, sauf ceux qui ne se dupliquent pas. Un enregistrement verrouillé par un autre poste ne se modifie pas.", false,
-                    ["Dupliquer", "Verrou"]),
-                new MarcheEcran("Enregistrement", "Enregistrer écrit le code ; la liste se rafraîchit.", true,
-                    ["Enregistrer"]),
+                new MarcheEcran("Enregistrement", "Le code ne se renomme pas (en saisir un autre ouvre son enregistrement dans RIG v2) ; le libellé et « Utilisable en saisie » se modifient (le libellé d'un type de dépôt AJMJ, par l'équipe Amitel seule). Un état de procédure collective se crée ici, une zone dans son onglet avec ses champs ; « Dupliquer » copie un état ou une zone sous un autre code ; un code cité ailleurs ne se supprime pas. Un type de dépôt AJMJ ne se crée, ne se copie ni ne se supprime : RIG v2 ne fait que le modifier.", true,
+                    ["Table", "Code", "Libellé", Champ.Case("Utilisable en saisie")]),
+                // Le formulaire d'un etat de PC (OPE_AFFICHE_SQLBASE_PC_ETAT.cs:64-82), sous sa ligne ouverte : la fiche dit quels champs se
+                // saisissent, EcrivainTablesReference.EtatAsync joue les regles de la V2 a chaque enregistrement (cases exclusives :89-108 ;
+                // resolution du plan et code cloture :135-161 ; « A sauver » :116-119 ; regime : la liste eTableRefModaliteRegime, :39-44).
+                // En lecture : les modalites AJ et PA (les changer recalcule les decisions et la saisie rattachees : Modalite_Changed,
+                // :111-114 -> _PC_ETAT_DJ_EP.cs:393-401, _PC_ETAT_SAISIE.cs:706-714, que la grille ne porte pas), le regime des statistiques
+                // (equipe Amitel, :52-55) et le code processus (liste PROCESSUS_ET_FONCTIONALITE absente de la base V3).
+                new MarcheEcran("Champs d'un état de PC", "Le formulaire d'un état de procédure collective (OPE_AFFICHE_SQLBASE_PC_ETAT.cs:64-82), avec ses règles : ouverture, clôture, conversion et extension s'excluent (en cocher une décoche les autres) ; « Résolution du plan » ne se montre que sur un état d'ouverture et se décoche avec elle ; le code clôture ne se montre que sur résolution du plan, y est obligatoire et se vide sans elle ; « À sauver » est bloqué quand « Mise à jour de la PC » est cochée. En lecture : les modalités (les changer recalcule dans RIG v2 les décisions et la saisie rattachées à l'état), le régime des statistiques (équipe Amitel) et le code procédure (sa liste n'est pas dans la base V3).", false,
+                    [Champ.Liste("Régime", "Général", "Simplifié facultatif", "Simplifié obligatoire"), "Modalité PA", "Modalité AJ",
+                     // Les quatre cases s'excluent AU CLIC, comme dans la V2 (:89-108) : chacune decoche les trois autres.
+                     Champ.Case("Ouverture") with { Exclut = ["Clôture", "Conversion LJ", "Extension"] },
+                     Champ.Case("Clôture") with { Exclut = ["Ouverture", "Conversion LJ", "Extension"] },
+                     Champ.Case("Conversion LJ") with { Exclut = ["Ouverture", "Clôture", "Extension"] },
+                     Champ.Case("Extension") with { Exclut = ["Ouverture", "Clôture", "Conversion LJ"] },
+                     // Montres et bloques comme dans la V2 : « Résolution du plan » avec « Ouverture » (:135-142), « Code clôture » avec
+                     // « Résolution du plan » (:149-156), « À sauver » bloque sous « Mise à jour de la PC » (:116-119).
+                     Champ.Case("Résolution du plan") with { VisibleSi = "Ouverture" }, Champ.Texte("Code clôture") with { VisibleSi = "Résolution du plan" },
+                     Champ.Case("Mise à jour de la PC"), Champ.Case("À sauver") with { BloqueSi = "Mise à jour de la PC" }, Champ.Case("Audience future"), "Régime PC (statistiques)", "Code procédure"]),
+                // Saisis a la creation et a la copie d'une zone (SectionsAjout), lus ensuite : synonyme, ISO, simplifie et developpe,
+                // table, attribut, type et etat sont obligatoires ; le type et l'etat, les listes de RIG v2 (_ChargerComboTypes,
+                // OPE_AFFICHE_SQLBASE_PC_ETAT_ZONE.cs:48-55 ; _ChargerComboEtats, SousOPE_HISTORIQUE.cs:39-47).
+                new MarcheEcran("Champs d'une zone", "Le formulaire d'une zone (OPE_AFFICHE_SQLBASE_PC_ETAT_ZONE.cs:75-95) : saisi quand la zone se crée, se copie ou se modifie (synonyme, ISO, textes simplifié et développé, table, attribut, type et état obligatoires ; une table et un attribut déjà portés par une autre zone sont refusés).", false,
+                    ["Synonyme", "ISO", "Abrégé pour édition", "Simplifié pour édition", Champ.Zone("Développé pour édition"), Champ.Zone("Exhaustif pour édition"),
+                     "Table de la zone", "Attribut", Champ.Liste("Type", "DATE", "DATETIME", "HEURE", "INT", "TEXT", "MULTILIGNE", "MONTANT"),
+                     Champ.Liste("État", "En test", "En vigueur pour tout", "En vigueur si maj après création", "Applicable si maj avant archivage", "Inactif"),
+                     Champ.Date("Date de désactivation")]),
+                new MarcheEcran("Historique d'une zone", "La création et la dernière modification d'une zone (SousOPE_HISTORIQUE), posées par RIG.", false,
+                    ["Création", "Modification"]),
+                // L'evenement de procedure se modifie (lie l. 46), facultatif (MetierObligatoire force a faux, l. 27-28), parmi les codes
+                // avec depot PC (MetierDepotPcObligatoire, .Designer.cs:98 -> ULT_COMBO_CODE_EVE_PRO.cs:79) ; creation et modification
+                // se lisent.
+                new MarcheEcran("Champs d'un type de dépôt", "Le formulaire d'un type de dépôt AJMJ (OPE_AFFICHE_SQLBASE_DEMAT_CFEC_AJMJ_TYPE_DEPOT.cs:44-52) : l'évènement de procédure se modifie (facultatif, un code avec dépôt PC) ; la création et la modification se lisent.", false,
+                    ["Évènement de procédure", "Création", "Modification"]),
             ],
             Lignes =
             [
-                new LigneEcran("État « ouvert »", "Procédures collectives · code 01", "Procédures collectives", "Validee", [0, 1, 2, 4]),
-                new LigneEcran("État « clôturé »", "Procédures collectives · code 02", "Procédures collectives", "Validee", [0, 1, 2, 4]),
-                new LigneEcran("État « en attente »", "Procédures collectives · libellé à saisir", "Procédures collectives", "EnCours", [0, 1]),
-                new LigneEcran("Nature « jugement »", "Actes et natures · copie en cours", "Actes et natures", "EnCours", [0, 1, 2]),
-                new LigneEcran("Nature « ordonnance »", "Actes et natures · à compléter", "Actes et natures", "AFaire", []),
-                new LigneEcran("Journal d'annonces légales", "Annonces et juridictions · enregistré", "Annonces et juridictions", "Validee", [0, 1, 2, 4]),
-                new LigneEcran("Juridiction extérieure", "Annonces et juridictions · verrouillée par un autre poste", "Annonces et juridictions", "EnCours", [0]),
-                new LigneEcran("Juridiction de référé", "Annonces et juridictions · à compléter", "Annonces et juridictions", "AFaire", []),
+                new LigneEcran("Ouverture redressement judiciaire", "code ORJ · PC_ETAT", "État de la procédure collective", "Validee", []) { Valeurs = ["ORJ", "Ouverture redressement judiciaire", "PC_ETAT", "oui"] },
+                new LigneEcran("Liquidation judiciaire", "code LJ · PC_ETAT", "État de la procédure collective", "Validee", []) { Valeurs = ["LJ", "Liquidation judiciaire", "PC_ETAT", "oui"] },
+                new LigneEcran("(! Non saisissable) Ancien état", "code ANC · PC_ETAT · non saisissable", "État de la procédure collective", "EnCours", []) { Valeurs = ["ANC", "Ancien état", "PC_ETAT", "non"] },
+                new LigneEcran("Date du jugement", "code DJ · PC_ETAT_ZONE", "Zones à afficher selon l’état de la procédure collective", "Validee", []) { Valeurs = ["DJ", "Date du jugement", "PC_ETAT_ZONE", "oui"] },
+                new LigneEcran("Date de cessation des paiements", "code DCP · PC_ETAT_ZONE", "Zones à afficher selon l’état de la procédure collective", "Validee", []) { Valeurs = ["DCP", "Date de cessation des paiements", "PC_ETAT_ZONE", "oui"] },
+                new LigneEcran("Rapport du mandataire", "code RAP · TYPE_DEPOT_AJMJ", "Types des dépôts envoyés par les AJMJ", "Validee", []) { Valeurs = ["RAP", "Rapport du mandataire", "TYPE_DEPOT_AJMJ", "oui"] },
             ],
         },
 
@@ -411,7 +459,7 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_CABINET", Titre = "Cabinets", Sujet = "cabinets",
-            Forme = FormeEcran.Referentiel,
+            Forme = FormeEcran.Referentiel, Suppression = false,
             // Les cabinets : AUDIENCE_CABINET hors audiences (AUDNC_AUDIENCE = 0, AudienceCabinet.cs:1280) et les champs de la saisie V2
             // (OPE_CREATION_CABINET.cs:25-30). Lignes : LecteurCabinets.cs ; gestes (Ajouter, Modifier ; la V2 ne supprime pas de cabinet) :
             // EcrivainCabinets.cs. Groupes : la date du cabinet contre le jour (la frontiere des invitations, l. 148).
@@ -450,7 +498,9 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             Code = "PROC_PARAM_IP", Titre = "Codes chefs IP", Sujet = "codes chefs",
             Forme = FormeEcran.Referentiel,
             // Colonnes de la liste V2 (OPE_PARAM_IP.cs:11-18) et le rang du code (RigListViewUpDown). Lignes : LecteurCodesChefsIp.cs
-            // (le reglage PARAMETRAGE IP_CODE_CHEF) ; gestes : EcrivainCodesChefsIp.cs.
+            // (le reglage IP_CODE_CHEF de PARAMETRAGE, repris dans soc.Reglage : ReprisesPhase1.cs:86). AUCUN ecrivain : les gestes
+            // des ecrans generes n'ecrivent que v2.* et rec.* (EcrivainEcran.cs, point 3), et soc.Reglage n'en est pas ; Ajouter,
+            // Modifier et Supprimer disent donc « Demonstration ». La raison est en tete de LecteurCodesChefsIp.cs.
             Colonnes = ["Code chef", "Libellé", Champ.Nombre("Ordre")],
             Recherche = "Rechercher un code chef…",
             Criteres = ["Code chef", "Libellé"],

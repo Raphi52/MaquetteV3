@@ -19,8 +19,16 @@
 // des vues = jeux de criteres (statut, type) dont « + Nouvelle vue » pour la session, une ligne par client
 // (avatar, nom, abrege · compte ; statut en point, type en pastille), pied de totaux. Les autres criteres de gauche
 // et le clic qui remonte l'abrege ne changent pas. Aucun montant dans cette liste : pas de carte en euros.
+//
+// BRANCHE SUR LA BASE (plan « RIG v3 100 % fonctionnel », lot 14, 27/11/2026) : les clients viennent du pont
+// (Pont/EcranClientsBase.cs) -- les clients en compte de la base du greffe, groupe, statut et type de RIG v2
+// (Serveur/Socle/EcransMain/LectureClients.cs, OPE_CRITERES et DgvRow.GetTypeClient cites) ; les criteres et les vues les filtrent
+// ici, comme ceux de RIG v2. L'ecran n'ecrit rien. Sans serveur, les clients d'exemple ci-dessous, marques ; en panne, le motif.
+// check: branchement neuf (lot 14), pas un correctif -- remplacements cibles, prouves par EcranClients.test.tsx (vitest).
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { appeler } from '../pont'
+import { ProvenanceEcran, type ModeLecture } from '../provenance'
 import { contientSansCasse, estBlanc } from '../criteres'
 import {
   CartesChiffrees, CelluleIdentite, EnteteListe, ListeModerne, Pastille, PiedListe, PointEtat, VuesListe, useVuesDeSession, type Teinte, type VueEnregistree,
@@ -43,7 +51,19 @@ const Types = ['En compte', 'Greffe', 'Prevention', 'PC', 'Web']
 const TeinteStatut: Record<string, Teinte> = { Actif: 'vert', Bloque: 'rouge', 'En sommeil': 'gris' }
 const TeinteType: Record<string, Teinte> = { 'En compte': 'bleu', Greffe: 'ardoise', Prevention: 'violet', PC: 'orange', Web: 'vert' }
 
-const Clients: ClientRcs[] = [
+/** Ce que rend le pont (Pont/EcranClientsBase.cs, VueClients). */
+export interface VueClients {
+  mode: ModeLecture
+  message: string | null
+  clients: ClientRcs[]
+  total: number
+}
+
+/** La liste du pont : la base, les exemples sans serveur, rien en panne ou avant la reponse. */
+export const clientsDe = (vue: VueClients | null): ClientRcs[] =>
+  vue === null ? [] : vue.mode === 'serveur' ? vue.clients : vue.mode === 'demo' ? ExemplesClients : []
+
+export const ExemplesClients: ClientRcs[] = [
   { id: 1042, compte: 'C-000142', abrege: 'LEROY', nom: 'SELARL LEROY & ASSOCIES', groupe: 'Mandataires', statut: 'Actif', type: 'En compte' },
   { id: 1088, compte: 'C-000188', abrege: 'BLANC', nom: 'CABINET BLANC', groupe: 'Mandataires', statut: 'Actif', type: 'En compte' },
   { id: 1130, compte: 'C-000231', abrege: 'DUPONT', nom: 'SCP DUPONT-MARTIN', groupe: 'Avocats', statut: 'Bloque', type: 'En compte' },
@@ -73,7 +93,7 @@ export interface CriteresClients {
 const SansCritere: CriteresClients = { motCle: '', statuts: new Set(), types: new Set() }
 
 /** Les clients qui repondent aux criteres (le filtre de l'ecran, inchange). */
-function filtrer({ motCle, statuts, types }: CriteresClients): ClientRcs[] {
+function filtrer(Clients: ClientRcs[], { motCle, statuts, types }: CriteresClients): ClientRcs[] {
   let trouves = Clients
   if (!estBlanc(motCle)) {
     const t = motCle.trim()
@@ -102,6 +122,15 @@ export function EcranClients({ selectionner }: ProprietesEcranClients) {
   const [critTypes, setCritTypes] = useState<ReadonlySet<string>>(new Set())
   const criteres: CriteresClients = { motCle, statuts: critStatuts, types: critTypes }
 
+  // La vue du pont : null tant qu'il n'a pas repondu (aucun client).
+  const [vue, setVue] = useState<VueClients | null>(null)
+  useEffect(() => {
+    let perime = false
+    void appeler<VueClients>('EcranClients.Clients').then((v) => { if (!perime) setVue(v) })
+    return () => { perime = true }
+  }, [])
+  const Clients = clientsDe(vue)
+
   function poserCriteres(c: CriteresClients) {
     setMotCle(c.motCle)
     setCritStatuts(new Set(c.statuts))
@@ -112,7 +141,7 @@ export function EcranClients({ selectionner }: ProprietesEcranClients) {
     poserCriteres(SansCritere)
   }
 
-  const trouves = filtrer(criteres)
+  const trouves = filtrer(Clients, criteres)
 
   const { vues, active: vueActive, enregistrer: enregistrerVue } = useVuesDeSession('Clients', VuesPrereglees, criteres, memesCriteres)
 
@@ -123,6 +152,13 @@ export function EcranClients({ selectionner }: ProprietesEcranClients) {
     <div className="rig-proc__corps">
 
       <aside className="rig-criteres">
+        <ProvenanceEcran mode={vue?.mode} message={vue?.message} quoi="Clients" />
+        {/* La liste lue est coupee au plafond du serveur (LectureClients.Plafond) : le dire, la recherche ne porte que sur elle. */}
+        {vue?.mode === 'serveur' && vue.total > vue.clients.length && (
+          <p className="rig-eg-note" role="note">
+            Les {vue.clients.length} premiers clients (par abrégé) sur {vue.total} dans la base du greffe : la recherche et les vues ne portent que sur eux.
+          </p>
+        )}
         <div className="rig-kicker" style={{ marginBottom: 'var(--rig-esp-3)' }}>Criteres de recherche</div>
 
         <div className="rig-criteres__bloc">
@@ -173,7 +209,7 @@ export function EcranClients({ selectionner }: ProprietesEcranClients) {
             })) },
         ]} />
 
-        <VuesListe vues={vues.map((v) => ({ cle: v.cle, libelle: v.libelle, compte: filtrer(v.criteres).length }))} active={vueActive}
+        <VuesListe vues={vues.map((v) => ({ cle: v.cle, libelle: v.libelle, compte: filtrer(Clients, v.criteres).length }))} active={vueActive}
                    choisir={(cle) => { const v = vues.find((x) => x.cle === cle); if (v) poserCriteres(v.criteres) }}
                    enregistrer={enregistrerVue} />
 

@@ -83,6 +83,17 @@ internal sealed class ModuleEcransMain : IModuleServeur
         routes.MapGet(RoutesDocDemat.Pieces, (string greffe, CatalogueGreffes c, CancellationToken ct)
             => SurLaBase(c, greffe, ct, async cn => Results.Ok(await LectureDocDemat.LireAsync(cn, ct))))
             .RequireAuthorization(PolitiquesSocle.AgentAdmis);
+        // Lot 12 : « Gestion des banques » (LectureBanques.cs).
+        routes.MapGet(RoutesBanques.Banques, (string greffe, CatalogueGreffes c, CancellationToken ct)
+            => SurLaBase(c, greffe, ct, async cn => Results.Ok(await LectureBanques.LireAsync(cn, ct))))
+            .RequireAuthorization(PolitiquesSocle.AgentAdmis);
+        // Lot 12 : « Encaissements » et « Factures » ouverts pour un dossier (LectureEncaissements.cs, LectureFactures.cs).
+        routes.MapGet(RoutesEncaissements.Depart, (string greffe, string dossier, CatalogueGreffes c, CancellationToken ct)
+            => SurLaBase(c, greffe, ct, async cn => Results.Ok(await LectureEncaissements.LireAsync(cn, dossier, DateTime.Now, ct))))
+            .RequireAuthorization(PolitiquesSocle.AgentAdmis);
+        routes.MapGet(RoutesFactures.Demande, (string greffe, string dossier, CatalogueGreffes c, CancellationToken ct)
+            => SurLaBase(c, greffe, ct, async cn => Results.Ok(new DemandeDuDossierLue(await LectureFactures.LireAsync(cn, dossier, DateTime.Now, ct)))))
+            .RequireAuthorization(PolitiquesSocle.AgentAdmis);
         // Lot 9 : « Statistiques » (LectureStatistiques.cs), les volets de RIG v2 calcules dans la base.
         routes.MapPost(RoutesStatistiques.Statistiques, (string greffe, RechercheStatistiques recherche, CatalogueGreffes c, CancellationToken ct)
             => SurLaBase(c, greffe, ct, async cn => Results.Ok(await LectureStatistiques.LireAsync(cn, recherche, ct))))
@@ -117,6 +128,21 @@ internal sealed class ModuleEcransMain : IModuleServeur
             => SurLaBase(c, greffe, ct, async cn => await droits.AppelantAsync(http, commune, cn, ct) is { } moi
                 ? Results.Ok(await LectureParametresAccueil.LireAsync(cn, moi.Id, moi.EstAdministrateur, moi.EstAmitel, ct))
                 : Results.Json(new { motif = "Agent inconnu dans la base de ce greffe." }, statusCode: StatusCodes.Status403Forbidden)))
+            .RequireAuthorization(PolitiquesSocle.AgentAdmis);
+        // Lot 14 : Acteurs, Experts, Clients et la fiche d'un client (LectureActeurs/Experts/Clients.cs).
+        routes.MapGet(RoutesActeurs.Acteurs, (string greffe, CatalogueGreffes c, CancellationToken ct)
+            => SurLaBase(c, greffe, ct, async cn => Results.Ok(await LectureActeurs.LireAsync(cn, ct))))
+            .RequireAuthorization(PolitiquesSocle.AgentAdmis);
+        routes.MapGet(RoutesExperts.Experts, (string greffe, CatalogueGreffes c, CancellationToken ct)
+            => SurLaBase(c, greffe, ct, async cn => Results.Ok(await LectureExperts.LireAsync(cn, ct))))
+            .RequireAuthorization(PolitiquesSocle.AgentAdmis);
+        routes.MapGet(RoutesClients.Clients, (string greffe, CatalogueGreffes c, CancellationToken ct)
+            => SurLaBase(c, greffe, ct, async cn => Results.Ok(await LectureClients.LireAsync(cn, ct))))
+            .RequireAuthorization(PolitiquesSocle.AgentAdmis);
+        routes.MapGet(RoutesClients.Fiche, (string greffe, int id, CatalogueGreffes c, CancellationToken ct)
+            => SurLaBase(c, greffe, ct, async cn => await LectureClients.FicheAsync(cn, id, ct) is { } fiche
+                ? Results.Ok(fiche)
+                : Results.Json(new { motif = $"Client {id} introuvable dans la base de ce greffe." }, statusCode: StatusCodes.Status404NotFound)))
             .RequireAuthorization(PolitiquesSocle.AgentAdmis);
     }
 

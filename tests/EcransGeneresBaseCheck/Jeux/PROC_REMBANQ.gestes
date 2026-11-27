@@ -1,0 +1,66 @@
+# Les gestes de EcrivainRemiseEnBanque (« Remise en banque », PROC_REMBANQ), joues dans l'ordre par la route POST, sur les lignes de
+# PROC_REMBANQ.sql. Format : en tete de tests/EcransGeneresBaseCheck/Program.cs. Chaque refus a son jumeau accepte.
+# 1. Aucun encaissement coche (OPE_ACTIONS.cs:102). Jumeau accepte : bloc 3.
+geste: Agir Générer un bordereau
+resultat: refuse
+message: Attenttion, aucun encaissement n'a été coché !
+---
+# 2. Un encaissement du mois precedent (2201013) avec un du mois (OPE_ACTIONS.cs:170). Jumeau accepte : bloc 3 (que des encaissements du mois).
+geste: Agir Générer un bordereau
+ids: 2201001,2201013
+resultat: refuse
+message: L'utilisation de la comptabilité de trésorerie ne vous permet pas de mettre des encaissements de mois différents sur le même remis. Veuillez faire un remis par mois.
+---
+# 3. Le bordereau definitif (RemiseEnBanque.cs:89-235) : MAX(ENCMT_REMIS) = 42 (PROC_REMBANQ.sql ; 12 dans PROC_RECHENC.sql), tri
+# par banque puis mode : L12CB d'abord -> remis 43 (2201003), L12ESP -> remis 44 (2201001, 2201002), un numero par mode (:171-174),
+# la banque du mode posee (:224). 2201004 (mode sans banque) est ecarte par le INNER JOIN de la V2 : il reste a remettre.
+geste: Agir Générer un bordereau
+ids: 2201003,2201001,2201002,2201004
+resultat: fait
+message: 3 encaissements remis en banque dans la base du greffe : remis n° 43, n° 44 ; le bordereau imprimé (état de la V2) n'est pas produit par la V3. Laissé à remettre, faute de banque pour son mode de paiement : n° 2201004.
+# L'encaissement INPI du jour (PROC_INPIPAY.gestes bloc 15, « Valider » d'un fichier de reversements, mode L12VICB utilisable en saisie,
+# date vide = maintenant) est un encaissement de la journee comme un autre : la remise le liste, a remettre (sans banque pour son mode).
+lignes:
+Encaissement R12TPE04 | Terminal sans banque (banc 12) · 33,33 € · le {J+0} · PAYEUR R12D · à remettre | Encaissements de la période | AFaire | []
+Encaissement VIR12-001-REFERENCE-BANCAIRE-TRE | Virement INPI (banc 12) · 245,50 € · le {J+0} · INPI · à remettre | Encaissements de la période | AFaire | []
+Encaissement R12CB03 | Carte (banc 12) · 45,00 € · le {J+0} · PAYEUR R12C · remis n° 43 | Encaissements de la période | EnCours | [] | valeurs: Encaissement R12CB03 ; Carte (banc 12) ; 45.00 ; 43
+Encaissement R12CB09 | Carte (banc 12) · 200,00 € · le {J+0} · PAYEUR R12I · remis n° 41 | Encaissements de la période | EnCours | [] | valeurs: Encaissement R12CB09 ; Carte (banc 12) ; 200.00 ; 41
+Encaissement R12CB10 | Carte (banc 12) · 300,00 € · le {J+0} · PAYEUR R12J · remis n° 42 | Encaissements de la période | Validee | [] | valeurs: Encaissement R12CB10 ; Carte (banc 12) ; 300.00 ; 42
+Encaissement R12ESP01 | Espèces (banc 12) · 120,50 € · le {J+0} · PAYEUR R12A · remis n° 44 | Encaissements de la période | EnCours | [] | valeurs: Encaissement R12ESP01 ; Espèces (banc 12) ; 120.50 ; 44
+Encaissement R12ESP02 | Espèces (banc 12) · 79,50 € · le {J+0} · PAYEUR R12B · remis n° 44 | Encaissements de la période | EnCours | [] | valeurs: Encaissement R12ESP02 ; Espèces (banc 12) ; 79.50 ; 44
+controle: SELECT CAST(SUM(ENCMT_MONTANT) AS decimal(19,2)) FROM v2.ENCAISSEMENT WHERE ENCMT_REMIS = 44 AND ENCMT_ID_BANQU = 2201901 => 200.00
+controle: SELECT COUNT(*) FROM v2.ENCAISSEMENT WHERE ENCMT_REMIS = 43 AND ENCMT_ID_BANQU = 2201901 AND ENCMT_ID_ENCMT = 2201003 => 1
+controle: SELECT COUNT(*) FROM v2.ENCAISSEMENT WHERE ENCMT_ID_ENCMT = 2201004 AND ENCMT_REMIS IS NULL AND ENCMT_ID_BANQU IS NULL => 1
+---
+# 4. Les memes encaissements, deja remis : rien a remettre (la V2 ne les montre plus). Jumeau accepte : bloc 3.
+geste: Agir Générer un bordereau
+ids: 2201001,2201002
+resultat: refuse
+message: Attenttion, aucun encaissement n'a été coché !
+---
+# 5. Annuler le remis 42, comptabilise (OPE_ACTIONS.cs:279). Jumeau accepte : bloc 7 (remis 44, non comptabilise).
+geste: Agir Annuler le remis
+ids: 2201010
+resultat: refuse
+message: Description du problème : le remis n°42 est déjà comptabilisé
+---
+# 6. Annuler sur un encaissement sans remis (OPE_ACTIONS.cs:283). Jumeau accepte : bloc 7.
+geste: Agir Annuler le remis
+ids: 2201004
+resultat: refuse
+message: Veuillez entrer un numéro de remis
+---
+# 7. Annuler le remis 44 par une de ses lignes : TOUT le remis non comptabilise est detache (OPE_ACTIONS.cs:203-204), 2201002 compris.
+geste: Agir Annuler le remis
+ids: 2201001
+resultat: fait
+message: Traitement terminé. Le remis n°44 a été annulé. Encaissements de nouveau à remettre : n° 2201001, 2201002.
+lignes:
+Encaissement R12ESP01 | Espèces (banc 12) · 120,50 € · le {J+0} · PAYEUR R12A · à remettre | Encaissements de la période | AFaire | []
+Encaissement R12ESP02 | Espèces (banc 12) · 79,50 € · le {J+0} · PAYEUR R12B · à remettre | Encaissements de la période | AFaire | []
+Encaissement R12TPE04 | Terminal sans banque (banc 12) · 33,33 € · le {J+0} · PAYEUR R12D · à remettre | Encaissements de la période | AFaire | []
+Encaissement VIR12-001-REFERENCE-BANCAIRE-TRE | Virement INPI (banc 12) · 245,50 € · le {J+0} · INPI · à remettre | Encaissements de la période | AFaire | []
+Encaissement R12CB03 | Carte (banc 12) · 45,00 € · le {J+0} · PAYEUR R12C · remis n° 43 | Encaissements de la période | EnCours | []
+Encaissement R12CB09 | Carte (banc 12) · 200,00 € · le {J+0} · PAYEUR R12I · remis n° 41 | Encaissements de la période | EnCours | []
+Encaissement R12CB10 | Carte (banc 12) · 300,00 € · le {J+0} · PAYEUR R12J · remis n° 42 | Encaissements de la période | Validee | []
+controle: SELECT COUNT(*) FROM v2.ENCAISSEMENT WHERE ENCMT_REMIS = 44 OR (ENCMT_ID_ENCMT IN (2201001, 2201002) AND ENCMT_ID_BANQU IS NOT NULL) => 0

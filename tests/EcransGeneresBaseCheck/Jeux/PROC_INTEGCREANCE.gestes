@@ -1,0 +1,34 @@
+# Les gestes de EcrivainIntegrationCreances (« Intégrer des créances », PROC_INTEGCREANCE), sur les lignes de PROC_ADDCREANCE.sql,
+# APRES PROC_ADDCREANCE.gestes (la PC 2202001 a alors deux creances PC). Chaque refus a son jumeau accepte : bloc 3.
+# 1. Rien de coche.
+geste: Agir Intégrer les créances sélectionnées
+resultat: refuse
+message: Aucune créance cochée : rien n'est intégré.
+---
+# 2. Une contestation seule : sautee (une instance dans RIG v2), rien d'integre ni d'erreur ecrite -> refus, rien d'ecrit.
+geste: Agir Intégrer les créances sélectionnées
+ids: 2202104
+resultat: refuse
+message: Aucune créance intégrée : CREANCIER CONTESTE D : Une contestation de créance : RIG v2 crée alors une instance (numéro de rôle, parties, décision, événements), que la V3 ne crée pas encore. Rien n'est enregistré.
+---
+# 3. Quatre creances, dans l'ordre des identifiants (IntegrationCreances.cs:107) : 2202102 s'integre (creance n° 3 de la PC, creancier
+# 2202304, creance PC 2202204) ; 2202103 et 2202107 echouent « PC absente en base », erreur ECRITE sur la transitoire (la V2 continue,
+# :111-516) ; 2202104 (contestation) est sautee et nommee.
+geste: Agir Intégrer les créances sélectionnées
+ids: 2202104,2202102,2202103,2202107
+resultat: fait
+message: 1 créance intégrée dans la base du greffe : CREANCIER ATTENTE B (créance n° 3 de la PC L12PC0001) ; 2 créances en erreur : CREANCIER ERREUR C : PC absente en base, la créance transitoire n° 2202107 : PC absente en base. Non intégrées par la V3 : CREANCIER CONTESTE D : Une contestation de créance : RIG v2 crée alors une instance (numéro de rôle, parties, décision, événements), que la V3 ne crée pas encore. Rien n'est enregistré.
+lignes:
+CREANCIER CONTESTE D | PC L12PC0001 · aucun montant admis · rejeté 500,00 € · saisie le {J-1} · à intégrer | Contestations | AFaire | []
+CREANCIER ERREUR C | PC L12PCXXXX · admis 10,00 € · saisie le {J-2} · erreur : PC absente en base | Admissions | EnCours | []
+CREANCIER ANCIEN E | PC L12PC0002 · admis 300,00 € · saisie le {J-2} · à intégrer | Admissions | AFaire | []
+Créance transitoire n° 2202107 | sans PC · aucun montant admis · saisie le {J-4} · erreur : PC absente en base | Admissions | EnCours | []
+controle: SELECT CAST(CRNPC_ADMIS_CHIRO_ECHU AS decimal(19,2)) FROM v2.CREANCE_PC WHERE CRNPC_ID_CRNPC = 2202204 AND CRNPC_ID_PRCLL = 2202001 AND CRNPC_NUM_ORDRE = 3 AND CRNPC_NATURE_CREANCE_ADM = 'Prêt' => 250.75
+controle: SELECT CRTRA_NATURE_ERREUR FROM v2.CREANCE_TRANSITOIRE WHERE CRTRA_ID_CRTRA = 2202107 => PC absente en base
+controle: SELECT COUNT(*) FROM v2.CREANCE_TRANSITOIRE WHERE CRTRA_ID_CRTRA = 2202102 AND CRTRA_DATE_INSERTION_RIG IS NOT NULL => 1
+---
+# 4. L'admission sur la PC de 2005 : sautee (une instance dans RIG v2) -> refus, rien d'ecrit. Jumeau accepte : bloc 3.
+geste: Agir Intégrer les créances sélectionnées
+ids: 2202106
+resultat: refuse
+message: Aucune créance intégrée : CREANCIER ANCIEN E : Une admission sur la PC L12PC0002, ouverte avant le 15/02/2009 (sans avis d'admission) : RIG v2 crée alors une instance (numéro de rôle, parties, décision, événements), que la V3 ne crée pas encore. Rien n'est enregistré.

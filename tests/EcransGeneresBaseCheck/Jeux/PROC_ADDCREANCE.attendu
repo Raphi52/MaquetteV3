@@ -1,0 +1,11 @@
+# « Ajouter une créance » (LecteurAjoutCreance) sur PROC_ADDCREANCE.sql : toutes les creances transitoires, les plus recentes
+# d'abord. Etapes (en tete du lecteur) : 0 PC, 1 creancier, 2 mode (contestation ou defaut), 3 montants, 4 nature ou observations,
+# 5 date de l'acte, 6 integree. Etat : aucune -> AFaire ; 0, 1, 3 et 6 -> Validee ; sinon EnCours. Pas de filtre : rien d'ecarte.
+CREANCIER CONTESTE D | PC L12PC0001 · aucun montant admis · rejeté 500,00 € · saisie le {J-1} · à intégrer | Contestation | EnCours | [0,1,2,3,5]
+CREANCIER ERREUR C | PC L12PCXXXX · admis 10,00 € · saisie le {J-2} · erreur : PC absente en base | Admission | EnCours | [0,1,3]
+CREANCIER ATTENTE B | PC L12PC0001 · admis 250,75 € · saisie le {J-2} · à intégrer | Admission | EnCours | [0,1,3,4]
+CREANCIER ANCIEN E | PC L12PC0002 · admis 300,00 € · saisie le {J-2} · à intégrer | Admission | EnCours | [0,1,3]
+CREANCIER INTEGRE A | PC L12PC0001 · admis 1 000,00 € · saisie le {J-3} · intégrée le {J-3} | Admission | Validee | [0,1,3,6]
+Créance transitoire n° 2202107 | sans PC · aucun montant admis · saisie le {J-4} · à intégrer | Admission | AFaire | []
+# La creance transitoire du lot 14 (PROC_RAPPACTEUR.sql : le doublon d'un mandataire, integree, sans PC) : cet ecran les lit toutes.
+Créance transitoire n° 2400901 | sans PC · aucun montant admis · saisie le 01/01/2000 · intégrée le 02/01/2000 | Admission | EnCours | [6]

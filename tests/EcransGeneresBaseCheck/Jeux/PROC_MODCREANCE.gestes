@@ -1,0 +1,44 @@
+# Les gestes de EcrivainModificationCreance (« Modifier une créance », PROC_MODCREANCE), APRES PROC_ADDCREANCE.gestes (creance PC
+# 2202203 ajoutee, n° 2 de la PC L12PC0001) et PROC_INTEGCREANCE.gestes (2202204, n° 3). Chaque refus a son jumeau accepte : bloc 3.
+# 1. La PC tenue par la demande 2202401 en cours (PROC_MODCREANCE.cs:56-60 ; VerrouDemandeV2).
+geste: Enregistrer
+ids: 2202202
+valeur: Montants admis › Chirographaire échu = 80
+resultat: refuse
+message: Procédure collective bloquée (26220000401), demande "En cours" : MODCREA par VERROU AGENT
+---
+# 2. Un montant illisible (la cellule montant de la V2 ne l'accepte pas).
+geste: Enregistrer
+ids: 2202203
+valeur: Montants admis › Privilégié échu = abc
+resultat: refuse
+message: « Montants admis › Privilégié échu » : montant illisible (abc).
+---
+# 3. La creance AJOUTEE par PROC_ADDCREANCE.gestes, modifiee : privilegie echu 1 234,56 -> 1 300,00, rejete pose a 34,56 ; seules ces
+# deux colonnes changent (colsMontants_ChangementValeur, puis CreancePC.Sauve).
+geste: Enregistrer
+ids: 2202203
+valeur: Montants admis › Privilégié échu = 1 300,00
+valeur: Montants admis › Rejeté = 34,56
+resultat: fait
+message: Créance n° 2 de la PC L12PC0001 enregistrée dans la base du greffe : Privilégié échu 1 300,00 €, Rejeté 34,56 €.
+lignes:
+PC L12PC0003, créance n° 1 | CREANCIER VERROU F · PC VERROUILLEE GAMMA · admis 75,50 € · verrouillée par une autre demande | Admissions | EnAttente | []
+PC L12PC0001, créance n° 1 | CREANCIER INTEGRE A · PC CREANCES ALPHA · admis 1 000,00 € | Admissions | AFaire | []
+PC L12PC0001, créance n° 2 | CREANCIER AJOUT G · PC CREANCES ALPHA · admis 1 400,10 € · rejeté 34,56 € | Admissions | AFaire | []
+PC L12PC0001, créance n° 3 | CREANCIER ATTENTE B · PC CREANCES ALPHA · admis 250,75 € | Admissions | AFaire | []
+fiche: 2202203
+Montants admis › Privilégié échu = 1300.00
+Montants admis › Chirographaire échu = 100.10
+Montants admis › Rejeté = 34.56
+Créance › Créancier = CREANCIER AJOUT G
+controle: SELECT CAST(CRNPC_ADMIS_PRIVI_ECHU AS decimal(19,2)) FROM v2.CREANCE_PC WHERE CRNPC_ID_CRNPC = 2202203 => 1300.00
+controle: SELECT CAST(CRNPC_REJETE AS decimal(19,2)) FROM v2.CREANCE_PC WHERE CRNPC_ID_CRNPC = 2202203 => 34.56
+controle: SELECT CAST(CRNPC_ADMIS_PRIVI_ECHU + CRNPC_ADMIS_CHIRO_ECHU AS decimal(19,2)) FROM v2.CREANCE_PC WHERE CRNPC_ID_CRNPC = 2202203 => 1400.10
+---
+# 4. Les memes valeurs : rien a enregistrer.
+geste: Enregistrer
+ids: 2202203
+valeur: Montants admis › Privilégié échu = 1300
+resultat: refuse
+message: Aucun montant n'est modifié : la créance garde les valeurs de la base.

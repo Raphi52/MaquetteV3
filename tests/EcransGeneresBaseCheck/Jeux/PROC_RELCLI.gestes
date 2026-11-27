@@ -1,0 +1,92 @@
+# Les gestes de EcrivainRelevesClients (« Releve de compte », PROC_RELCLI) : « Valider les soldes », sur les comptes de PROC_RELCLI.sql.
+# Format : en tete de tests/EcransGeneresBaseCheck/Program.cs. Chaque refus a son jumeau accepte. Les soldes ecrits se relisent par
+# des SELECT exacts (decimal(19,2)) sur v2.CLIENT_SOLDE.
+# Le refus « Droits insuffisants » (PROC_RELCLI.cs:72-73) ne se joue pas ici : l'agent du banc a EXPCOMPTA par son role (PROC_RELCLI.sql)
+# pour tous les blocs. Il se joue dans tests/EcransGeneresBaseCheck/Program.cs, juste AVANT la boucle des gestes : le droit retire, le
+# geste du bloc 3 refuse sans rien ecrire, puis le droit remis -- le bloc 3 est son jumeau accepte, dans le meme etat de base.
+
+# 1. Aucun compte coche (PROC_RELCLI.cs:75-76). Jumeau accepte : bloc 3 (un compte coche).
+geste: Agir Valider les soldes
+resultat: refuse
+message: Sélection de clients à éditer vide : aucun client n'est sélectionné dans la liste. Sélectionnez au moins un client.
+---
+# 2. Debut apres la fin (:78-79 ; debut et fin ramenes au 1er et au dernier jour de leur mois, OPE_EDITION.cs:120, :126). Jumeau
+# accepte : bloc 3 (debut avant la fin).
+geste: Agir Valider les soldes
+ids: 2207212
+valeur: Date de début = 01/03/2000
+valeur: Date de fin = 15/01/2000
+resultat: refuse
+message: La date de début est ultérieure à la date de fin. Veuillez corrigez votre saisie.
+---
+# 3. Periode NON achevee (fin en 2099, :81-82, :198) : pas de validation, mais la completion des soldes anterieurs du compte coche
+# 2207212, toujours faite (:165-196 ; MetierReleveClient.cs:573-600) : a rebours depuis son plus ancien solde (01/03/2000, 100,00),
+# solde du mois = solde suivant + factures - ventilations sur [mois, solde suivant[ :
+#   01/02/2000 : 100,00 + 5,55 - 12,00 = 93,55 ; 01/01/2000 : 93,55 + 20,00 = 113,55 ; 01/12/1999 : 113,55 - 30,00 = 83,55 (mois de sa
+#   premiere ecriture, la ventilation du 20/12/1999 : la boucle s'arrete).
+geste: Agir Valider les soldes
+ids: 2207212
+valeur: Date de début = 01/01/2000
+valeur: Date de fin = 31/12/2099
+resultat: fait
+message: 3 soldes antérieurs complétés sur les comptes cochés. La période sélectionnée n'est pas encore achevée. Aucun solde n'est validé. Les relevés (état de la V2) ne sont pas édités par la V3.
+controle: SELECT CAST(CLISO_MONTANT AS decimal(19,2)) FROM v2.CLIENT_SOLDE WHERE CLISO_ID_CLIEN = 2207212 AND CLISO_DATE_SOLDE = '20000201' => 93.55
+controle: SELECT CAST(CLISO_MONTANT AS decimal(19,2)) FROM v2.CLIENT_SOLDE WHERE CLISO_ID_CLIEN = 2207212 AND CLISO_DATE_SOLDE = '20000101' => 113.55
+controle: SELECT CAST(CLISO_MONTANT AS decimal(19,2)) FROM v2.CLIENT_SOLDE WHERE CLISO_ID_CLIEN = 2207212 AND CLISO_DATE_SOLDE = '19991201' => 83.55
+controle: SELECT COUNT(*) FROM v2.CLIENT_SOLDE WHERE CLISO_ID_CLIEN = 2207212 AND CLISO_ID_UTLST = 2000901 => 3
+# Rien d'autre : la periode n'est pas achevee, aucun compte n'est valide (2207211 garde son seul solde du 01/11/1999).
+controle: SELECT COUNT(*) FROM v2.CLIENT_SOLDE WHERE CLISO_ID_CLIEN = 2207211 => 1
+---
+# 4. La meme completion rejouee : idempotente (le plus ancien solde est au mois de la premiere ecriture, :585-587), et la periode n'est
+# pas achevee : rien a ecrire. Jumeau accepte : bloc 3.
+geste: Agir Valider les soldes
+ids: 2207212
+valeur: Date de début = 01/01/2000
+valeur: Date de fin = 31/12/2099
+resultat: refuse
+message: La période sélectionnée n'est pas encore achevée. Aucun solde n'est validé : RIG v2 n'y génère que les éditions des relevés, que la V3 ne produit pas.
+---
+# 5. La validation d'une periode achevee (fin 31/03/2000) : TOUS les comptes actifs C hors PC (MetierReleveClient.cs:649-662), pas
+# la seule selection. La piece bloquante est la facture non comptabilisee F12V005 du 14/02/2000 (l'encaissement 2207501 du
+# 10/03/2000 est posterieur ; 2207502 est remis ; F12V006 comptabilisee) : limite 01/02/2000, dernier solde valide = 01/02/2000.
+# Le message n'est pas compare : il compte aussi les comptes actifs des AUTRES jeux sans aucune date de depart (ni solde, ni
+# ecriture, ni date de modification), que la V3 nomme sans les valider -- leur nombre change avec les jeux des autres lots. Ce que la
+# V2 ecrit se relit par les controles :
+#   2207211 (dernier solde 01/11/1999 -50,00, Client.SoldeClient = solde + ventilations - factures) : 01/12/1999 -50 + 40 - 100 = -110,00 ;
+#   01/01/2000 -110 - 30,25 = -140,25 ; 01/02/2000 -140,25 + 60,50 - 10,00 = -89,75 ; la facture du 03/02/2000 (999,00) ne compte pas ;
+#   2207218 (sans solde, premiere ecriture 10/12/1999) : 01/01/2000 = 50 - 20 = 30,00 (depuis 1900) ; 01/02/2000 = 30,00 ;
+#   2207217 (sans solde ni ecriture, modifie le 15/12/1999) : 01/01/2000 et 01/02/2000 a 0,00 ;
+#   2207213 (sans solde, premiere ecriture F12V006 du 02/01/2000) : 01/02/2000 = -1,00 ; sa facture du 14/02/2000 ne compte pas ;
+#   2207212 : son dernier solde est du 01/03/2000, apres la limite -- rien ;
+#   2207214 (sommeil), 2207215 (compte PC), 2207216 (type D) : ecartes, leur seul solde reste.
+geste: Agir Valider les soldes
+ids: 2207212
+valeur: Date de début = 01/03/2000
+valeur: Date de fin = 31/03/2000
+resultat: fait
+controle: SELECT CAST(CLISO_MONTANT AS decimal(19,2)) FROM v2.CLIENT_SOLDE WHERE CLISO_ID_CLIEN = 2207211 AND CLISO_DATE_SOLDE = '19991201' => -110.00
+controle: SELECT CAST(CLISO_MONTANT AS decimal(19,2)) FROM v2.CLIENT_SOLDE WHERE CLISO_ID_CLIEN = 2207211 AND CLISO_DATE_SOLDE = '20000101' => -140.25
+controle: SELECT CAST(CLISO_MONTANT AS decimal(19,2)) FROM v2.CLIENT_SOLDE WHERE CLISO_ID_CLIEN = 2207211 AND CLISO_DATE_SOLDE = '20000201' => -89.75
+controle: SELECT COUNT(*) FROM v2.CLIENT_SOLDE WHERE CLISO_ID_CLIEN = 2207211 => 4
+controle: SELECT CAST(CLISO_MONTANT AS decimal(19,2)) FROM v2.CLIENT_SOLDE WHERE CLISO_ID_CLIEN = 2207218 AND CLISO_DATE_SOLDE = '20000101' => 30.00
+controle: SELECT CAST(CLISO_MONTANT AS decimal(19,2)) FROM v2.CLIENT_SOLDE WHERE CLISO_ID_CLIEN = 2207218 AND CLISO_DATE_SOLDE = '20000201' => 30.00
+controle: SELECT COUNT(*) FROM v2.CLIENT_SOLDE WHERE CLISO_ID_CLIEN = 2207218 => 2
+controle: SELECT COUNT(*) FROM v2.CLIENT_SOLDE WHERE CLISO_ID_CLIEN = 2207217 AND CLISO_MONTANT = 0 AND CLISO_DATE_SOLDE IN ('20000101', '20000201') => 2
+controle: SELECT COUNT(*) FROM v2.CLIENT_SOLDE WHERE CLISO_ID_CLIEN = 2207217 => 2
+controle: SELECT COUNT(*) FROM v2.CLIENT_SOLDE WHERE CLISO_ID_CLIEN IN (2207212, 2207213) AND CLISO_DATE_SOLDE > '20000201' AND CLISO_DATE_SOLDE <> '20000301' => 0
+controle: SELECT CAST(CLISO_MONTANT AS decimal(19,2)) FROM v2.CLIENT_SOLDE WHERE CLISO_ID_CLIEN = 2207213 AND CLISO_DATE_SOLDE = '20000201' => -1.00
+controle: SELECT COUNT(*) FROM v2.CLIENT_SOLDE WHERE CLISO_ID_CLIEN = 2207213 => 1
+controle: SELECT COUNT(*) FROM v2.CLIENT_SOLDE WHERE CLISO_ID_CLIEN IN (2207214, 2207215, 2207216) => 3
+# Le solde relu tombe juste : le relevé du compte 2207211 au 01/02/2000 = son solde du 01/11/1999 + toutes ses ventilations - toutes
+# ses factures d'avant le 01/02/2000.
+controle: SELECT CAST(-50.00 + (SELECT SUM(VENTI_MONTANT) FROM v2.VENTILATION WHERE VENTI_ID_CLIEN = 2207211 AND VENTI_DATE_VENTILATION < '20000201') - (SELECT SUM(FACTU_MONTANT_TTC) FROM v2.FACTURE WHERE FACTU_ID_CLIEN = 2207211 AND FACTU_DATE_CREATION >= '19991101' AND FACTU_DATE_CREATION < '20000201') - (SELECT CLISO_MONTANT FROM v2.CLIENT_SOLDE WHERE CLISO_ID_CLIEN = 2207211 AND CLISO_DATE_SOLDE = '20000201') AS decimal(19,2)) => 0.00
+# Aucun solde parti de 1800 (DBDateTime.ValeurNull de la V2, pour un compte sans aucune date) : la V3 ne le reprend pas.
+controle: SELECT COUNT(*) FROM v2.CLIENT_SOLDE WHERE CLISO_DATE_SOLDE < '19000101' => 0
+---
+# 6. La meme validation rejouee : chaque compte actif est deja valide jusqu'a la limite, la completion de 2207212 est deja faite --
+# rien a ecrire, refuse. Message non compare (meme raison qu'au bloc 5). Jumeau accepte : bloc 5.
+geste: Agir Valider les soldes
+ids: 2207212
+valeur: Date de début = 01/03/2000
+valeur: Date de fin = 31/03/2000
+resultat: refuse

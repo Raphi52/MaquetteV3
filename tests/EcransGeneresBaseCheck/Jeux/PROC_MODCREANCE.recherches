@@ -1,0 +1,13 @@
+# Les recherches de LecteurModificationCreance : les criteres de la recherche de PC de RIG v2 (OPE_RECHERCHE_PC), en LIKE.
+critere: Numéro de la procédure = L12PC0003
+lignes:
+PC L12PC0003, créance n° 1 | CREANCIER VERROU F · PC VERROUILLEE GAMMA · admis 75,50 € · verrouillée par une autre demande | Admissions | EnAttente | []
+---
+# Le texte cherche aussi le creancier.
+texte: INTEGRE A
+lignes:
+PC L12PC0001, créance n° 1 | CREANCIER INTEGRE A · PC CREANCES ALPHA · admis 1 000,00 € | Admissions | AFaire | []
+---
+# Un nom d'affaire qu'aucune PC ne porte : rien.
+critere: Nom de l'affaire = AUCUNE AFFAIRE L12
+lignes:

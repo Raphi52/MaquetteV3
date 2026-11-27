@@ -8,13 +8,20 @@
 // memes classes CSS. L'ecran ne lisait rien dans Metier/ : ses banques de
 // demonstration l'ont suivi ici.
 //
+// BRANCHE SUR LA BASE (plan « RIG v3 100 % fonctionnel », lot 12, 27/11/2026 ; marche du lot 17) : les banques viennent de la base du
+// greffe (Pont/EcranBanques.cs, Serveur/Socle/EcransMain/LectureBanques.cs : BANQUE et MODE_PAIEMENT_BANQUE). Sans serveur, la
+// demonstration ci-dessous reste, marquee « exemple » ; en panne, le motif et aucune banque. Les modes de paiement d'une banque de
+// la base sont ses CODES (Banque.GetListeModePaiementBanque de RIG v2), ceux de la demonstration des libelles.
+//
 // LISTE MODERNE « Tout reuni » (24/11/2026, plan des listes modernes, lot 4) : la liste prend les briques de
 // composants/ListeModerne.tsx -- tete, une ligne par banque (avatar, designation, code), modes de paiement en
 // pastilles, pied. Ni montant, ni critere d'etat, ni plus de quelques banques par greffe : pas de carte, pas de
 // vue, pas de « Aller a… ». Le clic qui montre la fiche ne change pas.
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { appeler } from '../pont'
 import { contientSansCasse, estBlanc } from '../criteres'
+import { ProvenanceEcran, type ModeLecture } from '../provenance'
 import { CelluleIdentite, EnteteListe, ListeModerne, Pastille, PiedListe, type Teinte } from '../composants/ListeModerne'
 
 // v2 : OPE_BANQIDENTITE (ult_BanqCode, ult_BanqNom), OPE_BANQADRESSE,
@@ -43,14 +50,38 @@ const Banques: Banque[] = [
 
 const TeinteMode: Record<string, Teinte> = { Cheque: 'bleu', Virement: 'violet', 'Carte bancaire': 'orange', Especes: 'vert' }
 
+/** Ce que rend le pont (Pont/EcranBanques.cs, VueBanques) : les banques de la base, et d'ou elles viennent. */
+export interface VueBanques {
+  banques: Banque[]
+  total: number
+  mode?: ModeLecture
+  message?: string | null
+}
+
 export function EcranBanques() {
   const [recherche, setRecherche] = useState('')
+  // null : la demonstration (pas encore de reponse du pont, ou mode « demo »).
+  const [vue, setVue] = useState<VueBanques | null>(null)
   const [selection, setSelection] = useState<Banque | null>(Banques[0]!)
 
-  let trouvees = Banques
+  useEffect(() => {
+    let perime = false
+    void appeler<VueBanques>('EcranBanques.Banques')
+      .then((v) => {
+        if (perime || v.mode === 'demo' || v.mode === undefined) return
+        // La base remplace la demonstration : sa premiere banque choisie (aucune en panne).
+        setVue(v)
+        setSelection(v.banques[0] ?? null)
+      })
+      .catch(() => { /* pas de pont (tests, page hors WebView2) : la demonstration reste */ })
+    return () => { perime = true }
+  }, [])
+
+  const source = vue ? vue.banques : Banques
+  let trouvees = source
   if (!estBlanc(recherche)) {
     const t = recherche.trim()
-    trouvees = Banques.filter((b) => contientSansCasse(b.code, t) || contientSansCasse(b.designation, t))
+    trouvees = source.filter((b) => contientSansCasse(b.code, t) || contientSansCasse(b.designation, t))
   }
   const s = selection
 
@@ -79,6 +110,7 @@ export function EcranBanques() {
 
       <ListeModerne etiquette="Banques declarees">
         <EnteteListe titre="Banques declarees" synthese={`${trouvees.length}${trouvees.length > 1 ? ' banques' : ' banque'}`} />
+        {vue ? <ProvenanceEcran mode={vue.mode} message={vue.message} quoi="Banques" /> : <ProvenanceEcran mode="demo" quoi="Banques" />}
 
         <div className="rig-table-cadre">
           <table className="rig-table rig-lm-table">
@@ -168,7 +200,7 @@ export function EcranBanques() {
 
         <PiedListe aide="Clic sur une ligne pour voir la fiche de la banque.">
           <span><b>{trouvees.length}</b>{trouvees.length > 1 ? ' banques affichees' : ' banque affichee'}</span>
-          <span>Fichier <b>{Banques.length}</b></span>
+          <span>Fichier <b>{vue ? vue.total : Banques.length}</b></span>
         </PiedListe>
       </ListeModerne>
     </div>

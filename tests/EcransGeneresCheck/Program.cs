@@ -443,6 +443,47 @@ foreach (var d in descripteurs)
         defauts.Add($"objet unique designe par {d.Criteres.Length} criteres : un seul, son numero (la fiche RIG v2 le recoit)");
     // Le resultat du geste (2e temps, apres lui) n'existe que pour une operation sur un objet unique.
     if (d.Resultat.Length > 0 && !d.ObjetUnique) defauts.Add("un resultat apres le geste hors d'une Operation sur un objet unique");
+    // Sans ajout ou sans suppression V2 (lot 14 : Dates de travail, Cabinets) : seule la grille d'un Referentiel les offre.
+    if ((!d.Ajout || !d.Suppression) && d.Forme != FormeEcran.Referentiel)
+        defauts.Add($"ajout ou suppression retire sur une forme {d.Forme} : seule la grille d'un Referentiel les offre");
+    // « Dupliquer » et les sections saisies sous une ligne neuve (lot 14 : Tables de reference) : la grille d'un Referentiel seule ;
+    // chaque groupe nomme est un groupe de l'ecran, chaque section une de ses sections (sinon la ligne neuve n'en montre aucune).
+    if ((d.Duplication || d.SectionsAjout.Count > 0) && d.Forme != FormeEcran.Referentiel)
+        defauts.Add($"duplication ou sections d'ajout sur une forme {d.Forme} : seule la grille d'un Referentiel les offre");
+    foreach (var (g, titres) in d.SectionsAjout)
+    {
+        if (!d.Groupes.Contains(g)) defauts.Add($"sections d'ajout du groupe « {g} », absent des groupes de l'ecran");
+        foreach (var t in titres.Where(t => d.Sections.All(s => s.Titre != t)))
+            defauts.Add($"section d'ajout « {t} » ({g}) absente des sections de l'ecran");
+    }
+    // Les sections d'une ligne par groupe et les groupes en modification seule (lot 14, 2e reprise : Tables de reference) : la
+    // grille d'un Referentiel seule ; chaque groupe et chaque section nommes existent (sinon la ligne ouverte n'en montre aucune).
+    if ((d.SectionsParGroupe.Count > 0 || d.GroupesModificationSeule.Length > 0) && d.Forme != FormeEcran.Referentiel)
+        defauts.Add($"sections par groupe ou groupes en modification seule sur une forme {d.Forme} : seule la grille d'un Referentiel les offre");
+    foreach (var (g, titres) in d.SectionsParGroupe)
+    {
+        if (!d.Groupes.Contains(g)) defauts.Add($"sections du groupe « {g} », absent des groupes de l'ecran");
+        foreach (var t in titres.Where(t => d.Sections.All(s => s.Titre != t)))
+            defauts.Add($"section « {t} » du groupe « {g} » absente des sections de l'ecran");
+    }
+    foreach (var g in d.GroupesModificationSeule.Where(g => !d.Groupes.Contains(g)))
+        defauts.Add($"groupe en modification seule « {g} », absent des groupes de l'ecran");
+    // Les regles d'affichage d'un champ (lot 14, 4e reprise : un etat de PC dans Tables de reference) : chacune nomme une CASE de sa
+    // section, autre que lui (sinon la grille ne lit aucune case : le champ resterait masque, ou jamais bloque). fix-ok: une regle
+    // qui nomme autre chose qu'une case de sa section est un champ masque pour toujours -- banc rouge sur une regle « Régime » injectee.
+    foreach (var s in d.Marches.Concat(d.Sections))
+        foreach (var c in s.Champs)
+            foreach (var (regle, cible) in new[] { ("visible si", c.VisibleSi), ("bloque si", c.BloqueSi) })
+                if (cible is not null && (cible == c.Libelle || !s.Champs.Any(x => x.Libelle == cible && x.Type == TypeChamp.Case)))
+                    defauts.Add($"champ « {c.Libelle} » ({s.Titre}) {regle} « {cible} » : pas une case de sa section");
+    // L'exclusion (lot 14, 5e reprise) : posee sur une CASE, elle nomme d'autres cases de sa section (sinon rien ne se decoche).
+    foreach (var s in d.Marches.Concat(d.Sections))
+        foreach (var c in s.Champs.Where(c => c.Exclut is { Length: > 0 }))
+        {
+            if (c.Type != TypeChamp.Case) defauts.Add($"champ « {c.Libelle} » ({s.Titre}) exclut d'autres cases sans etre une case");
+            foreach (var cible in c.Exclut!.Where(x => x == c.Libelle || !s.Champs.Any(y => y.Libelle == x && y.Type == TypeChamp.Case)))
+                defauts.Add($"champ « {c.Libelle} » ({s.Titre}) exclut « {cible} » : pas une autre case de sa section");
+        }
     if (!reuni)
     {
         switch (d.Forme)
@@ -514,6 +555,18 @@ Exiger(parCode.GetValueOrDefault("PROC_IA") is { Forme: FormeEcran.Operation, Ob
        && ia.Sections.SelectMany(s => s.Champs).All(c => c.Type == TypeChamp.Tableau)
        && parCode.GetValueOrDefault("SYNTHESE_FORMALITES_DEMAT") is { EnOnglets: true },
     "« Analyse IA » est une Operation sur UNE liasse recue par son numero : lancement (rien a saisir), puis resultat ; son ecran reuni passe en onglets");
+// Lot 12 (27/11/2026) : a l'ecran, Creer exige un champ rempli dans chaque etape obligatoire (web/src/ecrans/formes/commun.tsx,
+// manquantes) -- le banc des gestes, qui poste au serveur, ne passe pas par ce controle. « Ajouter une creance » declarait
+// obligatoire l'etape « Integration » et son champ « Erreur d'integration » : Creer refusait toujours (mesure sur le bureau cache).
+// Les etapes obligatoires sont les controles d'OPE_CREANCE (PC, creancier, au moins un montant) ; l'integration se lit, sans champ.
+Exiger(parCode.GetValueOrDefault("PROC_ADDCREANCE") is { Forme: FormeEcran.Saisie } ajout
+       && ajout.Marches.Where(m => m.Obligatoire).Select(m => m.Titre).SequenceEqual(new[] { "Procédure collective", "Créancier", "Montants" })
+       && ajout.Marches.Any(m => m.Titre == "Intégration" && !m.Obligatoire && !m.Champs.Any()),
+    "« Ajouter une creance » : etapes obligatoires PC, creancier et montants (OPE_CREANCE) ; l'integration se lit, sans champ a saisir");
+// Le jumeau, une Operation : le rejet ne fait saisir que ce que son ecrivain lit (EcrivainRejetsEncaissement : Destinataire, Motif).
+Exiger(parCode.GetValueOrDefault("PROC_REJET") is { Forme: FormeEcran.Operation } rejet
+       && rejet.Sections.Where(s => s.Champs.Any()).Select(s => s.Titre).SequenceEqual(new[] { "Destinataire", "Motif" }),
+    "« Rejets d'encaissement » : seuls le destinataire et le motif se saisissent, le cheque choisi se lit sur sa ligne");
 // Une section est une PARTIE de l'objet ouvert, jamais la liste qui l'a trouve : chaque forme montre deja ses lignes (liste,
 // tableau, file). Une section titree « Resultat(s) » repetait cette liste dans la fiche, ou dans le detail d'une ligne
 // (controle final du lot 1, 25/11/2026 : Trouver.cs PROC_REGJUD, PROC_RECHENC, PROC_TARIFS, PROC_BEN, Surveiller.cs PROC_ACTREJ).

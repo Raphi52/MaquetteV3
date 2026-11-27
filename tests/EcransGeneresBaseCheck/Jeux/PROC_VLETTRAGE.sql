@@ -80,5 +80,10 @@ INSERT INTO v2.VENTILATION (VENTI_ID_VENTI, VENTI_ID_ENCMT, VENTI_ID_AFFRE, VENT
     (2300531, 2300541, NULL, 2300571, 50, ''20250110''), (2300532, 2300542, 2300581, 2300572, 60, ''20250203''),
     (2300533, 2300543, NULL, 2300575, 20, ''20250122'');
 -- Le premier solde du compte B (au plus tard le 01/01/2019) : crediteur de 25.
+-- CLISO_ID_CLISO est un IDENTITY dans RIG v2 (RigDatabase/dbo/Tables/CLIENT_SOLDE.sql) : PROC_RELCLI.sql (lot 12), joue avant, cree la
+-- table ainsi ; les numeros explicites de ce jeu passent alors par IDENTITY_INSERT (sans lui : « Cannot insert explicit value for
+-- identity column », mesure a la reunion des lots 12 et 13).
+IF COLUMNPROPERTY(OBJECT_ID(N''v2.CLIENT_SOLDE''), ''CLISO_ID_CLISO'', ''IsIdentity'') = 1 SET IDENTITY_INSERT v2.CLIENT_SOLDE ON;
 INSERT INTO v2.CLIENT_SOLDE (CLISO_ID_CLISO, CLISO_DATE_SOLDE, CLISO_MONTANT, CLISO_ID_CLIEN, CLISO_ID_UTLST) VALUES
-    (2300521, ''20181231'', 25, 2300575, 7), (2300522, ''20190601'', 999, 2300575, 7);', N'@aujourdhui datetime', @aujourdhui;
+    (2300521, ''20181231'', 25, 2300575, 7), (2300522, ''20190601'', 999, 2300575, 7);
+IF COLUMNPROPERTY(OBJECT_ID(N''v2.CLIENT_SOLDE''), ''CLISO_ID_CLISO'', ''IsIdentity'') = 1 SET IDENTITY_INSERT v2.CLIENT_SOLDE OFF;', N'@aujourdhui datetime', @aujourdhui;

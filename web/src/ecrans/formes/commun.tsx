@@ -460,11 +460,37 @@ export const NON_LU = 'Non lu dans la base par la V3'
  * Les sections d'une fiche : en formulaire (saisies), ou en lecture (lecture = vrai). Avec la fiche LUE (fiche) : chaque
  * champ porte sa valeur de la base ; seuls ceux que l'ecrivain sait enregistrer se saisissent ; un champ absent de la
  * fiche le dit (NON_LU). Sans fiche (ligne d'exemple) : les champs vides, comme avant.
+ * LES REGLES D'AFFICHAGE DE LA FICHE RIG v2 (descripteur : visibleSi, bloqueSi, exclut) se jouent sur la valeur COURANTE de la
+ * case qui commande (saisie, sinon lue) : un champ visibleSi ne se montre que case cochee, et se vide quand elle se decoche (en
+ * chaine : ce qu'il commande se vide aussi) ; un champ bloqueSi, case cochee, se montre sans se saisir ; une case exclut, cochee,
+ * decoche au clic celles qu'elle nomme. PROC_GTABREF, un etat de PC (OPE_AFFICHE_SQLBASE_PC_ETAT.cs:89-108, :116-119, :135-156).
+ * fix-ok: controle final du lot 14 (27/11/2026, 5e reprise) -- cocher « Clôture » laissait « Ouverture » cochee a l'ecran
+ * (capture lot14-captures-reprise5\08) : aucune regle d'exclusion n'atteignait la grille ; test « cocher « Clôture » décoche
+ * « Ouverture » au clic » rouge sans elle. fix-ok: controle final du lot 14 (27/11/2026, 4e reprise) -- « Résolution
+ * du plan », « Code clôture » et « À sauver » s'affichaient toujours et se saisissaient, quand la V2 les masque ou les bloque :
+ * aucune regle d'affichage n'atteignait la grille (test « Sections : les regles d'affichage de la fiche RIG v2 », rouge sans elles).
  */
 export function Sections({ sections, saisies, changer, lecture = false, fiche = null }: {
   sections: MarcheEcranVue[]; saisies: Saisies; changer: (cle: string, valeur: string) => void; lecture?: boolean
   fiche?: FicheVue | null
 }) {
+  // La valeur courante d'un champ de la section : saisie, sinon lue dans la fiche.
+  const courante = (s: MarcheEcranVue, libelle: string) =>
+    saisies[cleChamp(s.titre, libelle)] ?? champLu(fiche, s.titre, libelle)?.valeur ?? ''
+  const masque = (s: MarcheEcranVue, c: ChampEcranVue) => !!c.visibleSi && courante(s, c.visibleSi) !== 'oui'
+  const bloque = (s: MarcheEcranVue, c: ChampEcranVue) => !!c.bloqueSi && courante(s, c.bloqueSi) === 'oui'
+  // Une case cochee decoche celles qu'elle exclut (si elles le sont) ; une case decochee vide les champs qu'elle montre, et
+  // ceux qu'ils montrent a leur tour (une fois chacun) : decochee par exclusion, « Ouverture » vide aussi ce qu'elle montre.
+  const changerSuivi = (s: MarcheEcranVue, libelle: string, valeur: string, vus = new Set<string>()) => {
+    vus.add(libelle)
+    changer(cleChamp(s.titre, libelle), valeur)
+    if (valeur === 'oui') {
+      for (const e of s.champs.find((x) => x.libelle === libelle)?.exclut ?? [])
+        if (!vus.has(e) && courante(s, e) === 'oui') changerSuivi(s, e, '', vus)
+      return
+    }
+    for (const d of s.champs) if (d.visibleSi === libelle && !vus.has(d.libelle)) changerSuivi(s, d.libelle, '', vus)
+  }
   if (fiche) {
     return (
       <div className="rig-eg-sections">
@@ -474,6 +500,7 @@ export function Sections({ sections, saisies, changer, lecture = false, fiche = 
             <p className="rig-eg-section__consigne">{s.consigne}</p>
             <div className="rig-champs rig-eg-champs">
               {s.champs.map((c) => {
+                if (masque(s, c)) return null
                 const lu = champLu(fiche, s.titre, c.libelle)
                 const cle = cleChamp(s.titre, c.libelle)
                 if (c.type === 'Tableau' || lecture || !lu?.modifiable) {
@@ -486,7 +513,8 @@ export function Sections({ sections, saisies, changer, lecture = false, fiche = 
                     </div>
                   )
                 }
-                return <ChampSaisie key={c.libelle} champ={c} valeur={saisies[cle] ?? lu.valeur} changer={(v) => changer(cle, v)} />
+                return <ChampSaisie key={c.libelle} champ={c} valeur={saisies[cle] ?? lu.valeur} lecture={bloque(s, c)}
+                                    changer={(v) => changerSuivi(s, c.libelle, v)} />
               })}
             </div>
           </section>
@@ -514,9 +542,9 @@ export function Sections({ sections, saisies, changer, lecture = false, fiche = 
             </dl>
           ) : (
             <div className="rig-champs rig-eg-champs">
-              {s.champs.map((c) => (
-                <ChampSaisie key={c.libelle} champ={c} valeur={saisies[cleChamp(s.titre, c.libelle)] ?? ''}
-                             changer={(v) => changer(cleChamp(s.titre, c.libelle), v)} />
+              {s.champs.filter((c) => !masque(s, c)).map((c) => (
+                <ChampSaisie key={c.libelle} champ={c} valeur={saisies[cleChamp(s.titre, c.libelle)] ?? ''} lecture={bloque(s, c)}
+                             changer={(v) => changerSuivi(s, c.libelle, v)} />
               ))}
             </div>
           ))}

@@ -1,0 +1,8 @@
+# « Intégrer des créances » (LecteurIntegrationCreances) sur PROC_ADDCREANCE.sql : les creances transitoires PAS encore integrees,
+# les plus recentes d'abord, groupees par mode (les onglets de la V2). Ecartee : 2202101, integree (CRTRA_DATE_INSERTION_RIG) --
+# jumeau retenu 2202102, meme PC, en attente. Etat : avec une erreur -> EnCours « En erreur » ; sinon AFaire.
+CREANCIER CONTESTE D | PC L12PC0001 · aucun montant admis · rejeté 500,00 € · saisie le {J-1} · à intégrer | Contestations | AFaire | []
+CREANCIER ERREUR C | PC L12PCXXXX · admis 10,00 € · saisie le {J-2} · erreur : PC absente en base | Admissions | EnCours | []
+CREANCIER ATTENTE B | PC L12PC0001 · admis 250,75 € · saisie le {J-2} · à intégrer | Admissions | AFaire | []
+CREANCIER ANCIEN E | PC L12PC0002 · admis 300,00 € · saisie le {J-2} · à intégrer | Admissions | AFaire | []
+Créance transitoire n° 2202107 | sans PC · aucun montant admis · saisie le {J-4} · à intégrer | Admissions | AFaire | []

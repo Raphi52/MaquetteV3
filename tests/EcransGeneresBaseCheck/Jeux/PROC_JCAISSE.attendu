@@ -4,5 +4,10 @@
 # Ecartes, chacun avec son jumeau retenu : 2300207 la veille a 23 h (2300208) ; 2300209 le lendemain a 0 h (2300201) ; les
 # encaissements du jour des autres jeux (PROC_RECHENC.sql) : leurs ventilations n'ont pas d'affaire de la base, ou leur mode n'existe pas.
 # Les cas de fevrier 2024 (deux ventilations, remboursement, ecartes par les jointures) : PROC_JCAISSE.recherches.
+# Les deux remboursements du jour de PROC_EDCHQEMIS.sql (lot 12, 2200701 et 2200702) sont retenus : ventiles sur l'affaire 2209301 de la
+# base, mode « Remboursement (banc 12) » present -- ce journal lit tous les encaissements du jour, comme RIG v2 ; ils viennent apres,
+# leur type de mode etant classe apres la carte et le cheque.
 Encaissement 2300208 | Carte bancaire · 7,77 € · le {J+0} · PAYEUR L13 MINUIT · à comptabiliser | Carte bancaire | AFaire | []
 Encaissement 2300201 | Chèque · 100,10 € · le {J+0} · PAYEUR L13 A · titre L13CHQ1 · BANQUE L13 · caissier Alice CAISSE · à comptabiliser | Chèque | AFaire | []
+Encaissement 2200701 | Remboursement (banc 12) · 45,00 € · le {J+0} · CLI REMBOURSE · titre RBT12001 · à comptabiliser | Remboursement | AFaire | []
+Encaissement 2200702 | Remboursement (banc 12) · 30,00 € · le {J+0} · DIVERS GREFFE · titre RBT12002 · à comptabiliser | Remboursement | AFaire | []

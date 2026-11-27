@@ -102,6 +102,23 @@ public sealed record ChampEcran(string Libelle, TypeChamp Type = TypeChamp.Texte
     /// <summary>Les valeurs d'une <see cref="TypeChamp.Liste"/>, dans l'ordre de la fiche ; vide sinon.</summary>
     public string[] Options { get; init; } = [];
 
+    /// <summary>Un champ que la fiche RIG v2 ne MONTRE que quand une case de SA section est cochee : le libelle de cette case ;
+    /// null sinon. La case decochee, le champ disparait et se vide, comme dans la V2. PROC_GTABREF, un etat de PC : « Résolution du
+    /// plan » sous « Ouverture », « Code clôture » sous « Résolution du plan » (OPE_AFFICHE_SQLBASE_PC_ETAT.cs:135-156).</summary>
+    public string? VisibleSi { get; init; }
+
+    /// <summary>Un champ que la fiche RIG v2 BLOQUE (montre sans le laisser changer) quand une case de SA section est cochee : le
+    /// libelle de cette case ; null sinon. PROC_GTABREF : « À sauver » sous « Mise à jour de la PC » (OPE_AFFICHE_SQLBASE_PC_ETAT.cs:116-119).</summary>
+    // fix-ok: controle final du lot 14 (27/11/2026, 4e reprise) -- la grille montrait et laissait saisir ces trois champs en toutes
+    // circonstances, faute de toute regle d'affichage dans le descripteur ; ReferentielParGroupe.test.tsx est rouge (3 tests) sans elles.
+    public string? BloqueSi { get; init; }
+
+    /// <summary>Une CASE qui, cochee, decoche au clic ces cases de SA section ; null sinon. PROC_GTABREF, un etat de PC : ouverture,
+    /// cloture, conversion LJ et extension s'excluent (OPE_AFFICHE_SQLBASE_PC_ETAT.cs:89-108).</summary>
+    // fix-ok: controle final du lot 14 (27/11/2026, 5e reprise) -- cocher Cloture laissait Ouverture cochee a l'ecran, faute de
+    // regle d'exclusion dans le descripteur ; ReferentielParGroupe.test.tsx rouge sans elle.
+    public string[]? Exclut { get; init; }
+
     public static implicit operator ChampEcran(string libelle) => new(libelle, Deviner(libelle));
 
     /// <summary>Le type qu'annonce le libelle de la fiche, UNE regle pour tous les ecrans : « Date de fin » est une
@@ -225,6 +242,44 @@ public sealed record DescripteurEcran
     /// l'ecran. Faux : l'operation se choisit dans une liste et peut viser plusieurs objets (les filles d'une
     /// jonction).</summary>
     public bool ObjetUnique { get; init; }
+
+    /// <summary>Un <see cref="FormeEcran.Referentiel"/> dont la fiche RIG v2 AJOUTE une ligne (vrai par defaut). Faux : la
+    /// grille n'offre pas « Ajouter » -- PROC_GESTDATE ne montre que des blocs de dates existantes (ETP_CATEGORIE.cs:10-12).
+    /// Un geste sans equivalent V2 ne s'invente pas (plan « RIG v3 100 % fonctionnel », lot 14).</summary>
+    public bool Ajout { get; init; } = true;
+
+    /// <summary>Un <see cref="FormeEcran.Referentiel"/> dont la fiche RIG v2 SUPPRIME une ligne (vrai par defaut). Faux : le
+    /// menu de ligne n'offre pas « Supprimer » -- PROC_GESTDATE et PROC_CABINET n'ont aucune suppression.</summary>
+    public bool Suppression { get; init; } = true;
+
+    /// <summary>Un <see cref="FormeEcran.Referentiel"/> dont la fiche RIG v2 DUPLIQUE un enregistrement : le menu de ligne offre
+    /// « Dupliquer », qui ouvre une ligne NEUVE pre-remplie des cellules de la ligne copiee, sauf la premiere (la cle, que la
+    /// V2 ne copie pas : ChampsNonDuplicables) ; « Enregistrer » l'envoie en <c>Ajouter</c>, Ids = [la ligne copiee], et
+    /// l'ecrivain recopie le reste. PROC_GTABREF : OPE_TABLE_REF_BUTTONS_BAR._Dupliquer (l. 335, 355-370), puis SetNewMetierBase (l. 247-249) et
+    /// SQLBase_Handler.Copie. Faux par defaut. A distinguer d'un geste de ligne nomme dans <see cref="Gestes"/> (« Dupliquer »
+    /// un document ocerise, lot 11), qui part tel quel a l'ecrivain sans rien saisir.</summary>
+    public bool Duplication { get; init; }
+
+    /// <summary>Un <see cref="FormeEcran.Referentiel"/> : par groupe, les titres des <see cref="Sections"/> dont les champs se
+    /// SAISISSENT sous une ligne neuve de ce groupe (« Ajouter » dans son onglet, ou « Dupliquer » une de ses lignes), envoyes
+    /// sous la cle « Section › Libelle ». PROC_GTABREF : une zone se cree avec ses champs obligatoires, que la grille ne porte
+    /// pas (OPE_AFFICHE_SQLBASE_PC_ETAT_ZONE.Designer.cs:78-96, SousOPE_ENREGISTREMENT.Designer.cs:81-111,
+    /// SousOPE_EDITION.Designer.cs:83-92). Vide : une ligne neuve n'a que ses colonnes.</summary>
+    public IReadOnlyDictionary<string, string[]> SectionsAjout { get; init; } = new Dictionary<string, string[]>();
+
+    /// <summary>Un <see cref="FormeEcran.Referentiel"/> dont les lignes n'ont pas toutes le meme formulaire RIG v2 : par groupe,
+    /// les titres des <see cref="Sections"/> d'une ligne de ce groupe. Sous une ligne ouverte en modification, la grille ne montre
+    /// QUE celles-la, et y fait saisir les champs que la fiche lue dit modifiables (hors colonnes, que la ligne porte deja) ;
+    /// Enregistrer envoie ceux qui changent sous la cle « Section › Libelle ». PROC_GTABREF : un etat de PC, une zone et un type
+    /// de depot ont chacun leur formulaire (OPE_AFFICHE_SQLBASE_PC_ETAT.cs:64-82, _PC_ETAT_ZONE.cs:75-95,
+    /// _DEMAT_CFEC_AJMJ_TYPE_DEPOT.cs:44-52) ; la fiche d'une zone montrait les deux autres « Non lu » (controle final du lot 14,
+    /// 27/11/2026). Groupe absent : toutes les sections, en lecture, comme avant.</summary>
+    public IReadOnlyDictionary<string, string[]> SectionsParGroupe { get; init; } = new Dictionary<string, string[]>();
+
+    /// <summary>Un <see cref="FormeEcran.Referentiel"/> : les groupes dont la fiche RIG v2 ne fait que MODIFIER une ligne -- ni
+    /// « Ajouter » dans leur onglet, ni « Supprimer » ni « Dupliquer » au menu de leurs lignes. PROC_GTABREF : le type de depot
+    /// AJMJ, dont la V2 cache les boutons NOUVEAU, SUPPRIMER et DUPLIQUER (OPE_AFFICHE_REF_CFEC_AJMJ_TYPE_DEPOT.cs:31-33).</summary>
+    public string[] GroupesModificationSeule { get; init; } = [];
 
     /// <summary>Le RESULTAT d'une operation sur un objet unique : les sections que le geste produit, montrees APRES lui
     /// (2e temps), et des l'ouverture d'un objet deja traite. PROC_IA : lancement puis restitution (proc_ia.md:151-156) ;

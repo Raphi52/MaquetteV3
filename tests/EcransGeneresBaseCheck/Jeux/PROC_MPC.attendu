@@ -5,6 +5,10 @@
 # Les autres lignes viennent des autres jeux : PC MD ALPHA / BETA et PRV MD GAMMA (PROC_MDJUD.sql), 2026P002xx (PROC_VNOTIF.sql),
 # et les trois PC sans numero ni nom de Program.cs (section 2, radiations d'office).
 # Le type en clair (TYPE_PC, TYPE_PRV) ; « 0 » (1316103) n'a pas de libelle dans ce jeu : le code reste.
+# Les PC L12PC000* sont celles de PROC_ADDCREANCE.sql (lot 12, creances) : cet ecran lit toutes les PC, elles viennent en tete.
+PC VERROUILLEE GAMMA | PC L12PC0003 · ouverte le 04/01/2016 · bloquée par la demande 26220000401 | Procédure collective (PC) | EnAttente | []
+PC CREANCES BETA | PC L12PC0002 · ouverte le 01/06/2005 | Procédure collective (PC) | AFaire | []
+PC CREANCES ALPHA | PC L12PC0001 · ouverte le 10/03/2015 | Procédure collective (PC) | AFaire | []
 MPC ZETA | PC 2027P16106 · redressement judiciaire · ouverte le 03/03/2026 | Procédure collective (PC) | AFaire | []
 MPC EPSILON | PC 2027P16105 · redressement judiciaire · ouverte le 02/03/2026 | Procédure collective (PC) | AFaire | []
 MPC DELTA | PC 2027P16104 · redressement judiciaire · ouverte le 01/03/2026 | Procédure collective (PC) | AFaire | []

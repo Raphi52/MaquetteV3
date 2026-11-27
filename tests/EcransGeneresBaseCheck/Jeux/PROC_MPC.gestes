@@ -105,6 +105,9 @@ valeur: Procédure › Date d'ouverture = 2026-01-20
 resultat: fait
 message: Prévention 2027V16201 enregistrée dans la base du greffe : « Date d'ouverture ».
 lignes:
+PC VERROUILLEE GAMMA | PC L12PC0003 · ouverte le 04/01/2016 · bloquée par la demande 26220000401 | Procédure collective (PC) | EnAttente | []
+PC CREANCES BETA | PC L12PC0002 · ouverte le 01/06/2005 | Procédure collective (PC) | AFaire | []
+PC CREANCES ALPHA | PC L12PC0001 · ouverte le 10/03/2015 | Procédure collective (PC) | AFaire | []
 MPC ZETA | PC 2027P16106 · redressement judiciaire · ouverte le 03/03/2026 | Procédure collective (PC) | Validee | []
 MPC EPSILON | PC 2027P16105 · redressement judiciaire · ouverte le 02/03/2026 | Procédure collective (PC) | AFaire | []
 MPC DELTA | PC 2027P16104 · redressement judiciaire · ouverte le 01/03/2026 | Procédure collective (PC) | AFaire | []

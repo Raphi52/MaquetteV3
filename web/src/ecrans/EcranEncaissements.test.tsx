@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { EcranEncaissements } from './EcranEncaissements'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { EcranEncaissements, type VueEncaissement } from './EcranEncaissements'
 import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
 import { contexteDossier } from '../test/dossier'
 
@@ -115,5 +115,50 @@ describe('EcranEncaissements ouvert depuis une affaire', () => {
     expect(screen.queryByText('Pour le dossier')).toBeNull()
     expect(sans.container.querySelectorAll('tbody tr.rig-ligne--valide')).toHaveLength(2)
     expect(compte(sans.container)).toBe('2 choisie(s) sur 4 · 357,57 € ventile(s) sur 357,57 € · solde nul')
+  })
+})
+
+// D'ou part l'encaissement (plan « RIG v3 100 % fonctionnel », lot 12) : la demonstration est marquee « exemple » ; branche, l'ecran
+// part de l'encaissement que RIG v2 prepare pour les factures du dossier ; depuis l'accueil, d'un encaissement vide ; en panne, le
+// motif et aucune ventilation (Pont/EcranEncaissements.cs).
+describe('EcranEncaissements : provenance de l encaissement', () => {
+  const base: VueEncaissement = {
+    payeur: 'CLIENT DU BANC', montant: 14250, mode: 'serveur', message: null,
+    ventilations: [{ identifiant: '2201101', affaire: '2201101 — Affaire du banc', client: 'CLIENT DU BANC', abrege: 'L12ENC',
+                     montant: 14250, soldeAffaire: 14250, soldeClient: 20000 }],
+  }
+
+  it('sans serveur, les ventilations de demonstration sont marquees « exemple »', () => {
+    ouvrir()
+    expect(document.querySelector('[role="note"]')!.textContent).toContain('Ventilations de démonstration')
+  })
+
+  it('ouvert pour un dossier, branche : le payeur, le montant et la ventilation de la base, cochee, sans mention', async () => {
+    const pont = installerFauxPont({ 'EcranEncaissements.DateDuJour': () => '2026-11-27', 'EcranEncaissements.Depart': () => base })
+    render(<EcranEncaissements dossier={contexteDossier({ numero: 'L12DOS01', nom: 'CLIENT DU BANC' })} />)
+    await screen.findByText('Affaire du banc', { exact: false })
+    expect(pont.appels).toHaveBeenCalledWith('EcranEncaissements.Depart', 'L12DOS01')
+    expect(document.querySelector('[role="note"]')).toBeNull()
+    expect((screen.getByLabelText('Payeur') as HTMLInputElement).value).toBe('CLIENT DU BANC')
+    expect(document.querySelector('.rig-lm-synthese')!.textContent).toContain('1 choisie(s) sur 1')
+    expect(screen.queryByText('SELARL LEROY & ASSOCIES')).toBeNull()
+    expect(screen.queryByText('Encaissement repris', { exact: false })).toBeNull()
+  })
+
+  it('depuis l accueil, branche : un encaissement vide, aucune ventilation', async () => {
+    const pont = installerFauxPont({ 'EcranEncaissements.DateDuJour': () => '2026-11-27',
+      'EcranEncaissements.Depart': () => ({ payeur: '', montant: 0, ventilations: [], mode: 'serveur', message: null }) })
+    render(<EcranEncaissements />)
+    await waitFor(() => expect(document.querySelector('.rig-lm-synthese')!.textContent).toContain('0 choisie(s) sur 0'))
+    expect(pont.appels).toHaveBeenCalledWith('EcranEncaissements.Depart', null)
+    expect((screen.getByLabelText('Payeur') as HTMLInputElement).value).toBe('')
+  })
+
+  it('en panne, le motif et aucune ventilation (jamais la demonstration a la place)', async () => {
+    installerFauxPont({ 'EcranEncaissements.DateDuJour': () => '2026-11-27',
+      'EcranEncaissements.Depart': () => ({ payeur: '', montant: 0, ventilations: [], mode: 'erreur', message: 'La base du greffe 3801 ne répond pas.' }) })
+    render(<EcranEncaissements />)
+    expect((await screen.findByRole('alert')).textContent).toContain('La base du greffe 3801 ne répond pas.')
+    expect(screen.queryByText('SELARL LEROY & ASSOCIES')).toBeNull()
   })
 })

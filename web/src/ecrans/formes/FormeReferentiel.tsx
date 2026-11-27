@@ -14,17 +14,41 @@
 // s'enregistre pas (son message). Modifier n'envoie que les colonnes CHANGEES (une absente garde la valeur de la base),
 // comme Enregistrer d'une Fiche. fix-ok: mesure par le controle final du lot 2 (26/11/2026) -- la grille filtrait ses
 // lignes deja lues (texteLigne, jamais chercher) et ne lisait aucune fiche : une ligne de la base s'ouvrait [nom, '', ...].
+// LA LIGNE NEUVE (lot 14) : « Ajouter » dans un onglet, ou « Dupliquer » une ligne (descripteur.duplication : RIG v2
+// SQLBase_Handler.Copie, PROC_GTABREF), ouvre une ligne de champs ; dessous, les sections que le descripteur fait saisir a
+// l'ajout dans ce groupe (sectionsAjout : les champs obligatoires d'une zone, que la grille ne porte pas). Une copie part de
+// la ligne copiee : ses cellules sauf la premiere (la cle, que la V2 ne copie pas), et les champs de ses sections lus dans sa
+// fiche ; Enregistrer l'envoie en Ajouter, ids = [la ligne copiee], et l'ecrivain recopie le reste. Controle final du lot 14
+// (27/11/2026) : « Ajouter une zone » et « Dupliquer » de « Tables de reference » n'avaient aucun chemin, la ligne neuve
+// n'envoyant que ses colonnes.
+// LA LIGNE MODIFIEE, PAR GROUPE (lot 14, reprise) : quand les lignes n'ont pas toutes le meme formulaire RIG v2
+// (descripteur.sectionsParGroupe : un etat de PC, une zone, un type de depot AJMJ dans « Tables de reference »), la ligne ouverte
+// ne montre que les sections de SON groupe, et y fait saisir les champs que la fiche lue dit modifiables (hors colonnes) ;
+// Enregistrer envoie ceux qui changent en « Section › Libelle ». Les groupes ou RIG v2 ne fait que modifier
+// (descripteur.groupesModificationSeule : le type de depot AJMJ, OPE_AFFICHE_REF_CFEC_AJMJ_TYPE_DEPOT.cs:31-33) n'offrent ni
+// Ajouter, ni Supprimer, ni Dupliquer. fix-ok: controle final du lot 14 (27/11/2026, 2e reprise) -- la fiche d'une zone montrait les sections des deux
+// autres tables « Non lu », Modifier d'une zone n'envoyait que le libelle et la case, et un type AJMJ se supprimait.
 
 import { Fragment, useEffect, useState } from 'react'
 import { EnteteListe, ListeModerne, MenuLigne, montant, PiedListe, VuesListe } from '../../composants/ListeModerne'
 import type { ChampEcranVue, DescripteurEcranVue, LigneEcranVue } from '../../plan/types'
 import {
-  Annonce, ChampSaisie, GroupesVides, NoteRecherche, Provenance, Sections, enExemple, Exemple, nombreDe, parcoursDe, refus,
-  synthese, useAnnonce, useFiche, useGeste, useLignes, useRecherche, type FicheVue, type LigneTenue, type Saisies,
+  Annonce, ChampSaisie, GroupesVides, NoteRecherche, Provenance, Sections, champLu, cleChamp, enExemple, Exemple, nombreDe,
+  parcoursDe, refus, synthese, useAnnonce, useFiche, useGeste, useLignes, useRecherche, type FicheVue, type LigneTenue, type Saisies,
   type VueLignesEcran,
 } from './commun'
 
 const Tous = '\u0000tous'
+
+/**
+ * La ligne en cours de modification (son rang, ou « nouvelle »), ses valeurs saisies, et celles qu'elle avait a l'ouverture
+ * (lues dans la fiche, sinon ses cellules) : Modifier n'envoie que ce qui en differe. Une ligne neuve porte aussi son groupe
+ * (l'onglet, ou celui de la ligne copiee), la ligne qu'elle copie, et les champs saisis de ses sections.
+ */
+type Edition = {
+  cle: number | 'nouvelle'; valeurs: string[]; ouvertes: string[]
+  groupe?: string; source?: LigneTenue; saisies?: Saisies
+}
 
 /** Aucun critere : la grille ne cherche que son texte. */
 const SansCritere: Saisies = {}
@@ -74,29 +98,51 @@ export function FormeReferentiel({ d }: { d: DescripteurEcranVue }) {
   const { vue, lignes, relire } = lues
   const [texte, poserTexte] = useState('')
   const [groupe, poserGroupe] = useState(Tous)
-  // La ligne en cours de modification (son rang, ou « nouvelle »), ses valeurs saisies, et celles qu'elle avait a
-  // l'ouverture (lues dans la fiche, sinon ses cellules) : Modifier n'envoie que ce qui en differe.
-  const [edition, poserEdition] = useState<{ cle: number | 'nouvelle'; valeurs: string[]; ouvertes: string[] } | null>(null)
+  const [edition, poserEdition] = useState<Edition | null>(null)
   const [annonce, annoncer] = useAnnonce()
 
   const { visibles: trouvees, enBase, filtre } = useRecherche(lues, texte, SansCritere)
   const visibles = trouvees.filter((l) => groupe === Tous || l.groupe === groupe)
   const nbColonnes = d.colonnes.length + 1
   const enModification = edition && edition.cle !== 'nouvelle' ? lignes.find((l) => l.i === edition.cle) : undefined
-  const { fiche: vueFiche } = useFiche(d, enModification, vue)
+  // La fiche lue : celle de la ligne modifiee, ou de la ligne copiee (ses champs pre-remplissent la copie).
+  const { fiche: vueFiche } = useFiche(d, enModification ?? edition?.source, vue)
   const fiche = vueFiche?.fiche ?? null
-  // La fiche arrive apres l'ouverture : ses valeurs remplacent les cellules que l'agent n'a pas encore changees.
+  // Les sections saisies sous une ligne neuve : celles que le descripteur fait saisir a l'ajout dans son groupe.
+  const sectionsNeuves = (e: Edition) =>
+    (e.groupe === undefined ? [] : d.sectionsAjout?.[e.groupe] ?? []).flatMap((t) => d.sections.filter((s) => s.titre === t))
+  // Les groupes ou RIG v2 ne fait que modifier : ni Ajouter dans leur onglet, ni Supprimer, ni Dupliquer.
+  const modificationSeule = (g: string) => (d.groupesModificationSeule ?? []).includes(g)
+  // Les sections d'une ligne ouverte : celles de son groupe (sectionsParGroupe), qui se saisissent ; sinon toutes celles de sa
+  // procedure, en lecture.
+  const saisitSections = (l: LigneTenue) => d.sectionsParGroupe?.[l.groupe] !== undefined
+  const sectionsDe = (l: LigneTenue) => saisitSections(l)
+    ? d.sectionsParGroupe![l.groupe]!.flatMap((t) => d.sections.filter((s) => s.titre === t))
+    : parcoursDe(d, l.groupe).sections
+  // Un champ de section qui porte une colonne se saisit dans la ligne, jamais deux fois : sous elle, il se lit.
+  const estColonne = (libelle: string) => d.colonnes.some((c) => c.libelle === libelle)
+  const ficheSousLigne = fiche && {
+    ...fiche, sections: fiche.sections.map((s) => ({ ...s, champs: s.champs.map((c) => (estColonne(c.libelle) ? { ...c, modifiable: false } : c)) })),
+  }
+  // La fiche arrive apres l'ouverture : ses valeurs remplacent les cellules que l'agent n'a pas encore changees ; sous une
+  // copie, elles remplissent les champs de ses sections que l'agent n'a pas encore saisis.
   useEffect(() => {
     if (!fiche) return
     poserEdition((e) => {
-      if (!e || e.cle === 'nouvelle') return e
+      if (!e) return e
+      if (e.cle === 'nouvelle') {
+        if (!e.source) return e
+        const lus = sectionsNeuves(e).flatMap((s) => s.champs.map((c) => [cleChamp(s.titre, c.libelle), champLu(fiche, s.titre, c.libelle)?.valeur ?? '']))
+        const saisis = Object.entries(e.saisies ?? {}).filter(([, v]) => v !== '')
+        return { ...e, saisies: Object.fromEntries([...lus, ...saisis]) }
+      }
       const lus = d.colonnes.map((c, k) => champDeColonne(fiche, c.libelle)?.valeur ?? e.ouvertes[k] ?? '')
       return { ...e, valeurs: e.valeurs.map((v, k) => (v === e.ouvertes[k] ? lus[k]! : v)), ouvertes: lus }
     })
   }, [fiche])
   // Avec la fiche lue, une colonne se saisit si l'ecrivain l'enregistre et que RIG v2 ne verrouille pas la ligne.
   const modifiable = (k: number) => !fiche || (!fiche.lectureSeule && champDeColonne(fiche, d.colonnes[k]!.libelle)?.modifiable === true)
-  const modifier = (l: LigneTenue) => { poserEdition({ cle: l.i, valeurs: cellules(d, l), ouvertes: cellules(d, l) }); annoncer(null) }
+  const modifier = (l: LigneTenue) => { poserEdition({ cle: l.i, valeurs: cellules(d, l), ouvertes: cellules(d, l), saisies: {} }); annoncer(null) }
   const changer = (k: number, v: string) => poserEdition((e) => e && { ...e, valeurs: e.valeurs.map((x, j) => (j === k ? v : x)) })
   const jouer = useGeste(d, vue, annoncer)
   const parColonne = (valeurs: string[], garder: (k: number) => boolean = () => true) =>
@@ -105,18 +151,28 @@ export function FormeReferentiel({ d }: { d: DescripteurEcranVue }) {
     if (!edition) return
     const ligne = edition.cle === 'nouvelle' ? undefined : lignes.find((l) => l.i === edition.cle)
     if (!ligne) {
-      void jouer({ type: 'Ajouter', groupe: groupe !== Tous ? groupe : d.groupes[0] ?? d.titre, ids: [], valeurs: parColonne(edition.valeurs) },
+      // Les champs de ses sections, saisis ou vides (une copie efface ainsi un champ de la ligne copiee).
+      const saisies = sectionsNeuves(edition).flatMap((s) => s.champs.map((c) => cleChamp(s.titre, c.libelle)))
+        .map((k) => [k, edition.saisies?.[k] ?? ''] as const)
+      void jouer({ type: 'Ajouter', groupe: edition.groupe ?? (groupe !== Tous ? groupe : d.groupes[0] ?? d.titre),
+                   ids: edition.source?.id ? [edition.source.id] : [], valeurs: { ...parColonne(edition.valeurs), ...Object.fromEntries(saisies) } },
         refus('Enregistrer', ': la ligne n’est pas ajoutée à la table'), () => { poserEdition(null); relire() })
       return
     }
     const changees = parColonne(edition.valeurs, (k) => modifiable(k) && edition.valeurs[k] !== edition.ouvertes[k])
-    if (Object.keys(changees).length === 0) {
+    // Les champs saisis sous la ligne (sections de son groupe) qui different de la fiche lue.
+    const lus = new Map(saisitSections(ligne) && ficheSousLigne
+      ? sectionsDe(ligne).flatMap((s) => s.champs.map((c) => [cleChamp(s.titre, c.libelle), champLu(ficheSousLigne, s.titre, c.libelle)] as const))
+      : [])
+    const champsChanges = Object.fromEntries(Object.entries(edition.saisies ?? {})
+      .filter(([k, v]) => lus.get(k)?.modifiable === true && v !== lus.get(k)?.valeur))
+    if (Object.keys(changees).length === 0 && Object.keys(champsChanges).length === 0) {
       annoncer(fiche
-        ? `Aucune colonne n’est modifiée : « ${ligne.nom} » garde les valeurs de la base.`
+        ? `Aucune ${saisitSections(ligne) ? 'valeur' : 'colonne'} n’est modifiée : « ${ligne.nom} » garde les valeurs de la base.`
         : refus('Enregistrer', ': aucune colonne n’est modifiée, la ligne garde les valeurs de la table'))
       return
     }
-    void jouer({ type: 'Modifier', groupe: ligne.groupe, ids: [ligne.id], valeurs: changees },
+    void jouer({ type: 'Modifier', groupe: ligne.groupe, ids: [ligne.id], valeurs: { ...changees, ...champsChanges } },
       refus('Enregistrer', ': la ligne n’est pas modifiée dans la table'), () => { poserEdition(null); relire() })
   }
   const supprimer = (l: LigneTenue) => void jouer({ type: 'Supprimer', groupe: l.groupe, ids: [l.id], valeurs: {} },
@@ -124,6 +180,17 @@ export function FormeReferentiel({ d }: { d: DescripteurEcranVue }) {
   const agir = (geste: string, l: LigneTenue) => void jouer({ type: 'Agir', nom: geste, groupe: l.groupe, ids: [l.id], valeurs: {} },
     refus(geste, `: « ${l.nom} » n’est pas modifié dans la table`), relire)
   const annuler = () => { poserEdition(null); annoncer(null) }
+  const ajouter = () => {
+    const vides = d.colonnes.map(() => '')
+    poserEdition({ cle: 'nouvelle', valeurs: vides, ouvertes: vides, groupe: groupe !== Tous ? groupe : d.groupes.find((g) => !modificationSeule(g)) ?? d.titre, saisies: {} })
+    annoncer(null)
+  }
+  // « Dupliquer » (RIG v2 SQLBase_Handler.Copie) : une ligne neuve de son groupe, ses cellules sauf la cle.
+  const dupliquer = (l: LigneTenue) => {
+    const copiees = cellules(d, l).map((v, k) => (k === 0 ? '' : v))
+    poserEdition({ cle: 'nouvelle', valeurs: copiees, ouvertes: copiees, groupe: l.groupe, source: l, saisies: {} })
+    annoncer(null)
+  }
 
   // fix-ok: modifier() ouvre une ligne sans cellules (sansValeurs) en cellules(d, l) = [nom, '', ...] ; rien ne se devine
   // de ses precisions, qui restent donc affichees en lecture sous les champs, avec la raison (sur « Mandataires », Abrege
@@ -149,8 +216,21 @@ export function FormeReferentiel({ d }: { d: DescripteurEcranVue }) {
           <td colSpan={nbColonnes}>
             {fiche.lectureSeule && fiche.motif
               ? <p className="rig-eg-note" role="note">Ligne en lecture seule : {fiche.motif}.</p>
-              : <p className="rig-eg-note" role="note">Fiche lue dans la base du greffe{vue?.greffe ? ` ${vue.greffe}` : ''} : seules les colonnes qui s’enregistrent se saisissent.</p>}
-            <Sections sections={parcoursDe(d, l.groupe).sections} saisies={{}} changer={() => {}} lecture fiche={fiche} />
+              : <p className="rig-eg-note" role="note">Fiche lue dans la base du greffe{vue?.greffe ? ` ${vue.greffe}` : ''} : seul{saisitSections(l) ? 's les champs' : 'es les colonnes'} qui s’enregistrent se saisissent.</p>}
+            <Sections sections={sectionsDe(l)} saisies={edition.saisies ?? {}}
+                      changer={(k, v) => poserEdition((e) => e && { ...e, saisies: { ...e.saisies, [k]: v } })}
+                      lecture={!saisitSections(l) || fiche.lectureSeule} fiche={ficheSousLigne} />
+          </td>
+        </tr>
+      )}
+      {cle === 'nouvelle' && (edition.source || sectionsNeuves(edition).length > 0) && (
+        <tr className="rig-eg-ligne--edition rig-eg-edition-ajout">
+          <td colSpan={nbColonnes}>
+            {edition.source && (
+              <p className="rig-eg-note" role="note">Copie de « {edition.source.nom} » : ce qui n’est pas saisi ici est repris de la ligne copiée.</p>
+            )}
+            <Sections sections={sectionsNeuves(edition)} saisies={edition.saisies ?? {}}
+                      changer={(k, v) => poserEdition((e) => e && { ...e, saisies: { ...e.saisies, [k]: v } })} />
           </td>
         </tr>
       )}
@@ -175,8 +255,11 @@ export function FormeReferentiel({ d }: { d: DescripteurEcranVue }) {
         <VuesListe vues={[{ cle: Tous, libelle: 'Toutes', compte: lignes.length },
                           ...d.groupes.map((g) => ({ cle: g, libelle: g, compte: lignes.filter((l) => l.groupe === g).length }))]}
                    active={groupe} choisir={poserGroupe}>
-          <button type="button" className="rig-lm-outil rig-lm-outil--fort" disabled={edition?.cle === 'nouvelle'}
-                  onClick={() => { poserEdition({ cle: 'nouvelle', valeurs: d.colonnes.map(() => ''), ouvertes: d.colonnes.map(() => '') }); annoncer(null) }}>Ajouter</button>
+          {/* Sans « Ajouter » quand la fiche RIG v2 n'ajoute pas de ligne (descripteur.ajout faux : Dates de travail). */}
+          {d.ajout !== false && !modificationSeule(groupe) && (
+            <button type="button" className="rig-lm-outil rig-lm-outil--fort" disabled={edition?.cle === 'nouvelle'}
+                    onClick={ajouter}>Ajouter</button>
+          )}
         </VuesListe>
         <Annonce texte={annonce} />
         <div className="rig-table-cadre">
@@ -204,7 +287,11 @@ export function FormeReferentiel({ d }: { d: DescripteurEcranVue }) {
                   <td className="rig-lm-cellule-menu">
                     <MenuLigne libelle={`Actions — ${l.nom}`} actions={[
                       { libelle: 'Modifier', agir: () => modifier(l) },
-                      { libelle: 'Supprimer', agir: () => supprimer(l) },
+                      // Sans « Supprimer » quand la fiche RIG v2 ne supprime pas (descripteur.suppression faux : Cabinets).
+                      ...(d.suppression !== false && !modificationSeule(l.groupe) ? [{ libelle: 'Supprimer', agir: () => supprimer(l) }] : []),
+                      // « Dupliquer » une ligne quand la fiche RIG v2 le fait (descripteur.duplication : Tables de reference).
+                      // Ni l'un ni l'autre sur un groupe ou RIG v2 ne fait que modifier (groupesModificationSeule).
+                      ...(d.duplication && !modificationSeule(l.groupe) ? [{ libelle: 'Dupliquer', agir: () => dupliquer(l) }] : []),
                       ...parcoursDe(d, l.groupe).gestes.map((g) => ({ libelle: g, agir: () => agir(g, l) })),
                     ]} />
                   </td>

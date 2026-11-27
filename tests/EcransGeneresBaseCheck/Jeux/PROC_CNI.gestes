@@ -1,0 +1,95 @@
+# « Non-inscrits » (EcrivainNonInscrits) : « Valider » cree un non-inscrit comme OPE_CNI (champs obligatoires du Designer, _Rafraichir,
+# DoVerifier l. 104-118, DoSauve l. 119-177). Lignes : PROC_CNI.sql. Messages du moteur (« « X » est obligatoire. ») et de la V2 au mot pres.
+
+# Refus : le type du non-inscrit est obligatoire (Designer l. 198). Jumeau accepte : bloc « personne physique » (type JUD).
+geste: Creer
+valeur: Type et identité › Civilité = MR
+valeur: Adresse › Adresse = 1 RUE DU BANC
+resultat: refuse
+message: « Type et identité › Type de non-inscrit » est obligatoire.
+---
+# Refus : l'adresse de l'etablissement est obligatoire (Designer l. 123). Jumeau accepte : les deux creations, avec adresse.
+geste: Creer
+valeur: Type et identité › Type de non-inscrit = JUD
+valeur: Type et identité › Civilité = MR
+resultat: refuse
+message: « Adresse › Adresse » est obligatoire.
+---
+# Refus : un type hors de TYPE_NON_INSCRIT. Jumeau accepte : « Judiciaire » (par son libelle) plus bas.
+geste: Creer
+valeur: Type et identité › Type de non-inscrit = XXX
+valeur: Type et identité › Civilité = MR
+valeur: Adresse › Adresse = 1 RUE DU BANC
+resultat: refuse
+message: « Type de non-inscrit » : « XXX » n'est pas un type de non-inscrit de la table TYPE_NON_INSCRIT.
+---
+# Refus : personne physique (MR, toujours PP) sans forme juridique (« MetierObligatoire = !isPM », l. 270). Jumeau accepte : avec forme.
+geste: Creer
+valeur: Type et identité › Type de non-inscrit = JUD
+valeur: Type et identité › Civilité = MR
+valeur: Type et identité › Nom de naissance = BANCCREE
+valeur: Type et identité › Prénoms = Paul
+valeur: Adresse › Adresse = 1 RUE DU BANC
+resultat: refuse
+message: « Type et identité › Forme juridique » est obligatoire.
+---
+# Refus : MME sans nom d'usage (l. 402). Jumeau accepte : MR, sans nom d'usage, plus bas.
+geste: Creer
+valeur: Type et identité › Type de non-inscrit = AUT
+valeur: Type et identité › Civilité = MME
+valeur: Type et identité › Nom de naissance = BANCMME
+valeur: Type et identité › Prénoms = Anne
+valeur: Type et identité › Forme juridique = 1000
+valeur: Adresse › Adresse = 1 RUE DU BANC
+resultat: refuse
+message: « Type et identité › Nom d'usage » est obligatoire.
+---
+# Refus : personne morale sans denomination (l. 97). Jumeau accepte : la creation de la personne morale.
+geste: Creer
+valeur: Type et identité › Type de non-inscrit = AUT
+valeur: Type et identité › Civilité = PM
+valeur: Adresse › Adresse = 2 RUE DU BANC
+resultat: refuse
+message: « Type et identité › Dénomination » est obligatoire.
+---
+# Refus : un SIREN deja connu (le dossier RCS 1801201 de PROC_ACTREJ.sql, SIREN 518012010) : DoVerifier, au mot pres. Jumeau accepte :
+# la personne morale, sans SIREN.
+geste: Creer
+valeur: Type et identité › Type de non-inscrit = AUT
+valeur: Type et identité › Civilité = PM
+valeur: Type et identité › Dénomination = BANC CNI SIREN
+valeur: Type et identité › SIREN = 518 012 010
+valeur: Adresse › Adresse = 2 RUE DU BANC
+resultat: refuse
+message: Une entreprise existe déjà pour le siren 518012010, vous devez créer votre non inscrit sur cette entreprise. Quittez le processus actuel, lancez une recherche par siren puis choisissez "CNI sur entreprise sélectionnée".
+---
+# Une personne physique de type judiciaire (par son libelle) : entreprise representante (designation sans civilite), non-inscrit numerote
+# RGNI de l'annee de WINS (2026, PROC_GESTDATE.sql), etablissements NQ et NQS (type JUD), demande CNI validee au nom « M. BANCCREE Paul ».
+geste: Creer
+valeur: Type et identité › Type de non-inscrit = Judiciaire
+valeur: Type et identité › Civilité = MR
+valeur: Type et identité › Nom de naissance = BANCCREE
+valeur: Type et identité › Prénoms = Paul
+valeur: Type et identité › Forme juridique = 1000
+valeur: Naissance › Date de naissance = 1970-05-14
+valeur: Adresse › Adresse = 1 RUE DU BANC
+valeur: Adresse › Code postal = 38000
+valeur: Adresse › Ville = GRENOBLE
+resultat: fait
+message: Non-inscrit 2026000001 créé : BANCCREE Paul.
+controle: SELECT CONCAT(n.NINSC_TYPE_NON_INSCRIT, '/', n.NINSC_CIVILITE, '/', n.NINSC_PATRONYME, '/', n.NINSC_PRENOMS, '/', CAST(n.NINSC_PM AS int), '/', n.NINSC_PAYS, '/', CONVERT(varchar(10), n.NINSC_DATE_NAISSANCE, 23), '/', n.NINSC_ETAT_INFO, CAST(n.NINSC_PRINCIPAL AS int), CAST(n.NINSC_INSCRIT_REGISTRE_METIER AS int), '/', ISNULL(n.NINSC_DENOMINATION, 'sans denomination')) FROM v2.NON_INSCRIT AS n WHERE n.NINSC_NUM_NON_INSCRIT = '2026000001' => JUD/MR/BANCCREE/Paul/0/FRA/1970-05-14/110/sans denomination
+controle: SELECT CONCAT(e.Civilite, '/', e.Denomination, '/', e.FormeJuridique, '/', e.EtatInfo, '/', a.NomVoie, ' ', a.CodePostal, ' ', a.Localite) FROM v2.NON_INSCRIT AS n JOIN rec.Entreprise AS e ON e.Id = n.NINSC_ID_RPRTR JOIN rec.Adresse AS a ON a.Id = e.IdAdresse WHERE n.NINSC_NUM_NON_INSCRIT = '2026000001' => MR/BANCCREE Paul/1000/1/1 RUE DU BANC 38000 GRENOBLE
+controle: SELECT STRING_AGG(CONCAT(t.ETBLS_TYPE_ADRESSE, ':', t.ETBLS_NUM_ORDRE, ':', CAST(t.ETBLS_COMMERCIAL AS int), ':', CASE WHEN t.ETBLS_ID_ADRBS = e.IdAdresse THEN 'meme adresse' ELSE 'autre adresse' END), ', ') WITHIN GROUP (ORDER BY t.ETBLS_TYPE_ADRESSE) FROM v2.NON_INSCRIT AS n JOIN rec.Entreprise AS e ON e.Id = n.NINSC_ID_RPRTR JOIN v2.ETABLISSEMENT AS t ON t.ETBLS_ID_NINSC = n.NINSC_ID_NINSC WHERE n.NINSC_NUM_NON_INSCRIT = '2026000001' => NQ:1:0:meme adresse, NQS:1:1:meme adresse
+controle: SELECT STRING_AGG(CONCAT(ISNULL(CAST(t.ETBLS_AMBULANT AS varchar(1)), 'NULL'), ISNULL(CAST(t.ETBLS_ATTENTE_PIECE AS varchar(1)), 'NULL')), ',') FROM v2.NON_INSCRIT AS n JOIN v2.ETABLISSEMENT AS t ON t.ETBLS_ID_NINSC = n.NINSC_ID_NINSC WHERE n.NINSC_NUM_NON_INSCRIT = '2026000001' => 00,00
+controle: SELECT CONCAT(d.DMND_ETAT_DEMANDE, '/', d.DMND_NOM, '|') FROM v2.DEMANDE AS d WHERE d.DMND_CODE_PROSS = 'CNI' AND d.DMND_ID_DMND NOT IN (2400961, 2400962, 2400963) AND d.DMND_NOM LIKE 'M. BANCCREE%' => V/M. BANCCREE Paul |
+---
+# Une personne morale (PM) de type « Autre » : sa denomination, un seul etablissement NQ, la demande a son nom ; les champs PP restent NULL.
+geste: Creer
+valeur: Type et identité › Type de non-inscrit = AUT
+valeur: Type et identité › Civilité = PM
+valeur: Type et identité › Dénomination = BANC CNI SOCIETE
+valeur: Type et identité › Nom de naissance = IGNORE
+valeur: Adresse › Adresse = 2 RUE DU BANC
+resultat: fait
+message: Non-inscrit 2026000002 créé : BANC CNI SOCIETE.
+controle: SELECT CONCAT(CAST(n.NINSC_PM AS int), '/', n.NINSC_DENOMINATION, '/', ISNULL(n.NINSC_PATRONYME, 'sans patronyme'), '/', (SELECT COUNT(*) FROM v2.ETABLISSEMENT AS t WHERE t.ETBLS_ID_NINSC = n.NINSC_ID_NINSC)) FROM v2.NON_INSCRIT AS n WHERE n.NINSC_NUM_NON_INSCRIT = '2026000002' => 1/BANC CNI SOCIETE/sans patronyme/1
