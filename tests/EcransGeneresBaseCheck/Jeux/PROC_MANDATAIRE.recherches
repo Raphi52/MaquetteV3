@@ -1,0 +1,26 @@
+# La recherche des « Mandataires » (LecteurMandataires) : les criteres de FormRecherche_MANDATAIRE.cs:179-198, ajoutes a la liste.
+# Le champ de recherche : le nom ou l'abrege -- « dbg » trouve l'abrege DBG24, pas son doublon sans abrege (jumeau : bloc 3, qui
+# trouve les deux par le nom).
+texte: dbg
+lignes:
+Me DOUBLON Garde | abrégé DBG24 | Personne physique | Validee | [0,2]
+---
+# « Numéro CNBF » : egalite stricte (MNDTR_NUMERO_CNBF = …) ; 240001 seul -- jumeau ecarte : 150001 (ARDOISE).
+critere: Numéro CNBF = 240001
+lignes:
+M. CNBF Actif | non répertorié · CNBF 240001 | Personne physique | Validee | [0]
+---
+# « Désignation » : LIKE %x%, « * » est le joker de la V2 (l. 180) : « doub*garde » trouve les deux homonymes, actifs, par id.
+critere: Désignation = doub*garde
+lignes:
+Me DOUBLON Garde | abrégé DBG24 | Personne physique | Validee | [0,2]
+Me DOUBLON Garde | non répertorié | Personne physique | Validee | [0]
+---
+# « SIREN » : saisi avec ses blancs, compare sans (MNDTR_SIREN = …).
+critere: SIREN = 900 500 002
+lignes:
+KAPPA AVOCATS SELARL | abrégé KAPPA15 · SIREN 900 500 002 | Personne morale | Validee | [0,2]
+---
+# Un CNBF de structure que personne ne porte : rien.
+critere: CNBF de structure = 999999
+lignes:

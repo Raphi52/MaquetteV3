@@ -13,6 +13,13 @@ namespace RigV3Desktop.Pont.EcransGeneres;
 // Les procedures sans « Detail OPE » dans leur fiche (PROC_GED_NATURE_DOC) sont decrites d'apres
 // leurs autres sections.
 //
+// Lot 14 du plan « RIG v3 100 % fonctionnel » (27/11/2026) : les descripteurs des acteurs et referentiels (Mandataires, Rapprocher
+// des acteurs, Tiers payeurs, Natures de document, Codes chefs IP, Dates de travail...) sont realignes sur le code V2 que lisent
+// leurs lecteurs et ecrivains (Serveur/Socle/EcransGeneres/). fix-ok: mesure le 27/11/2026 en lisant le code V2 -- ces descripteurs
+// portaient les criteres, colonnes et sections des exemples du lot 7 (FormRecherche_MANDATAIRE.cs:179-198 cherche par nom, CNBF,
+// CNBF de structure et SIREN, pas par abrege ; PROC_RAPPACTEUR n'a ni « Acteurs à supprimer » ni « Confirmation » saisis) : une
+// edition par descripteur, chacune citee la ou elle porte.
+//
 // PROC_PARAM_LISTEEXCEL n'a PAS de descripteur : sa fiche RIG v2 ne decrit aucune fonction
 // (« Nature reelle du plugin : une coquille, pas une couche OPE »). Un ecran inventerait du
 // contenu, ce que le plan interdit : il reste « a venir » dans le menu, a trancher par le chef.
@@ -28,7 +35,8 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             // Colonnes : les champs des sections ci-dessous (fiche, Identite, Abrege, Adresse, Qualification).
             Colonnes = ["Désignation", "Civilité", "Abrégé", "SIREN", "Courriel", "Qualification", Champ.Case("Actif")],
             Recherche = "Rechercher un mandataire, un abrégé, un SIREN…",
-            Criteres = ["Désignation", "Abrégé", "SIREN"],
+            // Criteres de la recherche de la V2 (FormRecherche_MANDATAIRE.cs:179-198) : nom, CNBF, CNBF de structure, SIREN.
+            Criteres = ["Désignation", "Numéro CNBF", "CNBF de structure", "SIREN"],
             // Bouton final cite par la fiche v2 : DoSauve : Mandataire.Sauve (proc_mandataire.md, Detail OPE)
             Valider = "Enregistrer le mandataire",
             Rang = 7,
@@ -45,7 +53,11 @@ public sealed class DomaineConfigurer : IDomaineEcrans
                 new MarcheEcran("Client de facturation", "Le client est choisi parmi les comptes en compte du greffe ; la recherche client ouvre une fenêtre dédiée.", false,
                     ["Client de facturation", "Recherche client"]),
                 new MarcheEcran("Qualification", "La qualification de la profession et les infos complémentaires. L'état « actif » n'apparaît qu'en modification.", false,
-                    ["Qualification", "Infos complémentaires", "Actif"]),
+                    ["Qualification", "Infos complémentaires", Champ.Case("Actif")]),
+                // Mandataire.GetLiaisonEntite (Mandataire.cs:477-490) : ce qui reference le mandataire. RIG v2 ne supprime un
+                // mandataire qu'apres avoir repris ces liaisons sur un autre (PROC_RAPPACTEUR).
+                new MarcheEcran("Utilisations", "Les affaires et pièces qui citent ce mandataire. Un mandataire utilisé ne se supprime pas : ses liaisons se reprennent d'abord sur un autre (« Rapprocher des acteurs »). Un mandataire actif qui a un numéro CNBF ne se supprime pas.", false,
+                    [Champ.Tableau("Liaisons")]),
             ],
             Lignes =
             [
@@ -65,26 +77,26 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             Code = "PROC_RAPPACTEUR", Titre = "Rapprocher des acteurs", Sujet = "acteurs à fusionner",
             Forme = FormeEcran.Operation,
             Recherche = "Rechercher un acteur à garder…",
-            Criteres = ["Type d'acteur", "Acteur à garder", "Acteurs à supprimer"],
+            // La recherche de la V2 : le type, puis le nom (chaque mot dans le nom, le prenom et l'abrege, _Collate,
+            // OPE_SELECTION_ACTEUR.cs:169). Lignes et apercu : LecteurRapprochementActeurs.cs ; fusion : EcrivainRapprochementActeurs.cs.
+            Criteres = ["Type d'acteur", "Nom"],
             // Bouton final cite par la fiche v2 : _Valider, sauvegarde apres confirmation (proc_rappacteur.md, Detail OPE)
             Valider = "Valider",
             Rang = 7,
-            Etats = EtatsEcran.Trois("À choisir", "En cours", "Fusionné"),
+            // L'etat dit si l'acteur peut etre coche « a supprimer » : un mandataire actif a numero CNBF ne se supprime pas
+            // (Res.TEXTE_MANDATAIRE_ACTIF_AVEC_CNBF), sa ligne est figee.
+            Etats = EtatsEcran.Trois("Actif", "Inactif", "Protégé (actif, n° CNBF)"),
             Groupes = ["Juges", "Mandataires", "Mandataires PC"],
             Sections =
             [
-                new MarcheEcran("Type d'acteur", "Un seul type à la fois : juges, mandataires ou mandataires PC. Changer de type vide la sélection.", true,
-                    ["Type d'acteur"]),
-                new MarcheEcran("Acteur à garder", "Seul un acteur actif peut être gardé. Le juge paramétré comme juge système ne peut pas être gardé.", true,
-                    ["Acteur à garder", "Fiche de l'acteur gardé"]),
-                new MarcheEcran("Acteurs à supprimer", "Au moins un acteur à supprimer est coché. Un mandataire actif qui a un numéro CNBF ne peut pas être supprimé.", true,
-                    ["Acteurs à supprimer"]),
-                new MarcheEcran("Liaisons reprises", "Toutes les liaisons des acteurs supprimés (instances, décisions, audiences, éditions) passent à l'acteur gardé, dans une seule transaction.", false,
-                    ["Instances", "Décisions", "Audiences", "Éditions"]),
-                new MarcheEcran("Confirmation", "Le nom de l'acteur gardé et la liste des acteurs supprimés sont affichés. Sans « Oui », rien n'est écrit.", true,
-                    ["Confirmation"]),
-                new MarcheEcran("Piste d'audit", "Chaque suppression laisse une trace horodatée : utilisateur, acteur supprimé, acteur gardé.", false,
-                    ["Trace"]),
+                new MarcheEcran("Type d'acteur", "Un seul type à la fois : juges, mandataires ou mandataires PC. Les acteurs cochés sont ceux à supprimer ; cochez-les dans la grille, ils sont tous du même type.", false,
+                    [Champ.Liste("Type d'acteur", "Juges", "Mandataires", "Mandataires PC")]),
+                new MarcheEcran("Acteur à garder", "Le numéro ou l'abrégé de l'acteur qui reprend les affaires : du même type, actif et répertorié (avec un abrégé), et non coché. Un mandataire actif qui a un numéro CNBF ne peut pas être supprimé.", true,
+                    ["Acteur à garder"]),
+                new MarcheEcran("Liaisons reprises", "Ouvrez la ligne d'un acteur coché : ses liaisons et les affaires touchées passeront à l'acteur gardé, dans une seule transaction, puis il sera supprimé. ATTENTION CETTE OPERATION EST IRREVERSIBLE.", false,
+                    [Champ.Tableau("Liaisons"), Champ.Tableau("Affaires touchées")]),
+                new MarcheEcran("Piste d'audit", "Chaque suppression laisse une trace datée (ACTEUR_SUPP) : l'auteur, l'acteur supprimé, l'acteur gardé et les reprises faites.", false,
+                    []),
             ],
             Lignes =
             [
