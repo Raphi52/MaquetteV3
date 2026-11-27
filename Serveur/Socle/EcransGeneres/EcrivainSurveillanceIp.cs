@@ -20,8 +20,10 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// :630-636) : « Juge » (cboJuge, MetierObligatoire, OPE_RECHERCHE.Designer.cs:133 ; abrege d'un juge actif), « Greffier » et
 /// « Date prévue » (facultatifs) -- ils ne servent qu'a l'opposition (OP) creee ; et les cases « LRAR » et « LR » de la grille de
 /// RIG v2 (cellules LRAR / LR, une par ligne ; la case d'en-tete les pose sur toutes, :262-283) : ici une fois pour le lot, LRAR
-/// l'emportant sur LR comme dans le code (:744-760). RIG v2 les grise sur une ligne qui enrole une OP (:151-166) : elles y sont
-/// sans effet.
+/// l'emportant sur LR comme dans le code (:744-760). POURQUOI une fois : la liste a cocher de la V3 (FormeFile.tsx) envoie UNE
+/// saisie par geste pour toutes les lignes cochees (GesteEcran.Valeurs, un dictionnaire libelle -> valeur), pas une cellule par
+/// ligne. Le meme resultat que la V2 s'obtient en deux passages : cocher les IP a envoyer en LRAR, cocher « LRAR », appliquer ;
+/// puis les autres. RIG v2 grise ces cases sur une ligne qui enrole une OP (:151-166) : elles y sont sans effet.
 ///
 /// CONTROLES, avant toute ecriture :
 ///   1. « « Juge » est obligatoire. » (l'etape de recherche) ; un juge inconnu, inactif ou en double est refuse ;
@@ -66,9 +68,11 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///     (« <libelle> <role IP> », entite DECI_JUDICIAIRE, :3509-3520 ; RelancesRsurv.EditionAsync).
 /// Une IP traitee sort de la liste : son evenement futur n'est plus futur (la regle du lecteur).
 ///
-/// NON REPRIS (nommes, le message du geste le dit) : les EDITIONS des evenements survenus (eveProSurvenu.CreateDemandeEdition,
-/// :822-835 : maquettes CEP_EDITION et destinataires de l'instance -- la V3 ne calcule pas encore les editions d'un evenement,
-/// meme reserve qu'EcrivainRetourAudience) et celles des evenements de creation de l'OP ; la reedition de l'ordonnance en TITRE
+/// LES EDITIONS des evenements survenus (eveProSurvenu.CreateDemandeEdition, :822-835), sur la demande SURVIP, et celles des
+/// evenements de creation de l'OP, sur sa demande OPE (Instance.cs:3471-3476) : EditionsEvenement.cs (maquettes CEP_EDITION du
+/// code, une ligne v2.DEMANDE_EDITION par destinataire) ; ce qu'il ne reprend pas est dit dans le message.
+///
+/// NON REPRIS (nommes, le message du geste le dit) : la reedition de l'ordonnance en TITRE
 /// EXECUTOIRE (TrtTitreExecu, :1029-1051 : fichier PDF de la GED Vidiged, service externe) ; les pieces numerisees
 /// (GererPiecesNum) ; la ligne de rapport general ; les MOTS DIRECTEURS de l'OP (GenererMotDirecteur, :552-554) ; l'impression
 /// demat du juge signataire (JUG_SIGNATURE_DEMAT_TYPE_INSTANCES, :3513-3515). La facture : RIG v2 ne facture pas en SURVIP
@@ -143,6 +147,7 @@ internal sealed class EcrivainSurveillanceIp : IEcrivainEcran
         var traces = new List<TraceGeste>();
         var objets = new List<string>();
         var editions = new List<string>();
+        var bilans = new List<EditionsEvenement.Bilan>();
 
         // 3. Ligne par ligne (PreparationTraitements, :641-861).
         foreach (var id in ids)
@@ -180,7 +185,7 @@ internal sealed class EcrivainSurveillanceIp : IEcrivainEcran
             (int Id, string Role, string? Ordonnance)? op = null;
             if (codeOp is not null)
             {
-                var (creee, refusOp) = await CreerOpAsync(geste, e, codeOp, juge!, idGreffier, datePrevue, ct);
+                var (creee, refusOp) = await CreerOpAsync(geste, e, codeOp, juge!, idGreffier, datePrevue, bilans, ct);
                 if (creee is null) return IssueGeste.Refuser(refusOp!);
                 op = creee;
                 if (creee.Value.Ordonnance is { } o) editions.Add(o);
@@ -196,6 +201,8 @@ internal sealed class EcrivainSurveillanceIp : IEcrivainEcran
                     $"UPDATE v2.EVENEMENT_PROCEDURE SET EVNPR_SURVENU = 1, EVNPR_DATE = @jour, EVNPR_DATE_MAXI = NULL, EVNPR_DATE_MINI = NULL, EVNPR_DATE_FIXE = NULL{Texte(colonnesEve)} WHERE EVNPR_ID_EVNPR = @id",
                     ct, new SqlParameter("@jour", geste.Maintenant.Date), new SqlParameter("@id", e.IdEvenement));
                 survenu = e.Code;
+                // Ses editions (eveProSurvenu.CreateDemandeEdition, :822-835), sur la demande SURVIP.
+                bilans.Add(await EditionsEvenement.CreerAsync(geste, idDemande.Value, numeroDemande, e.IdEvenement, ct));
                 // La derniere opposition encore attendue passe expiree (:727-735), sans evenement survenu.
                 await geste.EcrireAsync($"""
                     UPDATE v2.EVENEMENT_PROCEDURE SET EVNPR_DELAI_EXPIRE = 1{Texte(colonnesEve)}
@@ -217,7 +224,10 @@ internal sealed class EcrivainSurveillanceIp : IEcrivainEcran
                     // Une ligne qui enrole une OP a ses cases grisees (:151-166).
                     if (code is not null && codeOp is null && (lrar || lr)) code = await SuffixeAsync(geste, code, lrar ? "LR" : "R", ct);
                 }
-                survenu = await ExpirerAsync(geste, e, code, colonnesEve, ct);
+                int? idSurvenu;
+                (survenu, idSurvenu) = await ExpirerAsync(geste, e, code, colonnesEve, ct);
+                // Les editions de l'evenement survenu (:822-835) ; un expire sans survenu n'en a pas.
+                if (idSurvenu is { } ids2) bilans.Add(await EditionsEvenement.CreerAsync(geste, idDemande.Value, numeroDemande, ids2, ct));
             }
 
             var quoi = FormeLigne.Joindre($"IP {e.Role} {Libelle(type)}", survenu is null ? null : $"événement {survenu}",
@@ -238,8 +248,8 @@ internal sealed class EcrivainSurveillanceIp : IEcrivainEcran
         var nb = faits.Count;
         var message = $"Traitements appliqués à {nb} injonction{(nb > 1 ? "s" : "")} de payer : {string.Join(" ; ", faits)}"
                     + (editions.Count == 0 ? "" : $" ; ordonnance{(editions.Count > 1 ? "s" : "")} « {string.Join(" », « ", editions.Distinct())} » en file d'édition")
-                    + ". Non repris par la V3 : les éditions des événements, la réédition de l'ordonnance en titre exécutoire (fichier de la GED) "
-                    + "et les mots directeurs des oppositions."
+                    + "." + EditionsEvenement.Message(bilans)
+                    + " Non repris par la V3 : la réédition de l'ordonnance en titre exécutoire (fichier de la GED) et les mots directeurs des oppositions."
                     + (erreurs.Count == 0 ? "" : " Erreurs : " + string.Join(" ; ", erreurs));
         return IssueGeste.Ecrit(message, [.. objets], [.. traces]);
     }
@@ -282,20 +292,20 @@ internal sealed class EcrivainSurveillanceIp : IEcrivainEcran
                                         new SqlParameter("@c", code + suffixe)) is string s ? s.Trim() : code;
 
     /// <summary>L'evenement futur passe expire ; si <paramref name="code"/> est donne, l'evenement survenu de ce code est cree du jour,
-    /// lie a l'expire par son numero source (creationEvenementSurvenuDepuisExpire, EvenementProcedure.cs:1816-1846). Rend le code cree.</summary>
-    private static async Task<string?> ExpirerAsync(GesteEnCours geste, Echeance e, string? code, HashSet<string> colonnes, CancellationToken ct)
+    /// lie a l'expire par son numero source (creationEvenementSurvenuDepuisExpire, EvenementProcedure.cs:1816-1846). Rend le code et l'id crees.</summary>
+    private static async Task<(string? Code, int? Id)> ExpirerAsync(GesteEnCours geste, Echeance e, string? code, HashSet<string> colonnes, CancellationToken ct)
     {
         var source = e.NumeroSource;
         if (source is null && colonnes.Contains("EVNPR_NUMERO_SOURCE")) source = Guid.NewGuid().ToString().ToUpperInvariant();
         await geste.EcrireAsync(
             $"UPDATE v2.EVENEMENT_PROCEDURE SET EVNPR_DELAI_EXPIRE = 1{Texte(colonnes)}{(source is not null && e.NumeroSource is null ? ", EVNPR_NUMERO_SOURCE = @s" : "")} WHERE EVNPR_ID_EVNPR = @id",
             ct, new SqlParameter("@id", e.IdEvenement), new SqlParameter("@s", (object?)source ?? DBNull.Value));
-        if (code is null) return null;
+        if (code is null) return (null, null);
         var idSurvenu = await EcrivainRetourAudience.EvenementSurvenuAsync(geste, e.IdInstance, code, geste.Maintenant.Date, ct);
         if (source is not null && colonnes.Contains("EVNPR_NUMERO_SOURCE_EP_LIE"))
             await geste.EcrireAsync("UPDATE v2.EVENEMENT_PROCEDURE SET EVNPR_NUMERO_SOURCE_EP_LIE = @s WHERE EVNPR_ID_EVNPR = @id", ct,
                 new SqlParameter("@s", source), new SqlParameter("@id", idSurvenu));
-        return code;
+        return (code, idSurvenu);
     }
 
     /// <summary>Les reglages « si pas enroler OP » (PARAMETRAGE de RIG v2, repris dans soc.Reglage) : le code et ses variantes LRAR / LR
@@ -387,7 +397,7 @@ internal sealed class EcrivainSurveillanceIp : IEcrivainEcran
     /// <summary>CreateInstanceOPSurIP puis ValiderInstancesDemandes (en tete du fichier) : l'OP, ses parties, son dossier judiciaire,
     /// ses evenements, sa decision et son ordonnance, et sa demande OPE validee.</summary>
     private static async Task<((int Id, string Role, string? Ordonnance)? Op, string? Refus)> CreerOpAsync(GesteEnCours geste, Echeance ip, CodeOp code,
-        Juge juge, int? idGreffier, DateTime? datePrevue, CancellationToken ct)
+        Juge juge, int? idGreffier, DateTime? datePrevue, List<EditionsEvenement.Bilan> bilans, CancellationToken ct)
     {
         var jour = geste.Maintenant.Date;
         var annee = geste.Maintenant.Year;
@@ -468,8 +478,12 @@ internal sealed class EcrivainSurveillanceIp : IEcrivainEcran
         }
 
         // Les evenements de creation du code affaire, survenus du jour.
+        // Leurs editions, sur la demande OPE (eveCA.CreateDemandeEdition(ddeOPE), Instance.cs:3471-3476).
         foreach (var eve in (code.EvenementsCreation ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
-            await EcrivainRetourAudience.EvenementSurvenuAsync(geste, idOp, eve, jour, ct);
+        {
+            var idEve = await EcrivainRetourAudience.EvenementSurvenuAsync(geste, idOp, eve, jour, ct);
+            bilans.Add(await EditionsEvenement.CreerAsync(geste, demande.Id, demande.Numero, idEve, ct));
+        }
 
         // La decision du type du code affaire, et son ordonnance.
         var decision = (await EcrivainMiseAuPointChambres.CreerDecisionAsync(geste, idOp, role, code.TypeDecision, datePrevue, null, ct))[0];

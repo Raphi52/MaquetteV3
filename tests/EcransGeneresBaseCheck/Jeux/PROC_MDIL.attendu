@@ -25,6 +25,12 @@ RELANCE OMICRON SAS · SIREN 518 004 401 | Dossier RCS 2026 B 18401 · SDCA · 1
 RBE QUATORZE SAS · SIREN 518 002 214 | Dossier RCS 2026 B 18214 · SDBE · non relancée | Sans relance | AFaire | []
 RBE TREIZE SAS · SIREN 518 002 213 | Dossier RCS 2026 B 18213 · SDBE · non relancée | Sans relance | AFaire | []
 # Lot 8 (27/11/2026) : les diligences SDBE de 1800102 et 1800103 (PROC_DBE_INJ.sql, jumeaux ecartes de l'injonction).
+# Lot 8 (27/11) : les diligences SDBE 1800104-08 de PROC_DBE_INJ.sql (exclusions de l'injonction ; PROC_MDIL lit toutes les diligences).
+ENJOINDRE DEJA OPINJRBE · SIREN 518 000 108 | Dossier RCS 2018 B 80108 · SDBE · 1 relance | Avec relance | AFaire | []
+ENJOINDRE DEMANDE MB1 · SIREN 518 000 107 | Dossier RCS 2018 B 80107 · SDBE · 1 relance | Avec relance | AFaire | []
+ENJOINDRE FORMALITE BEN · SIREN 518 000 106 | Dossier RCS 2018 B 80106 · SDBE · 1 relance | Avec relance | AFaire | []
+ENJOINDRE DEPOT BEN · SIREN 518 000 105 | Dossier RCS 2018 B 80105 · SDBE · 1 relance | Avec relance | AFaire | []
+ENJOINDRE SIEGE UE · SIREN 518 000 104 | Dossier RCS 2018 B 80104 · SDBE · 1 relance | Avec relance | AFaire | []
 ENJOINDRE SANS BEN · SIREN 518 000 103 | Dossier RCS 2018 B 80103 · SDBE · 1 relance | Avec relance | AFaire | []
 ENJOINDRE COTEE SA · SIREN 518 000 102 | Dossier RCS 2018 B 80102 · SDBE · 1 relance | Avec relance | AFaire | []
 ENJOINDRE SANS GERANT SAS · SIREN 518 000 101 | Dossier RCS 2018 B 80101 · SDBE · 1 relance | Avec relance | AFaire | []

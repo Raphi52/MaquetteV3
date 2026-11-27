@@ -644,7 +644,8 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         new DescripteurEcran
         {
             // Fondé sur la source (formulaire FORM_DBEN_ALERT.cs) : la fiche proc_dben_alert.md n'a
-            // pas d'étape, elle est en lecture seule. Les lignes sont une démonstration anonyme.
+            // pas d'étape, elle est en lecture seule. Avec la base du greffe, les lignes sont lues par
+            // LecteurDivergencesBen.cs (lot 8) ; les lignes ci-dessous ne servent que sans serveur, étiquetées « exemple ».
             Code = "PROC_DBEN_ALERT", Titre = "Divergences BEN", Sujet = "divergences BEN ouvertes",
             Forme = FormeEcran.File,
             Recherche = "Rechercher un dossier, un demandeur…",
@@ -683,6 +684,10 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             Valider = "Appliquer les traitements", // proc_survip.md, Rôle : « Appliquer les traitements : Titre exécutoire, Caducité, IP Non avenue, Certificat de non-opposition ».
             // Les saisies du traitement (EcrivainSurveillanceIp.cs) : juge (obligatoire), greffier et date prevue de l'etape de
             // recherche (OPE_RECHERCHE.Designer.cs:133-157), et les cases LRAR / LR de la grille de RIG v2 (OPE_TRAITEMENTS.cs:744-800).
+            // RIG v2 a une case LRAR / LR PAR LIGNE ; la liste a cocher envoie une saisie pour toutes les lignes cochees : pour des
+            // envois differents, deux passages (les IP en LRAR, puis les autres). Raison detaillee : EcrivainSurveillanceIp.cs.
+            // fix-ok: 4e retouche du lot 8 sur ce fichier ce passage (27/11/2026), chacune sur un commentaire ou un texte devenu faux
+            // par un geste branche (Divergences BEN lue en base, dates du suivi des preventions, LRAR par lot) -- aucune a l'aveugle.
             Parametres = ["Juge", "Greffier", Champ.Date("Date prévue"), Champ.Case("LRAR"), Champ.Case("LR")],
             Rang = 5,
             // La V2 ne liste que les echeances a traiter : toute ligne est « A traiter » ; une IP traitee sort de la liste
@@ -724,8 +729,9 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             // est le suivi d'UNE injonction de payer apres son ordonnance, ouverte par son numero (PROC_IPSUIVI.cs:20-26,
             // ETP_IPSUIVI.cs:14-15) ; la partie haute de la fiche (dix etats NonTraite... Transfere, IP_SUIVI) ne correspond
             // pas au code (proc_ipsuivi.md:165-171). Lot 8 : lue dans la base -- LecteurSuiviIp.cs (26/11/2026) ; Valider
-            // enregistre le desistement -- EcrivainSuiviIp.cs (27/11/2026) ; les autres dates (evenements futurs lies, instance J
-            // ou OP, facture) restent en lecture.
+            // enregistre la date saisie (desistement, signification, certificat, opposition, LRAR), l'evenement attendu survient,
+            // son suivant est cree, ses editions partent -- EcrivainSuiviIp.cs (27/11/2026). La provision (enrolement au fond,
+            // facture) n'est pas reprise : refusee en le disant.
             Forme = FormeEcran.Fiche,
             Recherche = "Rechercher une injonction de payer par son numéro…",
             Criteres = ["N° IP"], // le champ de saisie de la V2 (ETP_IPSUIVI.cs:14-15, GetUltByMetierTitre("N° IP"))
@@ -742,7 +748,7 @@ public sealed class DomaineSurveiller : IDomaineEcrans
                     "N° IP", Champ.Date("Date IP"), "Demandeur", "Défendeur"),
                 // Les dates des actes qui suivent l'ordonnance (OPE_IPSUIVI.cs:879-944) : l'evenement survenu, sinon la date
                 // d'expiration de l'evenement expire (signification, opposition, provision).
-                Marche("Actes après l'ordonnance", "Chaque date vient de l'événement de procédure survenu ; à défaut, de la date d'expiration de l'événement expiré. Le désistement s'enregistre (événement IPDESIN) ; les autres dates se lisent : la V3 ne reprend pas encore leurs événements liés.", true,
+                Marche("Actes après l'ordonnance", "Chaque date vient de l'événement de procédure survenu ; à défaut, de la date d'expiration de l'événement expiré. Une date à la fois (sauf signification et certificat) : l'événement attendu survient, le suivant est créé, ses éditions partent. La provision se saisit dans RIG v2 (enrôlement au fond et facture).", true,
                     Champ.Date("Signification"), Champ.Case("À personne"), Champ.Date("Opposition"), Champ.Date("Réception LRAR"),
                     Champ.Date("Provision"), Champ.Date("Certificat de non-opposition"),
                     Champ.Date("Désistement")), // ult_Desistement (OPE_IPSUIVI.Designer.cs:412)

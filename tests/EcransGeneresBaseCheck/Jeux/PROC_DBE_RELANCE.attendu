@@ -29,6 +29,12 @@ BENEF THETA SAS · SIREN 511 000 208 | Relance 2 du {J-5} | DBE non déposée | 
 BENEF BETA SAS · SIREN 511 000 202 | Relance 1 du {J-10} · limite {J+20} | DBE non déposée | Validee | [0,1,2]
 BENEF ZETA SAS · SIREN 511 000 206 | Relance 1 du {J-30} · limite {J+0} | DBE non déposée | Validee | [0,1,2]
 # Lot 8 (27/11/2026) : 1800102 et 1800103 (PROC_DBE_INJ.sql), relance echue mais ecartes de l'injonction (societe cotee, forme sans beneficiaires) : leur relance reste ici.
+# Lot 8 (27/11) : les dossiers 1800104-08 de PROC_DBE_INJ.sql, relance 1 echue, que l'injonction ecarte (une exclusion chacun) : Relancee ici.
+ENJOINDRE DEJA OPINJRBE · SIREN 518 000 108 | Relance 1 du {J-31} · limite {J-1} | DBE non déposée | Validee | [0,1,2]
+ENJOINDRE DEMANDE MB1 · SIREN 518 000 107 | Relance 1 du {J-31} · limite {J-1} | DBE non déposée | Validee | [0,1,2]
+ENJOINDRE FORMALITE BEN · SIREN 518 000 106 | Relance 1 du {J-31} · limite {J-1} | DBE non déposée | Validee | [0,1,2]
+ENJOINDRE DEPOT BEN · SIREN 518 000 105 | Relance 1 du {J-31} · limite {J-1} | DBE non déposée | Validee | [0,1,2]
+ENJOINDRE SIEGE UE · SIREN 518 000 104 | Relance 1 du {J-31} · limite {J-1} | DBE non déposée | Validee | [0,1,2]
 ENJOINDRE SANS BEN · SIREN 518 000 103 | Relance 1 du {J-31} · limite {J-1} | DBE non déposée | Validee | [0,1,2]
 ENJOINDRE COTEE SA · SIREN 518 000 102 | Relance 1 du {J-31} · limite {J-1} | DBE non déposée | Validee | [0,1,2]
 BENEF ETA SARL · SIREN 511 000 207 | Relance 1 du {J-31} · limite {J-1} | DBE non déposée | Validee | [0,1,2]

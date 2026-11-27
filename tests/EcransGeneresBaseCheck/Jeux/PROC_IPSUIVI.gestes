@@ -1,14 +1,15 @@
-# « Suivi des preventions » (PROC_IPSUIVI) : « Valider » enregistre le desistement d'une injonction de payer (EcrivainSuiviIp =
-# le traitement IPDesistement d'OPE_IPSUIVI.cs:1762-1772 et les alertes de Remplir_IP, :976-1055). Les IP : PROC_IPSUIVI.sql (18015xx,
-# 18016xx). La date saisie est litterale (15/01/2099 : jamais avant la date de l'IP). Lot 8 du plan « RIG v3 100 % fonctionnel », 27/11/2026.
+# « Suivi des preventions » (PROC_IPSUIVI) : « Valider » enregistre la date saisie d'une injonction de payer (EcrivainSuiviIp =
+# PreparerObjectsEtEditions d'OPE_IPSUIVI.cs:1762-2140, les dates saisies :2769-3017 et les grisages de Remplir_IP, :976-1125). Les IP :
+# PROC_IPSUIVI.sql (18015xx, 18016xx, 18017xx). Les dates saisies sont litterales (2099 : jamais avant la date de l'IP). Lot 8 du
+# plan « RIG v3 100 % fonctionnel », 26-27/11/2026.
 
-# 1. Refus : une autre date que le desistement -- la V3 ne reprend pas encore la signification (evenements futurs lies). Jumeau
-#    accepte : bloc 9 (le desistement seul).
+# 1. Refus : la provision de 1801601 -- RIG v2 ne la laisse pas saisir (seule une signification est attendue). Jumeau accepte :
+#    bloc 9 (le desistement, que RIG v2 laisse saisir) ; bloc 17 (la provision attendue de 1801702, saisissable).
 geste: Enregistrer
 ids: 1801601
-valeur: Actes après l'ordonnance › Signification = 2099-01-15
+valeur: Actes après l'ordonnance › Provision = 2099-01-15
 resultat: refuse
-message: « Actes après l'ordonnance › Signification » : la V3 ne reprend pas encore cette saisie de RIG v2 (événements futurs liés, instance J ou OP, facture) ; seul le désistement s'enregistre.
+message: « Actes après l'ordonnance › Provision » n'est pas modifiable sur cette IP : RIG v2 la grise (OPE_IPSUIVI.cs:976-1120).
 ---
 # 2. Refus : 1801503 a deja son desistement (IPDESIN survenu), au message de RIG v2 (:983). Jumeau accepte : bloc 9 (1801601, sans).
 geste: Enregistrer
@@ -39,13 +40,13 @@ valeur: Actes après l'ordonnance › Désistement = 2099-01-15
 resultat: refuse
 message: IP rejetée, traitement impossible en IPSUIVI vous devez aller en MJUD.
 ---
-# 6. Refus : ordonnance rendue, mais plus aucun evenement futur -- la case « Désistement » n'est pas offerte (:1024-1029). Jumeau
+# 6. Refus : ordonnance rendue, mais plus aucun evenement futur -- l'alerte de RIG v2 (:1029-1031), aucune date n'est offerte. Jumeau
 #    accepte : bloc 9 (1801601, une signification attendue) ; et bloc 10 (1801605 : decision sans date, desistement offert sans futur).
 geste: Enregistrer
 ids: 1801604
 valeur: Actes après l'ordonnance › Désistement = 2099-01-15
 resultat: refuse
-message: Aucun évènement futur : RIG v2 n'offre pas le désistement sur cette IP (OPE_IPSUIVI.cs:1024-1029).
+message: Aucun évènement futur, traitement impossible en IPSUIVI vous devez aller en MJUD.
 ---
 # 7. Refus : la date precede celle de l'IP (l'ordonnance de 1801601, il y a 20 jours) : « Date incorrect » (:1765-1766). Jumeau
 #    accepte : bloc 9 (15/01/2099).
@@ -68,12 +69,20 @@ geste: Enregistrer
 ids: 1801601
 valeur: Actes après l'ordonnance › Désistement = 2099-01-15
 resultat: fait
-message: Désistement du 15/01/2099 enregistré sur l'IP 2026IP81601 (événement IPDESIN). Non repris par la V3 : les éditions de l'événement et le tableau récapitulatif.
+message: Enregistré sur l'IP 2026IP81601 : désistement du 15/01/2099 (événement IPDESIN). Non repris par la V3 : le tableau récapitulatif.
 fiche: 1801601
 Actes après l'ordonnance › Désistement = 2099-01-15
 controle: SELECT e.EVNPR_CODE_EVE_PRO + '|' + CONVERT(varchar(10), e.EVNPR_DATE, 103) + '|' + CAST(CAST(e.EVNPR_SURVENU AS int) AS varchar(1)) FROM v2.EVENEMENT_PROCEDURE AS e WHERE e.EVNPR_ID_INSTN = 1801601 AND e.EVNPR_CODE_EVE_PRO = 'IPDESIN' => IPDESIN|15/01/2099|1
 controle: SELECT INSTN_NOTE_AUDIENCE FROM v2.INSTANCE WHERE INSTN_ID_INSTN = 1801601 => Relance faite Désistement
 controle: SELECT d.DMND_ETAT_DEMANDE + '|' + d.DMND_NUM_INDICATIF + '|' + d.DMND_NOM FROM v2.DEMANDE AS d JOIN v2.DOSSIER_DEMANDE AS dd ON dd.DSSDM_ID_DMND = d.DMND_ID_DMND AND dd.DSSDM_CODE_SEQUENCEUR = '2J' AND dd.DSSDM_VALEUR_SEQUENCEUR = '1801601' WHERE d.DMND_CODE_PROSS = 'IPSUIVI' => V|2026IP81601|DESISTER OK
+---
+# 9b. Refus : 1801605, decision prevue sans date rendue -- RIG v2 n'y laisse que le desistement (:1004-1013). Jumeau accepte :
+#     bloc 10 (le desistement de la meme IP).
+geste: Enregistrer
+ids: 1801605
+valeur: Actes après l'ordonnance › Signification = 2099-01-15
+resultat: refuse
+message: Date de la décision vide, vous devez aller en ORDOSIGN.
 ---
 # 10. FAIT : 1801605, decision prevue sans date rendue (pas passee par ORDOSIGN) et sans evenement futur -- RIG v2 ne laisse alors
 #     que le desistement (:1004-1013).
@@ -81,7 +90,7 @@ geste: Enregistrer
 ids: 1801605
 valeur: Actes après l'ordonnance › Désistement = 2099-01-15
 resultat: fait
-message: Désistement du 15/01/2099 enregistré sur l'IP 2026IP81605 (événement IPDESIN). Non repris par la V3 : les éditions de l'événement et le tableau récapitulatif.
+message: Enregistré sur l'IP 2026IP81605 : désistement du 15/01/2099 (événement IPDESIN). Non repris par la V3 : le tableau récapitulatif.
 controle: SELECT INSTN_NOTE_AUDIENCE FROM v2.INSTANCE WHERE INSTN_ID_INSTN = 1801605 => Désistement
 ---
 # 11. Refus : rejouer 1801601 -- son desistement est enregistre (bloc 9). Jumeau accepte : bloc 9.
@@ -90,3 +99,123 @@ ids: 1801601
 valeur: Actes après l'ordonnance › Désistement = 2099-01-16
 resultat: refuse
 message: Désistement IP, traitement impossible en IPSUIVI vous devez aller en MJUD.
+---
+# 12. FAIT : la signification de 1801701 (nouvelle loi), a personne, au 15/01/2099. L'evenement attendu IPSIGNIF survient (date,
+#     « à personne », date maxi effacee) ; son suivant, le certificat IPCERTNOPP, est attendu au 15/02/2099 (1 mois, CODE_EVE_PRO),
+#     lie a la signification (EP_LIE). Pas de maquette d'edition pour IPSIGNIF : aucune edition. Relue : la fiche porte la date.
+geste: Enregistrer
+ids: 1801701
+valeur: Actes après l'ordonnance › Signification = 2099-01-15
+valeur: Actes après l'ordonnance › À personne = oui
+resultat: fait
+message: Enregistré sur l'IP 2026IP81701 : signification du 15/01/2099 à personne (événement IPSIGNIF, IPCERTNOPP attendu). Non repris par la V3 : le tableau récapitulatif.
+fiche: 1801701
+Actes après l'ordonnance › Signification = 2099-01-15
+Actes après l'ordonnance › À personne = oui
+controle: SELECT e.EVNPR_CODE_EVE_PRO + '|' + ISNULL(CONVERT(varchar(10), e.EVNPR_DATE, 103), '-') + '|' + ISNULL(CONVERT(varchar(10), e.EVNPR_DATE_MAXI, 103), '-') + '|' + CAST(CAST(e.EVNPR_SURVENU AS int) AS varchar(1)) + CAST(CAST(e.EVNPR_DELAI_EXPIRE AS int) AS varchar(1)) + '|' + ISNULL(e.EVNPR_NUMERO_SOURCE_EP_LIE, '-') FROM v2.EVENEMENT_PROCEDURE AS e WHERE e.EVNPR_ID_INSTN = 1801701 AND e.EVNPR_CODE_EVE_PRO = 'IPSIGNIF' => IPSIGNIF|15/01/2099|-|10|-
+controle: SELECT CAST(CAST(EVNPR_SIGNIF_A_PERSONNE AS int) AS varchar(1)) FROM v2.EVENEMENT_PROCEDURE WHERE EVNPR_ID_EVNPR = 1801771 => 1
+controle: SELECT e.EVNPR_CODE_EVE_PRO + '|' + ISNULL(CONVERT(varchar(10), e.EVNPR_DATE, 103), '-') + '|' + ISNULL(CONVERT(varchar(10), e.EVNPR_DATE_MAXI, 103), '-') + '|' + CAST(CAST(e.EVNPR_SURVENU AS int) AS varchar(1)) + CAST(CAST(e.EVNPR_DELAI_EXPIRE AS int) AS varchar(1)) + '|' + ISNULL(e.EVNPR_NUMERO_SOURCE_EP_LIE, '-') FROM v2.EVENEMENT_PROCEDURE AS e WHERE e.EVNPR_ID_INSTN = 1801701 AND e.EVNPR_CODE_EVE_PRO = 'IPCERTNOPP' => IPCERTNOPP|-|15/02/2099|00|SRC-1801771
+controle: SELECT COUNT(*) FROM v2.DEMANDE AS d JOIN v2.DOSSIER_DEMANDE AS dd ON dd.DSSDM_ID_DMND = d.DMND_ID_DMND AND dd.DSSDM_CODE_SEQUENCEUR = '2J' AND dd.DSSDM_VALEUR_SEQUENCEUR = '1801701' WHERE d.DMND_CODE_PROSS = 'IPSUIVI' AND d.DMND_ETAT_DEMANDE = 'V' => 1
+---
+# 13. Refus : resignifier 1801701 -- la signification est survenue (bloc 12), RIG v2 la grise. Jumeau accepte : bloc 12.
+geste: Enregistrer
+ids: 1801701
+valeur: Actes après l'ordonnance › Signification = 2099-01-16
+resultat: refuse
+message: « Actes après l'ordonnance › Signification » n'est pas modifiable sur cette IP : RIG v2 la grise (OPE_IPSUIVI.cs:976-1120).
+---
+# 14. FAIT : le certificat de non-opposition de 1801701 au 10/02/2099 -- le certificat attendu (bloc 12) survient. Sa maquette
+#     (IP_SANS_LISTE18, PROC_SURVIP.sql) n'a pas de liste de parametres : RIG v2 n'edite rien (GetAllEditions, :2811).
+geste: Enregistrer
+ids: 1801701
+valeur: Actes après l'ordonnance › Certificat de non-opposition = 2099-02-10
+resultat: fait
+message: Enregistré sur l'IP 2026IP81701 : certificat de non-opposition du 10/02/2099 (événement IPCERTNOPP). Non repris par la V3 : le tableau récapitulatif.
+controle: SELECT e.EVNPR_CODE_EVE_PRO + '|' + ISNULL(CONVERT(varchar(10), e.EVNPR_DATE, 103), '-') + '|' + ISNULL(CONVERT(varchar(10), e.EVNPR_DATE_MAXI, 103), '-') + '|' + CAST(CAST(e.EVNPR_SURVENU AS int) AS varchar(1)) + CAST(CAST(e.EVNPR_DELAI_EXPIRE AS int) AS varchar(1)) + '|' + ISNULL(e.EVNPR_NUMERO_SOURCE_EP_LIE, '-') FROM v2.EVENEMENT_PROCEDURE AS e WHERE e.EVNPR_ID_INSTN = 1801701 AND e.EVNPR_CODE_EVE_PRO = 'IPCERTNOPP' => IPCERTNOPP|10/02/2099|-|10|SRC-1801771
+---
+# 15. FAIT : l'opposition de 1801702 au 15/01/2099. IPOPOS attendu survient, son suivant IPAROPOS (la LRAR de provision) est attendu
+#     au 15/02/2099. Ses EDITIONS (CEP_EDITION de RIG_DEV) : IP_OPPO « -IE » (pas de juridiction exterieure) au demandeur « D » en
+#     LRAR -- une ligne « IP opposition - LRAR » a CREANCIER OMICRON, puis l'imprime JLRAR ; IP_OPPO « +IE » ne s'applique pas.
+geste: Enregistrer
+ids: 1801702
+valeur: Actes après l'ordonnance › Opposition = 2099-01-15
+resultat: fait
+message: Enregistré sur l'IP 2026IP81702 : opposition du 15/01/2099 (événement IPOPOS, IPAROPOS attendu). 2 éditions en file : « IP opposition - LRAR » → CREANCIER OMICRON ; « Imprimé LRAR La Poste - Imprimé LR La Poste » → CREANCIER OMICRON. Non repris par la V3 : le tableau récapitulatif.
+fiche: 1801702
+Actes après l'ordonnance › Opposition = 2099-01-15
+controle: SELECT e.EVNPR_CODE_EVE_PRO + '|' + ISNULL(CONVERT(varchar(10), e.EVNPR_DATE, 103), '-') + '|' + ISNULL(CONVERT(varchar(10), e.EVNPR_DATE_MAXI, 103), '-') + '|' + CAST(CAST(e.EVNPR_SURVENU AS int) AS varchar(1)) + CAST(CAST(e.EVNPR_DELAI_EXPIRE AS int) AS varchar(1)) + '|' + ISNULL(e.EVNPR_NUMERO_SOURCE_EP_LIE, '-') FROM v2.EVENEMENT_PROCEDURE AS e WHERE e.EVNPR_ID_INSTN = 1801702 AND e.EVNPR_CODE_EVE_PRO = 'IPOPOS' => IPOPOS|15/01/2099|-|10|-
+controle: SELECT e.EVNPR_CODE_EVE_PRO + '|' + ISNULL(CONVERT(varchar(10), e.EVNPR_DATE, 103), '-') + '|' + ISNULL(CONVERT(varchar(10), e.EVNPR_DATE_MAXI, 103), '-') + '|' + CAST(CAST(e.EVNPR_SURVENU AS int) AS varchar(1)) + CAST(CAST(e.EVNPR_DELAI_EXPIRE AS int) AS varchar(1)) + '|' + ISNULL(e.EVNPR_NUMERO_SOURCE_EP_LIE, '-') FROM v2.EVENEMENT_PROCEDURE AS e WHERE e.EVNPR_ID_INSTN = 1801702 AND e.EVNPR_CODE_EVE_PRO = 'IPAROPOS' => IPAROPOS|-|15/02/2099|00|SRC-1801772
+controle: SELECT STRING_AGG(x.DMNED_LIBELLE_DOCUMENT + '|' + x.DMNED_CODE_ENTITE_SOURCE + '|' + x.DMNED_VALEUR_ID_SOURCE + '|' + x.DMNED_CODE_ENTITE_DESTINATAIRE + '|' + x.DMNED_VALEUR_ID_DESTINATAIRE + '|' + x.DMNED_DESIGNATION_DESTINATAIRE + '|' + x.DMNED_LIBELLE_SOURCE + '|' + x.DMNED_LES_NUMEROS, ' / ') WITHIN GROUP (ORDER BY x.DMNED_ID_DMNED) FROM v2.DEMANDE_EDITION AS x JOIN v2.DOSSIER_DEMANDE AS dd ON dd.DSSDM_ID_DMND = x.DMNED_ID_DMND AND dd.DSSDM_CODE_SEQUENCEUR = '2J' AND dd.DSSDM_VALEUR_SEQUENCEUR = '1801702' => IP opposition - LRAR|EVT_PROC|SRC-1801772|PART_D|PRT-1801763|CREANCIER OMICRON|IPOPOS - 15/01/2099 (EP n° 1)|2026IP81702 / Imprimé LRAR La Poste - Imprimé LR La Poste|EVT_PROC|SRC-1801772|PART_D|PRT-1801763|CREANCIER OMICRON|IPOPOS - 15/01/2099 (EP n° 1)|2026IP81702
+controle: SELECT COUNT(*) FROM v2.DEMANDE_EDITION AS x JOIN v2.DOSSIER_DEMANDE AS dd ON dd.DSSDM_ID_DMND = x.DMNED_ID_DMND AND dd.DSSDM_CODE_SEQUENCEUR = '2J' AND dd.DSSDM_VALEUR_SEQUENCEUR = '1801702' WHERE x.DMNED_PARAMETRE_GENERATION LIKE '<PARAMETRES HAS_OBSERVATION="0" MODE_ENVOI="LRAR" NUM_DEMANDE="%" />' => 2
+---
+# 16. FAIT : la reception de la LRAR de 1801702 au 20/01/2099 -- IPAROPOS attendu (bloc 15) survient ; aucune provision n'est
+#     survenue : son suivant, la provision IPCONSOPOS, est attendue au 04/02/2099 (15 jours).
+geste: Enregistrer
+ids: 1801702
+valeur: Actes après l'ordonnance › Réception LRAR = 2099-01-20
+resultat: fait
+message: Enregistré sur l'IP 2026IP81702 : réception de la LRAR du 20/01/2099 (événement IPAROPOS, IPCONSOPOS attendu). Non repris par la V3 : le tableau récapitulatif.
+controle: SELECT e.EVNPR_CODE_EVE_PRO + '|' + ISNULL(CONVERT(varchar(10), e.EVNPR_DATE, 103), '-') + '|' + ISNULL(CONVERT(varchar(10), e.EVNPR_DATE_MAXI, 103), '-') + '|' + CAST(CAST(e.EVNPR_SURVENU AS int) AS varchar(1)) + CAST(CAST(e.EVNPR_DELAI_EXPIRE AS int) AS varchar(1)) + '|' + ISNULL(e.EVNPR_NUMERO_SOURCE_EP_LIE, '-') FROM v2.EVENEMENT_PROCEDURE AS e WHERE e.EVNPR_ID_INSTN = 1801702 AND e.EVNPR_CODE_EVE_PRO = 'IPAROPOS' => IPAROPOS|20/01/2099|-|10|SRC-1801772
+controle: SELECT e.EVNPR_CODE_EVE_PRO + '|' + CONVERT(varchar(10), e.EVNPR_DATE_MAXI, 103) + '|' + CAST(CAST(e.EVNPR_SURVENU AS int) AS varchar(1)) + CAST(CAST(e.EVNPR_DELAI_EXPIRE AS int) AS varchar(1)) FROM v2.EVENEMENT_PROCEDURE AS e WHERE e.EVNPR_ID_INSTN = 1801702 AND e.EVNPR_CODE_EVE_PRO = 'IPCONSOPOS' => IPCONSOPOS|04/02/2099|00
+---
+# 17. Refus : la provision de 1801702 (attendue, bloc 16) -- RIG v2 enrole l'opposition au fond et facture, que la V3 ne reprend pas
+#     encore ; rien n'est ecrit. Jumeau accepte : bloc 16 (la LRAR de la meme IP).
+geste: Enregistrer
+ids: 1801702
+valeur: Actes après l'ordonnance › Provision = 2099-01-25
+resultat: refuse
+message: « Provision » : dans les délais, RIG v2 enrôle l'opposition au fond (instance J « TIP1 », demande OIPE) et facture la provision ; hors délai, il constate la caducité (OPE_IPSUIVI.cs:2028-2100, :3029-3100). La V3 ne le reprend pas encore : rien n'est enregistré.
+controle: SELECT COUNT(*) FROM v2.EVENEMENT_PROCEDURE WHERE EVNPR_ID_INSTN = 1801702 AND EVNPR_CODE_EVE_PRO = 'IPCONSOPOS' AND EVNPR_SURVENU = 1 => 0
+---
+# 18. Refus : deux dates a la fois sur 1801703 (signification et opposition) -- RIG v2 grise les autres des qu'une est saisie. Jumeau
+#     accepte : bloc 19 (signification et certificat, le seul couple permis).
+geste: Enregistrer
+ids: 1801703
+valeur: Actes après l'ordonnance › Signification = 2099-01-15
+valeur: Actes après l'ordonnance › Opposition = 2099-01-20
+resultat: refuse
+message: Une seule date par validation : RIG v2 grise les autres dès qu'une date est saisie (OPE_IPSUIVI.cs:1196-1250), sauf la signification avec le certificat de non-opposition (:101-103).
+---
+# 19. FAIT : signification ET certificat de 1801703 -- la signification survient et cree le certificat attendu (:2809-2822), que le
+#     traitement du certificat fait survenir aussitot (:1891-1896).
+geste: Enregistrer
+ids: 1801703
+valeur: Actes après l'ordonnance › Signification = 2099-01-15
+valeur: Actes après l'ordonnance › Certificat de non-opposition = 2099-02-20
+resultat: fait
+message: Enregistré sur l'IP 2026IP81703 : signification du 15/01/2099 (événement IPSIGNIF, IPCERTNOPP attendu) ; certificat de non-opposition du 20/02/2099 (événement IPCERTNOPP). Non repris par la V3 : le tableau récapitulatif.
+controle: SELECT e.EVNPR_CODE_EVE_PRO + '|' + ISNULL(CONVERT(varchar(10), e.EVNPR_DATE, 103), '-') + '|' + ISNULL(CONVERT(varchar(10), e.EVNPR_DATE_MAXI, 103), '-') + '|' + CAST(CAST(e.EVNPR_SURVENU AS int) AS varchar(1)) + CAST(CAST(e.EVNPR_DELAI_EXPIRE AS int) AS varchar(1)) + '|' + ISNULL(e.EVNPR_NUMERO_SOURCE_EP_LIE, '-') FROM v2.EVENEMENT_PROCEDURE AS e WHERE e.EVNPR_ID_INSTN = 1801703 AND e.EVNPR_CODE_EVE_PRO = 'IPSIGNIF' => IPSIGNIF|15/01/2099|-|10|-
+controle: SELECT e.EVNPR_CODE_EVE_PRO + '|' + ISNULL(CONVERT(varchar(10), e.EVNPR_DATE, 103), '-') + '|' + ISNULL(CONVERT(varchar(10), e.EVNPR_DATE_MAXI, 103), '-') + '|' + CAST(CAST(e.EVNPR_SURVENU AS int) AS varchar(1)) + CAST(CAST(e.EVNPR_DELAI_EXPIRE AS int) AS varchar(1)) + '|' + ISNULL(e.EVNPR_NUMERO_SOURCE_EP_LIE, '-') FROM v2.EVENEMENT_PROCEDURE AS e WHERE e.EVNPR_ID_INSTN = 1801703 AND e.EVNPR_CODE_EVE_PRO = 'IPCERTNOPP' => IPCERTNOPP|20/02/2099|-|10|SRC-1801773
+---
+# 20. Refus : une opposition de 1801704 AVANT sa signification (10/01/2099), au message de RIG v2 (:2714). Jumeau accepte : bloc 15
+#     (l'opposition de 1801702, qui n'a pas de signification).
+geste: Enregistrer
+ids: 1801704
+valeur: Actes après l'ordonnance › Opposition = 2099-01-05
+resultat: refuse
+message: La date de l'opposition ne peut pas être inférieure à la date de la signification
+---
+# 21. Refus : 1801706 (ancienne loi) signifiee le 15/01/2099, apres sa date maxi du 01/01/2099, sans opposition -- RIG v2 rend l'IP
+#     non avenue (OP ou evenement du reglage), que la V3 ne reprend pas ici. Jumeau accepte : bloc 23 (1801707, signifiee a temps).
+geste: Enregistrer
+ids: 1801706
+valeur: Actes après l'ordonnance › Signification = 2099-01-15
+resultat: refuse
+message: Signification après la date maxi (01/01/2099) : RIG v2 rend l'IP non avenue (OP « IPNAVSO » ou événement du réglage, OPE_IPSUIVI.cs:1830-1866) ; la V3 ne le reprend pas encore ici (« Injonctions de payer » applique la non-avenue à l'échéance).
+---
+# 22. Refus : une signification de 1801707 avant la date de l'IP (01/06/2021), au message de RIG v2 (:2699-2700). Jumeau accepte :
+#     bloc 23.
+geste: Enregistrer
+ids: 1801707
+valeur: Actes après l'ordonnance › Signification = 2001-01-01
+resultat: refuse
+message: La date de signification ne peut pas être inférieure à la date de l'IP
+---
+# 23. FAIT : 1801707 (ancienne loi) signifiee a temps le 15/01/2099 -- ISIGNI survient, l'opposition IOIP est attendue au 15/02/2099.
+geste: Enregistrer
+ids: 1801707
+valeur: Actes après l'ordonnance › Signification = 2099-01-15
+resultat: fait
+message: Enregistré sur l'IP 2021IP81707 : signification du 15/01/2099 (événement ISIGNI, IOIP attendu). Non repris par la V3 : le tableau récapitulatif.
+controle: SELECT e.EVNPR_CODE_EVE_PRO + '|' + ISNULL(CONVERT(varchar(10), e.EVNPR_DATE, 103), '-') + '|' + ISNULL(CONVERT(varchar(10), e.EVNPR_DATE_MAXI, 103), '-') + '|' + CAST(CAST(e.EVNPR_SURVENU AS int) AS varchar(1)) + CAST(CAST(e.EVNPR_DELAI_EXPIRE AS int) AS varchar(1)) + '|' + ISNULL(e.EVNPR_NUMERO_SOURCE_EP_LIE, '-') FROM v2.EVENEMENT_PROCEDURE AS e WHERE e.EVNPR_ID_INSTN = 1801707 AND e.EVNPR_CODE_EVE_PRO = 'ISIGNI' => ISIGNI|15/01/2099|-|10|-
+controle: SELECT e.EVNPR_CODE_EVE_PRO + '|' + ISNULL(CONVERT(varchar(10), e.EVNPR_DATE, 103), '-') + '|' + ISNULL(CONVERT(varchar(10), e.EVNPR_DATE_MAXI, 103), '-') + '|' + CAST(CAST(e.EVNPR_SURVENU AS int) AS varchar(1)) + CAST(CAST(e.EVNPR_DELAI_EXPIRE AS int) AS varchar(1)) + '|' + ISNULL(e.EVNPR_NUMERO_SOURCE_EP_LIE, '-') FROM v2.EVENEMENT_PROCEDURE AS e WHERE e.EVNPR_ID_INSTN = 1801707 AND e.EVNPR_CODE_EVE_PRO = 'IOIP' => IOIP|-|15/02/2099|00|SRC-1801777

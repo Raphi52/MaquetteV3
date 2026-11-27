@@ -324,3 +324,72 @@ INSERT INTO v2.RELANCE_RCS (RLCRC_ID_RLCRC, RLCRC_ID_DLGRC, RLCRC_NUM_ORDRE, RLC
     (1800122, 1800102, 1, DATEADD(DAY, -31, @aujourdhui), DATEADD(DAY, -1, @aujourdhui), ''S'', NULL, 0),
     (1800123, 1800103, 1, DATEADD(DAY, -31, @aujourdhui), DATEADD(DAY, -1, @aujourdhui), ''S'', NULL, 0);',
     N'@aujourdhui datetime', @aujourdhui;
+
+-- LES QUATRE AUTRES EXCLUSIONS d'ExclusionsIsurv (controle final du lot 8, 27/11/2026 : « une erreur dans ces conditions
+-- laisserait le banc vert »). Un dossier par condition, relance 1 echue et forme SAI18 non cotee comme 1100101 (jumeau accepte,
+-- bloc 7 de PROC_DBE_INJ.gestes) ; seule sa condition le fait ecarter :
+--   1800104 : siege (etablissement SPM) en Allemagne, pays de l'Union europeenne (R_PAYS_CEE 1) ;
+--   1800105 : un depot de categorie « N » avec son acte BEN ;
+--   1800106 : une formalite d'un evenement BEN (R_CODEEVENEM_ISBENEF 1) ;
+--   1800107 : une demande « MB1 » (%[MR][BCD]1%) en attente (Q) ;
+--   1800108 : partie (PRT_ID_DSRCS) d'une instance OPINJRBE.
+-- Leurs tables sont creees ici a l'identique des jeux qui les creent plus loin (PAYS, INSCRIPTION_RCS : PROC_DBE_RELANCE.sql).
+-- Leur diligence reste a « Relances beneficiaires », « Relancee » (PROC_DBE_RELANCE.attendu) et a « Diligences » (PROC_MDIL).
+IF OBJECT_ID(N'v2.PAYS') IS NULL CREATE TABLE v2.PAYS (R_PAYS_VALEUR varchar(3) NOT NULL PRIMARY KEY, R_PAYS_CEE bit NULL);
+IF OBJECT_ID(N'v2.INSCRIPTION_RCS') IS NULL CREATE TABLE v2.INSCRIPTION_RCS (INSRC_ID_INSRC int NOT NULL PRIMARY KEY);
+IF COL_LENGTH('v2.CODE_EVENEMENT_RCS', 'R_CODEEVENEM_ISBENEF') IS NULL ALTER TABLE v2.CODE_EVENEMENT_RCS ADD R_CODEEVENEM_ISBENEF bit NULL;
+IF COL_LENGTH('v2.DEPOT_RCS', 'DPTRC_CATEGORIE_DEPOT') IS NULL ALTER TABLE v2.DEPOT_RCS ADD DPTRC_CATEGORIE_DEPOT varchar(1) NULL;
+IF COL_LENGTH('v2.INSTANCE', 'INSTN_TYPE_INSTANCE') IS NULL ALTER TABLE v2.INSTANCE ADD INSTN_TYPE_INSTANCE varchar(2) NULL;
+SET IDENTITY_INSERT rec.Entreprise ON;
+INSERT INTO rec.Entreprise (Id, Siren, Civilite, Denomination, EtatInfo, FicheSommaire) VALUES
+    (1800104, '518000104', '', N'ENJOINDRE SIEGE UE', 'C', 0), (1800105, '518000105', '', N'ENJOINDRE DEPOT BEN', 'C', 0),
+    (1800106, '518000106', '', N'ENJOINDRE FORMALITE BEN', 'C', 0), (1800107, '518000107', '', N'ENJOINDRE DEMANDE MB1', 'C', 0),
+    (1800108, '518000108', '', N'ENJOINDRE DEJA OPINJRBE', 'C', 0);
+SET IDENTITY_INSERT rec.Entreprise OFF;
+SET IDENTITY_INSERT rec.DossierRcs ON;
+INSERT INTO rec.DossierRcs (Id, IdEntreprise, TypeRcs, NumeroGestion, Siren, DateImmatriculation, MotifImmatriculation,
+    ProvisoirementSans, CompteurMaj, DateMaj, EtatDossier, EtatInfo, InscritRegistreMetiers, ModificationInterne,
+    SirenProvisoire, Accre, AutoEntrepreneur, Eirl, AutoEntrepreneurRegularise)
+SELECT v.Id, v.Id, 'B1', '2018B8' + RIGHT(CAST(v.Id AS varchar(7)), 4), '51800' + RIGHT(CAST(v.Id AS varchar(7)), 4), '20180101', 'C', 0, 0,
+       '20180101', 'A', 'C', 0, 0, 0, 0, 0, 0, 0
+FROM (VALUES (1800104), (1800105), (1800106), (1800107), (1800108)) AS v (Id);
+SET IDENTITY_INSERT rec.DossierRcs OFF;
+SET IDENTITY_INSERT rec.Adresse ON;
+INSERT INTO rec.Adresse (Id, NumeroVoie, ComplementNumero, TypeVoie, NomVoie, CodePostal, Localite, Pays, BoitePostale, Cedex, EtatInfo) VALUES
+    (1800104, '3', NULL, NULL, 'Strasse des Banks', '10115', 'BERLIN', 'DEU', NULL, NULL, 'C');
+SET IDENTITY_INSERT rec.Adresse OFF;
+SET IDENTITY_INSERT rec.ActionRegistre ON;
+INSERT INTO rec.ActionRegistre (Id, IdDossier, IdDepot, CodeProcessus, EtatInfo, EtatAction, SurNotification) VALUES
+    (1800104, 1800104, NULL, 'RDBE', 'C', 'V', 0), (1800105, 1800105, NULL, 'RDBE', 'C', 'V', 0), (1800106, 1800106, NULL, 'RDBE', 'C', 'V', 0),
+    (1800107, 1800107, NULL, 'RDBE', 'C', 'V', 0), (1800108, 1800108, NULL, 'RDBE', 'C', 'V', 0),
+    -- le depot de 1800105
+    (1800115, 1800105, 1800105, 'DEP', 'C', 'V', 0);
+INSERT INTO rec.ActionRegistre (Id, IdDossier, IdDepot, IdInscriptionRegistre, CodeProcessus, EtatInfo, EtatAction, SurNotification) VALUES
+    -- la formalite de 1800106
+    (1800116, 1800106, NULL, 1800106, 'MOD', 'C', 'V', 0);
+SET IDENTITY_INSERT rec.ActionRegistre OFF;
+EXEC sp_executesql N'
+INSERT INTO v2.PAYS (R_PAYS_VALEUR, R_PAYS_CEE) SELECT ''DEU'', 1 WHERE NOT EXISTS (SELECT 1 FROM v2.PAYS WHERE R_PAYS_VALEUR = ''DEU'');
+INSERT INTO v2.INSCRIT_PM (INSPM_ID_DSRCS, INSPM_FORME_JURIDIQUE_UTI, INSPM_SOCI_COTEE)
+SELECT v.Id, ''SAI18'', 0 FROM (VALUES (1800104), (1800105), (1800106), (1800107), (1800108)) AS v (Id);
+INSERT INTO v2.DILIGENCE_RCS (DLGRC_ID_DLGRC, DLGRC_ID_ACTRC, DLGRC_NATURE_DILIGENCE, DLGRC_ETAT_DILIGENCE, DLGRC_ETAT_RELANCE)
+SELECT v.Id, v.Id, ''SDBE'', ''1'', ''2'' FROM (VALUES (1800104), (1800105), (1800106), (1800107), (1800108)) AS v (Id);
+INSERT INTO v2.RELANCE_RCS (RLCRC_ID_RLCRC, RLCRC_ID_DLGRC, RLCRC_NUM_ORDRE, RLCRC_DATE_RELANCE, RLCRC_DATE_LIMITE, RLCRC_TYPE_RELANCE,
+    RLCRC_ID_INSTN, RLCRC_FACTURE)
+SELECT v.Id + 20, v.Id, 1, DATEADD(DAY, -31, @aujourdhui), DATEADD(DAY, -1, @aujourdhui), ''S'', NULL, 0
+FROM (VALUES (1800104), (1800105), (1800106), (1800107), (1800108)) AS v (Id);
+INSERT INTO v2.ETABLISSEMENT (ETBLS_ID_ETBLS, ETBLS_ID_ADRBS, ETBLS_ID_DSRCS, ETBLS_TYPE_ADRESSE, ETBLS_SUPPRIME) VALUES
+    (1800114, 1800104, 1800104, ''SPM'', 0);
+INSERT INTO v2.DEPOT_RCS (DPTRC_ID_DPTRC, DPTRC_NUM_DEPOT, DPTRC_CATEGORIE_DEPOT) VALUES (1800105, ''2026D18105'', ''N'');
+INSERT INTO v2.ACTE_DEPOSE (ACTDP_ID_ACDPS, ACTDP_ID_DPTRC, ACTDP_ABREGE_PIECE) VALUES (1800105, 1800105, ''BEN'');
+INSERT INTO v2.INSCRIPTION_RCS (INSRC_ID_INSRC) VALUES (1800106);
+INSERT INTO v2.CODE_EVENEMENT_RCS (R_CODEEVENEM_VALEUR, R_CODEEVENEM_ISBENEF) VALUES (''BEN18'', 1);
+INSERT INTO v2.EVENEMENT_RCS (EVNRC_ID_EVNRC, EVNRC_ID_ACTRC, EVNRC_NUM_ORDRE, EVNRC_CODE_EVENEMENT_RCS, EVNRC_OBJET_DEPOT)
+    VALUES (1800106, 1800116, 1, ''BEN18'', 0);
+INSERT INTO v2.DEMANDE (DMND_ID_DMND, DMND_ID_DSRCS, DMND_NUM_DEMANDE, DMND_ETAT_DEMANDE, DMND_CODE_PROSS, DMND_DATE_CREATION)
+    VALUES (1800107, 1800107, ''D1800107'', ''Q'', ''MB1'', DATEADD(DAY, -2, @aujourdhui));
+INSERT INTO v2.INSTANCE (INSTN_ID_INSTN, INSTN_NUM_ROLE, INSTN_NOM_COURANT, INSTN_TYPE_INSTANCE, INSTN_NATURE_AFFAIRE)
+    VALUES (1800108, ''2026OP81808'', N''INJONCTION RBE ANCIENNE'', ''RP'', ''OPINJRBE'');
+INSERT INTO v2.PARTIE (PRT_ID_PRT, PRT_ID_INSTN, PRT_NUM_ORDRE, PRT_CIVILITE, PRT_DESIGNATION, PRT_NOM, PRT_QUALIF_PARTIE, PRT_ID_DSRCS)
+    VALUES (1800108, 1800108, 1, ''PM'', N''ENJOINDRE DEJA OPINJRBE'', N''ENJOINDRE DEJA OPINJRBE'', ''F'', 1800108);',
+    N'@aujourdhui datetime', @aujourdhui;

@@ -38,7 +38,7 @@ ids: 1801472,1801474
 valeur: Juge = JIP18
 valeur: LRAR = oui
 resultat: fait
-message: Traitements appliqués à 2 injonctions de payer : IP 2026IP81401 en titre exécutoire · événement IPEXECUTLR ; IP 2026IP81403 non avenue · événement IPCNAVLR. Non repris par la V3 : les éditions des événements, la réédition de l'ordonnance en titre exécutoire (fichier de la GED) et les mots directeurs des oppositions.
+message: Traitements appliqués à 2 injonctions de payer : IP 2026IP81401 en titre exécutoire · événement IPEXECUTLR ; IP 2026IP81403 non avenue · événement IPCNAVLR. 2 éditions en file : « IP envoi exécutoire - LRAR » → CREANCIER ALPHA ; « Imprimé LRAR La Poste - Imprimé LR La Poste » → CREANCIER ALPHA. Éditions non reprises par la V3 : l'édition IP_ENVOI_EXECUT de l'événement IPEXECUTLR (condition « +TF701 » non reprise). Non repris par la V3 : la réédition de l'ordonnance en titre exécutoire (fichier de la GED) et les mots directeurs des oppositions.
 lignes:
 IP 2026IP81410 · IP TITRE OMEGA | échéance du {J-7} dépassée | Titre exécutoire | AFaire | []
 IP 2026IP81405 · IP CADUCITE EPSILON | échéance du {J-2} dépassée | Caducité | AFaire | []
@@ -48,6 +48,15 @@ controle: SELECT e.EVNPR_CODE_EVE_PRO + '|' + e.EVNPR_NUMERO_SOURCE_EP_LIE + '|'
 controle: SELECT STRING_AGG(e.EVNPR_CODE_EVE_PRO, ',') FROM v2.EVENEMENT_PROCEDURE AS e WHERE e.EVNPR_ID_INSTN = 1801403 AND e.EVNPR_SURVENU = 1 => IPCNAVLR
 controle: SELECT COUNT(*) FROM v2.DEMANDE AS d JOIN v2.DOSSIER_DEMANDE AS dd ON dd.DSSDM_ID_DMND = d.DMND_ID_DMND AND dd.DSSDM_CODE_SEQUENCEUR = '2J' WHERE d.DMND_CODE_PROSS = 'SURVIP' AND d.DMND_ETAT_DEMANDE = 'V' AND dd.DSSDM_VALEUR_SEQUENCEUR IN ('1801401', '1801403') => 2
 controle: SELECT COUNT(*) FROM v2.INSTANCE WHERE INSTN_ID_INSTN_INSTANCE_PRINCIPA IN (1801401, 1801403) => 0
+# Les editions de l'executoire survenu (EditionsEvenement, maquettes CEP_EDITION de PROC_SURVIP.sql) : « AVD,LRAR » -> l'avocat du
+# demandeur, sinon le demandeur (CREANCIER ALPHA, son numero source) en LRAR, puis l'imprime JLRAR ; la maquette « +TF701 » est
+# nommee et rien n'est cree ; la maquette de type « M » (mesure) ne vaut pas pour une instance. Rattachees a la demande SURVIP de
+# l'IP. L'IP 1801403 n'a pas de partie : son
+# evenement IPCNAVLR n'a pas d'edition (aucune maquette ici).
+controle: SELECT STRING_AGG(x.DMNED_LIBELLE_DOCUMENT + '|' + x.DMNED_CODE_ENTITE_SOURCE + '|' + e.EVNPR_CODE_EVE_PRO + '|' + ISNULL(x.DMNED_CODE_ENTITE_DESTINATAIRE, '-') + '|' + ISNULL(x.DMNED_VALEUR_ID_DESTINATAIRE, '-') + '|' + x.DMNED_DESIGNATION_DESTINATAIRE + '|' + REPLACE(x.DMNED_LIBELLE_SOURCE, CONVERT(varchar(10), GETDATE(), 103), 'jour') + '|' + ISNULL(x.DMNED_CODE_MAQUETTE, '-') + '|' + ISNULL(x.DMNED_TYPE_DOCUMENT, '-'), ' / ') WITHIN GROUP (ORDER BY x.DMNED_ID_DMNED) FROM v2.DEMANDE_EDITION AS x JOIN v2.EVENEMENT_PROCEDURE AS e ON e.EVNPR_NUMERO_SOURCE = x.DMNED_VALEUR_ID_SOURCE WHERE e.EVNPR_ID_INSTN = 1801401 AND e.EVNPR_CODE_EVE_PRO = 'IPEXECUTLR' => IP envoi exécutoire - LRAR|EVT_PROC|IPEXECUTLR|PART_AVD|PRT-1801461|CREANCIER ALPHA|IPEXECUTLR - jour (EP n° 3)|LOT2_IP_ENVOI_EXECUT|NOTIF / Imprimé LRAR La Poste - Imprimé LR La Poste|EVT_PROC|IPEXECUTLR|PART_AVD|PRT-1801461|CREANCIER ALPHA|IPEXECUTLR - jour (EP n° 3)|3801_JLRAR|-
+# Le lot de l'imprime, « LRAR_ » + le compte de l'agent, n'est pas un lot actif du banc (v2.LOT, PROC_GESTLOT.sql) : RIG v2 le vide
+# (« Si le LOT parametre n'existe pas, le supprimer », GenereDemandeEdition :3420-3424) ; son papier est celui de JLRAR.
+controle: SELECT ISNULL(x.DMNED_LOT, 'null') + '|' + x.DMNED_TYPE_PAPIER + '|' + d.DMND_CODE_PROSS FROM v2.DEMANDE_EDITION AS x JOIN v2.EVENEMENT_PROCEDURE AS e ON e.EVNPR_NUMERO_SOURCE = x.DMNED_VALEUR_ID_SOURCE JOIN v2.DEMANDE AS d ON d.DMND_ID_DMND = x.DMNED_ID_DMND WHERE e.EVNPR_ID_INSTN = 1801401 AND x.DMNED_LIBELLE_DOCUMENT LIKE 'Imprimé%' => |LRAR|SURVIP
 ---
 # 6. Refus : rejouer 1801472 -- son opposition attendue a expire au bloc 5 : plus de ligne a traiter. Jumeau accepte : bloc 5.
 geste: Agir Appliquer les traitements
@@ -75,7 +84,7 @@ valeur: Juge = JIP18
 valeur: Date prévue = 2099-01-15
 valeur: LRAR = oui
 resultat: fait
-message: Traitements appliqués à 2 injonctions de payer : IP 2026IP81405 caduque · événement IPCAD · opposition 2026OP00001 enrôlée ; IP 2026IP81407 certificat de non-opposition · événement IPCERTNOPP ; ordonnance « Ordonnance de caducite 2026IP81405 » en file d'édition. Non repris par la V3 : les éditions des événements, la réédition de l'ordonnance en titre exécutoire (fichier de la GED) et les mots directeurs des oppositions.
+message: Traitements appliqués à 2 injonctions de payer : IP 2026IP81405 caduque · événement IPCAD · opposition 2026OP00001 enrôlée ; IP 2026IP81407 certificat de non-opposition · événement IPCERTNOPP ; ordonnance « Ordonnance de caducite 2026IP81405 » en file d'édition. 1 édition en file : « Note de caducite » → Document interne. Non repris par la V3 : la réédition de l'ordonnance en titre exécutoire (fichier de la GED) et les mots directeurs des oppositions.
 lignes:
 IP 2026IP81410 · IP TITRE OMEGA | échéance du {J-7} dépassée | Titre exécutoire | AFaire | []
 controle: SELECT i.INSTN_CODE_AFFAIRE + '|' + i.INSTN_TYPE_INSTANCE + '|' + i.INSTN_NATURE_AFFAIRE + '|' + i.INSTN_CODE_ACTE_PROCE + '|' + LEFT(i.INSTN_NUM_ROLE, 6) + '|' + CASE WHEN i.INSTN_NUM_REP_GENERAL IS NULL THEN 'sans' ELSE 'rep' END + '|' + CASE WHEN i.INSTN_DATE_JONCTION = CAST(GETDATE() AS date) THEN 'jointe' ELSE 'non' END FROM v2.INSTANCE AS i WHERE i.INSTN_ID_INSTN_INSTANCE_PRINCIPA = 1801405 => IPCADSO|RP|OPCAD|SO|2026OP|rep|jointe
@@ -86,3 +95,6 @@ controle: SELECT COUNT(*) FROM v2.DEMANDE_EDITION WHERE DMNED_CODE_ENTITE_SOURCE
 controle: SELECT d.DMND_ETAT_DEMANDE + '|' + LEFT(d.DMND_LES_NUMEROS, 18) FROM v2.DEMANDE AS d JOIN v2.DOSSIER_DEMANDE AS dd ON dd.DSSDM_ID_DMND = d.DMND_ID_DMND AND dd.DSSDM_CODE_SEQUENCEUR = '2J' JOIN v2.INSTANCE AS i ON CAST(i.INSTN_ID_INSTN AS varchar(10)) = dd.DSSDM_VALEUR_SEQUENCEUR WHERE d.DMND_CODE_PROSS = 'OPE' AND i.INSTN_ID_INSTN_INSTANCE_PRINCIPA = 1801405 => V|2026IP81405 2026OP
 controle: SELECT STRING_AGG(e.EVNPR_CODE_EVE_PRO + ':' + CAST(CAST(e.EVNPR_SURVENU AS int) AS varchar(1)) + CAST(CAST(e.EVNPR_DELAI_EXPIRE AS int) AS varchar(1)), ',') WITHIN GROUP (ORDER BY e.EVNPR_ID_EVNPR) FROM v2.EVENEMENT_PROCEDURE AS e WHERE e.EVNPR_ID_INSTN = 1801405 => IPCONSOPOS:01,IPCAD:10
 controle: SELECT CAST(CAST(EVNPR_SURVENU AS int) AS varchar(1)) + '|' + CASE WHEN EVNPR_DATE = CAST(GETDATE() AS date) THEN 'jour' ELSE 'autre' END + '|' + ISNULL(CONVERT(varchar(10), EVNPR_DATE_MAXI, 103), 'sans') FROM v2.EVENEMENT_PROCEDURE WHERE EVNPR_ID_EVNPR = 1801479 => 1|jour|sans
+# Les editions : IPCAD (survenu sur 1801405) -> sa note « DI », le document interne ; IPCERTNOPP -> un parametre sans liste : rien.
+controle: SELECT STRING_AGG(x.DMNED_LIBELLE_DOCUMENT + '|' + x.DMNED_CODE_ENTITE_SOURCE + '|' + e.EVNPR_CODE_EVE_PRO + '|' + ISNULL(x.DMNED_CODE_ENTITE_DESTINATAIRE, '-') + '|' + ISNULL(x.DMNED_VALEUR_ID_DESTINATAIRE, '-') + '|' + x.DMNED_DESIGNATION_DESTINATAIRE + '|' + REPLACE(x.DMNED_LIBELLE_SOURCE, CONVERT(varchar(10), GETDATE(), 103), 'jour') + '|' + ISNULL(x.DMNED_CODE_MAQUETTE, '-') + '|' + ISNULL(x.DMNED_TYPE_DOCUMENT, '-'), ' / ') WITHIN GROUP (ORDER BY x.DMNED_ID_DMNED) FROM v2.DEMANDE_EDITION AS x JOIN v2.EVENEMENT_PROCEDURE AS e ON e.EVNPR_NUMERO_SOURCE = x.DMNED_VALEUR_ID_SOURCE WHERE e.EVNPR_ID_INSTN = 1801405 AND e.EVNPR_CODE_EVE_PRO = 'IPCAD' => Note de caducite|EVT_PROC|IPCAD|-|-|Document interne|IPCAD - jour (EP n° 2)|-|-
+controle: SELECT COUNT(*) FROM v2.DEMANDE_EDITION AS x JOIN v2.EVENEMENT_PROCEDURE AS e ON e.EVNPR_NUMERO_SOURCE = x.DMNED_VALEUR_ID_SOURCE WHERE e.EVNPR_ID_EVNPR = 1801479 => 0

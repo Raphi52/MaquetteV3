@@ -3,6 +3,13 @@
 # Jeu PROC_IPSUIVI.sql : 1801503 close (desistement survenu), 1801502 signifiee (opposition EXPIREE : sa date maxi ; provision
 # survenue), 1801501 rien de signifie (signification seulement attendue ; ordonnance prevue : sa date prevue).
 # 1801601 a 1801605 : les IP du desistement (PROC_IPSUIVI.sql, EcrivainSuiviIp, 27/11/2026), les plus recentes en tete.
+# Lot 8 (27/11) : les IP 18017xx de PROC_IPSUIVI.sql (signification, opposition, LRAR, ancienne loi).
+IP 2021IP81707 · ANCIENNE LOI A TEMPS | ordonnance du 01/06/2021 | Injonctions de payer | AFaire | []
+IP 2021IP81706 · ANCIENNE LOI HORS DELAI | ordonnance du 01/06/2021 | Injonctions de payer | AFaire | []
+IP 2026IP81704 · OPPOSER TROP TOT | ordonnance du {J-20} · signification 10/01/2099 | Injonctions de payer | EnCours | []
+IP 2026IP81703 · SIGNIFIER ET CERTIFIER | ordonnance du {J-20} | Injonctions de payer | AFaire | []
+IP 2026IP81702 · CREANCIER OMICRON c/ DEBITEUR OMICRON | ordonnance du {J-20} | Injonctions de payer | AFaire | []
+IP 2026IP81701 · CREANCIER SIGMA c/ DEBITEUR SIGMA | ordonnance du {J-20} | Injonctions de payer | AFaire | []
 IP 2026IP81605 · DESISTER NON SIGNEE | ordonnance du {J-5} | Injonctions de payer | AFaire | []
 IP 2026IP81604 · DESISTER SANS FUTUR | ordonnance du {J-20} | Injonctions de payer | AFaire | []
 IP 2026IP81603 · DESISTER REJETEE | ordonnance du {J-20} | Injonctions de payer | AFaire | []

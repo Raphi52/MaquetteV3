@@ -111,31 +111,46 @@ internal static class RelancesRsurv
                              TypeGeneration(FormeLigne.Texte(r, "PRMED_TYPE_GENERATION"), FormeLigne.Texte(r, "PRMED_LISTE")));
         if (parametre is not { } p) return null;
         var libelle = $"{p.Libelle}{suffixe}";
-        var valeurs = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
-        {
-            ["DMNED_ID_DMND"] = idDemande, ["DMNED_DATE_CREATION"] = geste.Maintenant, ["DMNED_TYPE_PAPIER"] = "NORMAL",
-            ["DMNED_MEDIA"] = "IMPR", ["DMNED_ETAT_EMISSION"] = "N", ["DMNED_PHASE_TRAITEMENT"] = "C",
-            ["DMNED_UTILISATEUR"] = geste.Agent.CompteWindows, ["DMNED_INTERLOCUTEUR"] = geste.Agent.CompteWindows,
-            ["DMNED_NOMBRE_EXEMPLAIRE"] = 1, ["DMNED_IMPRESSION"] = true, ["DMNED_PAPIER_TRAME"] = false, ["DMNED_AGRAFAGE"] = false,
-            ["DMNED_RECTO_VERSO"] = p.RectoVerso, ["DMNED_AFF_AVANT_IMPRESSION"] = p.Afficher, ["DMNED_LIBELLE_DOCUMENT"] = libelle,
-            ["DMNED_GROUPAGE_AUTOMATIQUE"] = true, ["DMNED_RESUME"] = false, ["DMNED_READ_ONLY"] = false,
-            ["DMNED_CODE_ENTITE_SOURCE"] = entite, ["DMNED_VALEUR_ID_SOURCE"] = idSource,
-            ["DMNED_CODE_CFECP"] = p.Cfecp, ["DMNED_LOT"] = lot, ["DMNED_DESIGNATION_DESTINATAIRE"] = designation,
-            // Le type de generation du parametre (CreateDemandeEditionByParametreGeneration, DemandeEdition.cs:2588-2589).
-            ["DMNED_TYPE_GENERATION"] = p.TypeGeneration,
-            // Mesure le 26/11/2026 (banc reuni au lot 6 de main, erreur 515 « Cannot insert the value NULL into column
-            // 'DMNED_MASQUER_COFFRE_FORT' ») -- RIG_DEV donne a ces colonnes NOT NULL le defaut ((0)) (INFORMATION_SCHEMA de
-            // SQL-DEV\DEV), que la base V3 n'a pas repris : la V2 les laisse a ce defaut, ecrit ici en clair (comme
-            // EcrivainRegistresJudiciaires).
-            ["DMNED_ENVOI_PAR_MAIL"] = false, ["DMNED_HAS_NUMLRAR"] = false, ["DMNED_IS_NON_SUPPRESSIBLE"] = false,
-            ["DMNED_HAS_NUMLR"] = false, ["DMNED_MASQUER_COFFRE_FORT"] = false,
-        };
+        var valeurs = ValeursEdition(geste, idDemande);
+        valeurs["DMNED_RECTO_VERSO"] = p.RectoVerso;
+        valeurs["DMNED_AFF_AVANT_IMPRESSION"] = p.Afficher;
+        valeurs["DMNED_LIBELLE_DOCUMENT"] = libelle;
+        valeurs["DMNED_CODE_ENTITE_SOURCE"] = entite;
+        valeurs["DMNED_VALEUR_ID_SOURCE"] = idSource;
+        valeurs["DMNED_CODE_CFECP"] = p.Cfecp;
+        valeurs["DMNED_LOT"] = lot;
+        valeurs["DMNED_DESIGNATION_DESTINATAIRE"] = designation;
+        // Le type de generation du parametre (CreateDemandeEditionByParametreGeneration, DemandeEdition.cs:2588-2589).
+        valeurs["DMNED_TYPE_GENERATION"] = p.TypeGeneration;
         // Les colonnes que la table du greffe porte (une base de banc n'en a qu'une partie) : celles de RIG v2 sinon.
         var presentes = await ColonnesAsync(geste, "v2.DEMANDE_EDITION", ct);
         await geste.InsererAsync("v2.DEMANDE_EDITION", "DMNED_ID_DMNED",
             valeurs.Where(v => presentes.Contains(v.Key)).ToDictionary(v => v.Key, v => v.Value), ct);
         return libelle;
     }
+
+    /// <summary>Les valeurs qu'une demande d'edition neuve porte dans RIG v2 (DemandeEdition.CreateDemandeEdition : media, etat
+    /// d'emission, phase, utilisateur, une impression d'un exemplaire), pour la demande <paramref name="idDemande"/> ; l'appelant
+    /// complete le document, la source et le destinataire. Le courrier de relance (EditionAsync) et les editions d'un evenement
+    /// (EditionsEvenement.cs) partent de la.</summary>
+    // fix-ok: extraction mesuree, pas un correctif -- les editions d'un evenement (lot 8, 27/11/2026, objection du controle final :
+    // OPE_TRAITEMENTS.cs:822-835 cree ces editions) ecrivent les memes valeurs par defaut que le courrier de relance ; partagees ici
+    // plutot que recopiees. EditionAsync garde son comportement (mêmes cles, memes valeurs ; banc PROC_DCA_RELANCE et PROC_DBE_*).
+    internal static Dictionary<string, object?> ValeursEdition(GesteEnCours geste, int idDemande) => new(StringComparer.OrdinalIgnoreCase)
+    {
+        ["DMNED_ID_DMND"] = idDemande, ["DMNED_DATE_CREATION"] = geste.Maintenant, ["DMNED_TYPE_PAPIER"] = "NORMAL",
+        ["DMNED_MEDIA"] = "IMPR", ["DMNED_ETAT_EMISSION"] = "N", ["DMNED_PHASE_TRAITEMENT"] = "C",
+        ["DMNED_UTILISATEUR"] = geste.Agent.CompteWindows, ["DMNED_INTERLOCUTEUR"] = geste.Agent.CompteWindows,
+        ["DMNED_NOMBRE_EXEMPLAIRE"] = 1, ["DMNED_IMPRESSION"] = true, ["DMNED_PAPIER_TRAME"] = false, ["DMNED_AGRAFAGE"] = false,
+        ["DMNED_RECTO_VERSO"] = false, ["DMNED_AFF_AVANT_IMPRESSION"] = false,
+        ["DMNED_GROUPAGE_AUTOMATIQUE"] = true, ["DMNED_RESUME"] = false, ["DMNED_READ_ONLY"] = false,
+        // Mesure le 26/11/2026 (banc reuni au lot 6 de main, erreur 515 « Cannot insert the value NULL into column
+        // 'DMNED_MASQUER_COFFRE_FORT' ») -- RIG_DEV donne a ces colonnes NOT NULL le defaut ((0)) (INFORMATION_SCHEMA de
+        // SQL-DEV\DEV), que la base V3 n'a pas repris : la V2 les laisse a ce defaut, ecrit ici en clair (comme
+        // EcrivainRegistresJudiciaires).
+        ["DMNED_ENVOI_PAR_MAIL"] = false, ["DMNED_HAS_NUMLRAR"] = false, ["DMNED_IS_NON_SUPPRESSIBLE"] = false,
+        ["DMNED_HAS_NUMLR"] = false, ["DMNED_MASQUER_COFFRE_FORT"] = false,
+    };
 
     /// <summary>« ... : 2 courriers « … », « … » en file d'édition. », ou l'absence de parametre d'edition (pas de reglage
     /// CodeParamEdition, ou un reglage qui designe un parametre absent de la base : RIG v2 ne cree alors aucun courrier).</summary>

@@ -73,6 +73,53 @@ valeur: Date prévue = 2099-01-15
 resultat: refuse
 message: ENJOINDRE SANS BEN · SIREN 518 000 103 : rien à enjoindre (seule une relance restée sans effet, sans injonction émise, sur un dossier que la recherche d'injonction de RIG v2 retient, s'enjoint).
 ---
+# 6c. Refus : les quatre autres exclusions d'ExclusionsIsurv, un dossier par condition (PROC_DBE_INJ.sql, 18001xx) ; chacun a une
+#     relance 1 echue et la forme SAI18 non cotee de 1100101. Jumeau accepte : bloc 7 (1100101, aucune de ces conditions).
+# 6c. 1800104 : siege (etablissement SPM) en Allemagne, pays de l'Union europeenne.
+geste: Agir Générer les injonctions
+ids: 1800104
+valeur: Date du cabinet = 2099-01-15
+valeur: Cabinet = CB18
+valeur: Date prévue = 2099-01-15
+resultat: refuse
+message: ENJOINDRE SIEGE UE · SIREN 518 000 104 : rien à enjoindre (seule une relance restée sans effet, sans injonction émise, sur un dossier que la recherche d'injonction de RIG v2 retient, s'enjoint).
+---
+# 6c. 1800105 : un depot de categorie N avec son acte BEN.
+geste: Agir Générer les injonctions
+ids: 1800105
+valeur: Date du cabinet = 2099-01-15
+valeur: Cabinet = CB18
+valeur: Date prévue = 2099-01-15
+resultat: refuse
+message: ENJOINDRE DEPOT BEN · SIREN 518 000 105 : rien à enjoindre (seule une relance restée sans effet, sans injonction émise, sur un dossier que la recherche d'injonction de RIG v2 retient, s'enjoint).
+---
+# 6c. 1800106 : une formalite d'un evenement BEN (R_CODEEVENEM_ISBENEF 1).
+geste: Agir Générer les injonctions
+ids: 1800106
+valeur: Date du cabinet = 2099-01-15
+valeur: Cabinet = CB18
+valeur: Date prévue = 2099-01-15
+resultat: refuse
+message: ENJOINDRE FORMALITE BEN · SIREN 518 000 106 : rien à enjoindre (seule une relance restée sans effet, sans injonction émise, sur un dossier que la recherche d'injonction de RIG v2 retient, s'enjoint).
+---
+# 6c. 1800107 : une demande MB1 en attente (Q).
+geste: Agir Générer les injonctions
+ids: 1800107
+valeur: Date du cabinet = 2099-01-15
+valeur: Cabinet = CB18
+valeur: Date prévue = 2099-01-15
+resultat: refuse
+message: ENJOINDRE DEMANDE MB1 · SIREN 518 000 107 : rien à enjoindre (seule une relance restée sans effet, sans injonction émise, sur un dossier que la recherche d'injonction de RIG v2 retient, s'enjoint).
+---
+# 6c. 1800108 : partie d'une instance OPINJRBE.
+geste: Agir Générer les injonctions
+ids: 1800108
+valeur: Date du cabinet = 2099-01-15
+valeur: Cabinet = CB18
+valeur: Date prévue = 2099-01-15
+resultat: refuse
+message: ENJOINDRE DEJA OPINJRBE · SIREN 518 000 108 : rien à enjoindre (seule une relance restée sans effet, sans injonction émise, sur un dossier que la recherche d'injonction de RIG v2 retient, s'enjoint).
+---
 # 7. FAIT, en lot sur 2 lignes : 1100101 et 1100102, cabinet du 15/01/2099 chambre CB18 -- juge, greffier et type de classement
 #    (CJ, seul admis) recopies du cabinet --, heure d'appel 09:45, ordonnance prevue le 15/01/2099. Une instance INJ18 par dossier
 #    (role JRO18, repertoire JGAFF), ses trois parties, l'appel, la decision OPRBE18 et ses deux evenements, la relance IDBE n° 2 sur la
