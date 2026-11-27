@@ -31,10 +31,14 @@
 // gardait le mode « Facturer » (facture numerotee a 0 EUR), le total 0,00 et l'encaissement
 // « Facture soldee » : l'ecran supposait qu'il y a toujours quelque chose a facturer.
 //
-// BRANCHE SUR LA BASE (plan « RIG v3 100 % fonctionnel », lot 12, 27/11/2026 ; marche du lot 17) : ouverte pour une affaire avec un
-// serveur, la demande et le client de sa facture viennent de la base du greffe (Pont/EcranFactures.cs, DemandeDe ;
-// Serveur/Socle/EcransMain/LectureFactures.cs : nom, abrege, adresse, solde du) ; « Changer de client » ne propose alors plus les
-// fiches de demonstration. En panne, le motif, et aucun client. Depuis l'accueil, la facture de demonstration reste (non branchee).
+// BRANCHE SUR LA BASE (plan « RIG v3 100 % fonctionnel », lot 12, 27/11/2026 ; marche du lot 17). Le pont dit d'ou vient la facture
+// (Pont/EcranFactures.cs, DemandeDe ; Serveur/Socle/EcransMain/LectureFactures.cs) :
+//   - « serveur », ouverte pour une affaire : la demande, le client de sa facture (nom, abrege, adresse, solde du) et SES articles,
+//     lus dans v2.ARTICLE_UTILISE comme la grille de RIG v2 les charge (ceux de la facture, sinon ceux de la tarification) ; le tarif
+//     de l'ecran n'y entre plus, « Changer de client » ne propose plus les fiches de demonstration ;
+//   - « serveur », ouverte depuis l'accueil : la facture VIDE de RIG v2 (nouvelle demande, PROC_FACTURE.cs:400-424), rien de la demo ;
+//   - « demo » (sans serveur, ou tant que le pont n'a pas repondu) : la demonstration ci-dessous, marquee « exemple » ;
+//   - une panne : le motif, et ni client ni article (le tarif d'exemple ne la remplace pas).
 //
 // LISTE MODERNE « Tout reuni » (24/11/2026, plan des listes modernes, lot 4) : les articles prennent les
 // briques de composants/ListeModerne.tsx. Tete (nombre d'articles, total TTC, reste a encaisser), trois cartes :
@@ -79,8 +83,10 @@ interface LigneFacture {
 }
 
 /** Une ligne telle que la grille la montre : les montants de la ligne (unite x quantite),
- *  sauf le prix UHT, qui reste celui d'une unite. */
+ *  sauf le prix UHT, qui reste celui d'une unite. `cle` la distingue : le code d'un article du tarif
+ *  (une fois par facture de demonstration), l'identifiant ARTUT d'un article lu (un code peut revenir). */
 interface ArticleFacture {
+  cle: string
   code: string
   libelle: string
   quantite: number
@@ -164,7 +170,7 @@ function article(ligne: LigneFacture): ArticleFacture {
   if (!t) throw new Error(`Article ${ligne.code} absent du tarif`)
   const fois = (montant: number) => centimes(montant) * ligne.quantite / 100
   return {
-    code: t.code, libelle: t.libelle, quantite: ligne.quantite, prixUht: t.prixUht, tauxTva: t.tauxTva,
+    cle: t.code, code: t.code, libelle: t.libelle, quantite: ligne.quantite, prixUht: t.prixUht, tauxTva: t.tauxTva,
     bodacc: fois(t.bodacc), inpi: fois(t.inpi), autre: fois(t.autre), ttc: fois(t.ttc), commentaire: ligne.commentaire,
   }
 }
@@ -179,6 +185,30 @@ type FiltreArticles = 'retenus' | 'retires' | 'bodacc' | 'inpi' | 'autre'
 /** Les colonnes du tableau : chevron, Article (libelle et code), Quantite, Etat, Montant TTC, Commentaire, menu. */
 const NbColonnes = 7
 
+/** Un article lu dans la base (Contrats/EcransMain/LectureFactures.cs, ArticleDeFacture) : les montants de la LIGNE, sauf le prix
+ *  UHT (une unite), comme la grille de RIG v2 (ArticlesDataGridView.cs:597-622). */
+interface ArticleLu {
+  id: number
+  code: string
+  libelle: string
+  quantite: number
+  prixUht: number
+  tauxTva: number
+  bodacc: number
+  inpi: number
+  autre: number
+  ttc: number
+  commentaire: string
+}
+
+const articleLu = (a: ArticleLu): ArticleFacture => ({
+  cle: String(a.id), code: a.code, libelle: a.libelle, quantite: a.quantite, prixUht: a.prixUht, tauxTva: a.tauxTva,
+  bodacc: a.bodacc, inpi: a.inpi, autre: a.autre, ttc: a.ttc, commentaire: a.commentaire,
+})
+
+/** Le numero de la demande de la facture de demonstration. */
+const DemandeDemo = 'D2026-04118'
+
 /** La demande d'une affaire, telle que Pont/EcranFactures.cs (DemandeDe) la rend. */
 interface DemandeFacturee {
   numero: string
@@ -190,6 +220,9 @@ interface DemandeFacturee {
   solde?: number | null
   mode?: ModeLecture
   message?: string | null
+  /** Lus dans la base : le numero de sa facture (vide si elle n'est que tarifee) et ses articles. */
+  facture?: string
+  articles?: readonly ArticleLu[] | null
 }
 
 export interface ProprietesEcranFactures {
@@ -202,10 +235,12 @@ export function EcranFactures({ dossier = null }: ProprietesEcranFactures) {
   // Ouvert pour une affaire, la facture part d'elle seule : son client et sa demande
   // arrivent du pont (DemandeDe) ; d'ici la, et si elle n'en a pas, ils restent vides.
   const [client, setClient] = useState(dossier ? FicheVide.nom : (Fiches[0] ?? FicheVide).nom)
-  const [numDemande, setNumDemande] = useState(dossier ? '' : 'D2026-04118')
+  const [numDemande, setNumDemande] = useState(dossier ? '' : DemandeDemo)
   const [demande, setDemande] = useState<DemandeFacturee | null>(null)
-  // Une affaire est montee avec sa cle (Aiguillage.tsx) : sa facture est lue une fois.
-  const [lignes] = useState<readonly LigneFacture[]>(() => dossier ? factureDe(dossier) : FactureDemo)
+  // D'ou vient la facture : la demonstration tant que le pont n'a rien dit (ou sans serveur), la base, ou une panne.
+  const provenance: ModeLecture = demande?.mode ?? 'demo'
+  const demonstration = provenance === 'demo'
+  const enBase = provenance === 'serveur'
 
   // v2 : ult_Facturer_Tarifer, "F" par defaut.
   const [tarifer, setTarifer] = useState(false)
@@ -213,7 +248,7 @@ export function EcranFactures({ dossier = null }: ProprietesEcranFactures) {
   const [payeur, setPayeur] = useState('')
   const [references, setReferences] = useState('')
   const [attention, setAttention] = useState('')
-  const ventilationId = dossier ? '' : 'V-2026-8801'
+  const ventilationId = dossier || !demonstration ? '' : 'V-2026-8801'
   const [mode, setMode] = useState('Compte')
   const [banque, setBanque] = useState('')
   const [numTitre, setNumTitre] = useState('')
@@ -239,15 +274,24 @@ export function EcranFactures({ dossier = null }: ProprietesEcranFactures) {
   const numeroAffaire = dossier?.numero
   const nomAffaire = dossier?.nom ?? ''
   useEffect(() => {
-    if (numeroAffaire === undefined) return
     let perime = false
-    void appeler<DemandeFacturee | null>('EcranFactures.DemandeDe', numeroAffaire).then((d) => {
+    // Depuis l'accueil aussi (null) : avec un serveur, la facture vide de RIG v2 remplace la demonstration.
+    appeler<DemandeFacturee | null>('EcranFactures.DemandeDe', numeroAffaire ?? null).then((d) => {
       if (perime || !d) return
       setDemande(d)
+      if (numeroAffaire === undefined) {
+        if (d.mode === undefined || d.mode === 'demo') return
+        // Le numero, le client et l'encaissement d'exemple s'en vont ; ce que l'agent a deja saisi reste.
+        setNumDemande((avant) => avant === DemandeDemo ? '' : avant)
+        setClient('')
+        setEncaisseTexte((avant) => avant === '200' ? '' : avant)
+        setEncaisse((avant) => avant === 200 ? 0 : avant)
+        return
+      }
       // Ce que l'agent a deja saisi ou choisi entre-temps n'est pas ecrase.
       setNumDemande((avant) => avant || d.numero)
       if (d.client) setClient((avant) => avant || nomAffaire)
-    })
+    }).catch(() => { /* pas de pont (page hors WebView2) : la demonstration reste, marquee « exemple » */ })
     return () => { perime = true }
   }, [numeroAffaire, nomAffaire])
 
@@ -255,13 +299,14 @@ export function EcranFactures({ dossier = null }: ProprietesEcranFactures) {
   // (toutes les demandes du jeu de demonstration abregent la denomination de leur
   // dossier). Ni type, ni adresse, ni solde : l'affaire ne les dit pas.
   // Lue dans la base : la fiche du client de sa facture, seule (les fiches de demonstration ne sont pas des clients du greffe).
-  const enBase = demande?.mode !== undefined && demande.mode !== 'demo'
+  // Hors demonstration (base ou panne), aucune fiche d'exemple n'est proposee.
   const ficheAffaire: FicheClient | null = dossier
     ? (enBase && demande?.client
         ? { ...FicheVide, nom: demande.nom || nomAffaire, abrege: demande.client, adresse: demande.adresse ?? '', solde: demande.solde ?? null }
         : demande?.client ? { ...FicheVide, nom: nomAffaire, abrege: demande.client } : FicheVide)
     : null
-  const fiches: readonly FicheClient[] = ficheAffaire ? (enBase ? [ficheAffaire] : [ficheAffaire, ...Fiches]) : Fiches
+  const fiches: readonly FicheClient[] = !demonstration ? [ficheAffaire ?? FicheVide]
+    : ficheAffaire ? [ficheAffaire, ...Fiches] : Fiches
   const fiche = fiches.find((f) => f.nom === client) ?? fiches[0] ?? FicheVide
 
   // v2 : btn_Changer_client fait defiler les clients rattachables a la facture.
@@ -270,10 +315,10 @@ export function EcranFactures({ dossier = null }: ProprietesEcranFactures) {
     setClient((fiches[(i + 1) % fiches.length] ?? FicheVide).nom)
   }
 
-  function basculer(code: string) {
+  function basculer(cle: string) {
     setRetires((avant) => {
       const apres = new Set(avant)
-      if (!apres.delete(code)) apres.add(code)
+      if (!apres.delete(cle)) apres.add(cle)
       return apres
     })
   }
@@ -284,25 +329,36 @@ export function EcranFactures({ dossier = null }: ProprietesEcranFactures) {
     if (Number.isFinite(valeur)) setEncaisse(valeur)
   }
 
-  const articles = lignes.map(article)
-  const total = articles.filter((a) => !retires.has(a.code)).reduce((s, a) => s + centimes(a.ttc), 0)
+  // La demonstration : la facture de l'accueil, ou celle d'une affaire tiree du tarif d'exemple. La base : les articles lus, seuls.
+  // Une panne : aucun article.
+  const articles: readonly ArticleFacture[] = demonstration
+    ? (dossier ? factureDe(dossier) : FactureDemo).map(article)
+    : (demande?.articles ?? []).map(articleLu)
+  const total = articles.filter((a) => !retires.has(a.cle)).reduce((s, a) => s + centimes(a.ttc), 0)
   const reste = Math.max(0, total - centimes(encaisse))
   // Une facture d'affaire SANS article n'est ni a emettre (une facture numerotee a 0 EUR)
   // ni a encaisser, et n'est pas « soldee » : l'ecran dit pourquoi il n'y a rien.
   const nature = dossier ? natureDe(dossier) : ''
   const sansArticle = articles.length === 0
-  const pourquoiRien = NaturesGratuites.includes(nature)
-    ? `Rien a facturer : ${nature}, depot gratuit au greffe.`
-    : `Aucun article du tarif pour cette affaire${nature ? ` (${nature})` : ''}.`
+  const pourquoiRien = !demonstration && !enBase
+    ? 'Aucun article : la base du greffe n\'a pas ete lue (motif ci-dessus).'
+    : enBase
+      ? (!dossier ? 'Facture vide : ouverte hors d\'un dossier, elle ne reprend aucune demande (RIG v2 l\'ouvre vide).'
+        : !demande?.numero ? 'Aucune demande pour ce dossier dans la base du greffe : rien a facturer.'
+        : demande.facture ? `Facture ${demande.facture} : aucun article dans la base du greffe.`
+        : `Demande ${demande.numero} : ni facture ni article tarife dans la base du greffe.`)
+      : NaturesGratuites.includes(nature)
+        ? `Rien a facturer : ${nature}, depot gratuit au greffe.`
+        : `Aucun article du tarif pour cette affaire${nature ? ` (${nature})` : ''}.`
 
   // Les chiffres des cartes et du pied, en centimes. Les frais sont ceux des articles RETENUS, comme le total.
-  const retenus = articles.filter((a) => !retires.has(a.code))
-  const totalRetires = articles.filter((a) => retires.has(a.code)).reduce((s, a) => s + centimes(a.ttc), 0)
+  const retenus = articles.filter((a) => !retires.has(a.cle))
+  const totalRetires = articles.filter((a) => retires.has(a.cle)).reduce((s, a) => s + centimes(a.ttc), 0)
   const frais = (champ: 'bodacc' | 'inpi' | 'autre') => retenus.reduce((s, a) => s + centimes(a[champ]), 0)
   const affiches = articles.filter((a) => {
     switch (filtre) {
-      case 'retenus': return !retires.has(a.code)
-      case 'retires': return retires.has(a.code)
+      case 'retenus': return !retires.has(a.cle)
+      case 'retires': return retires.has(a.cle)
       case 'bodacc': case 'inpi': case 'autre': return a[filtre] > 0
       default: return true
     }
@@ -316,9 +372,6 @@ export function EcranFactures({ dossier = null }: ProprietesEcranFactures) {
 
       <aside className="rig-criteres">
         {dossier && <PourLeDossier dossier={dossier} />}
-        {dossier && demande?.mode !== undefined && demande.mode !== 'serveur' && demande.mode !== 'demo' && (
-          <ProvenanceEcran mode={demande.mode} message={demande.message} quoi="Demandes" />
-        )}
 
         <div className="rig-kicker" style={{ marginBottom: 'var(--rig-esp-3)' }}>Informations client</div>
 
@@ -408,11 +461,12 @@ export function EcranFactures({ dossier = null }: ProprietesEcranFactures) {
       </aside>
 
       <ListeModerne etiquette="Articles de la facture">
-        <EnteteListe titre="Articles de la facture"
+        <EnteteListe titre={demande?.facture ? `Articles de la facture ${demande.facture}` : 'Articles de la facture'}
                      synthese={sansArticle ? 'Aucun article' : <>
                        {articles.length}{articles.length > 1 ? ' articles' : ' article'}
                        {retires.size > 0 && ` · ${retires.size} retire${retires.size > 1 ? 's' : ''}`}
                        {' · total TTC '}<b>{montant(total / 100)}</b>{' · reste a encaisser '}<b>{montant(reste / 100)}</b></>} />
+        <ProvenanceEcran mode={provenance} message={demande?.message} quoi="Lignes de facture" />
 
         {!sansArticle && (
           <CartesChiffrees cartes={[
@@ -464,14 +518,14 @@ export function EcranFactures({ dossier = null }: ProprietesEcranFactures) {
                 </tr>
               )}
               {affiches.map((art) => {
-                const retire = retires.has(art.code)
-                const estOuverte = ouverte === art.code
-                const action: ActionLigne = { libelle: retire ? 'Remettre dans le total' : 'Retirer du total', agir: () => basculer(art.code) }
+                const retire = retires.has(art.cle)
+                const estOuverte = ouverte === art.cle
+                const action: ActionLigne = { libelle: retire ? 'Remettre dans le total' : 'Retirer du total', agir: () => basculer(art.cle) }
                 const classes = [retire ? 'rig-table__ligne--inerte' : '', estOuverte ? 'rig-lm-ouverte' : ''].filter(Boolean).join(' ')
                 return (
-                  <Fragment key={art.code}>
-                  <tr className={classes || undefined} onClick={() => basculer(art.code)}>
-                    <CelluleChevron ouverte={estOuverte} basculer={() => setOuverte(estOuverte ? null : art.code)} />
+                  <Fragment key={art.cle}>
+                  <tr className={classes || undefined} onClick={() => basculer(art.cle)}>
+                    <CelluleChevron ouverte={estOuverte} basculer={() => setOuverte(estOuverte ? null : art.cle)} />
                     <CelluleIdentite avatar={false} nom={art.libelle} objet={art.code} titre={`${art.libelle} · ${art.code}`} />
                     <td className="rig-table__centre">{art.quantite}</td>
                     <td><PointEtat teinte={retire ? 'gris' : 'vert'}>{retire ? 'Retire' : 'Retenu'}</PointEtat></td>
@@ -482,7 +536,7 @@ export function EcranFactures({ dossier = null }: ProprietesEcranFactures) {
                     <td className="rig-lm-cellule-menu">
                       <MenuLigne libelle={`Actions de l'article ${art.code}`} actions={[
                         action,
-                        { libelle: estOuverte ? 'Replier la ligne' : 'Deplier la ligne', agir: () => setOuverte(estOuverte ? null : art.code) },
+                        { libelle: estOuverte ? 'Replier la ligne' : 'Deplier la ligne', agir: () => setOuverte(estOuverte ? null : art.cle) },
                       ]} />
                     </td>
                   </tr>

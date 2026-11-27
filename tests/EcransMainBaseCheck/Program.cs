@@ -1513,9 +1513,24 @@ Exiger((await EcranBanques.BanquesAsync(client, GreffeAbsent)) is { Mode: "erreu
 // -Affaire.GetSolde(client), un couple au solde nul ecarte ; payeur = client de la premiere facture) et la demande que la facture
 // reprend (sa premiere, le client de sa facture, son solde Client.SoldeClient). Le dossier 2026B12001 par son numero de gestion RCS,
 // L12DOS02 par le numero indicatif de sa demande. Identifiants du lot 12 : 2 200 000 a 2 299 999.
+// Les articles de la facture (objection du juge, lot 12 : ils venaient du tarif ecrit dans l'ecran) : ceux de SA facture
+// (Facture.cs:988-990) ; L12DOS03, une demande sans facture mais tarifee : le client de son premier article tarife et TOUS les
+// articles non factures de l'affaire pour lui (PROC_FACTURE.cs:393-397, ArticleUtilise.cs:224-225) ; L12DOS04, ni l'un ni l'autre :
+// la facture vide. Colonnes de v2.ARTICLE_UTILISE aux types de RIG v2 (RigDatabase/dbo/Tables/ARTICLE_UTILISE.sql).
 await Sql("""
     ALTER TABLE v2.FACTURE ADD FACTU_MONTANT_TTC money NULL;
     ALTER TABLE v2.ARTICLE_UTILISE ADD ARTUT_NUMERO_FACTURE varchar(25) NULL;
+    IF COL_LENGTH('v2.ARTICLE_UTILISE', 'ARTUT_NUM_DEMANDE') IS NULL ALTER TABLE v2.ARTICLE_UTILISE ADD ARTUT_NUM_DEMANDE varchar(11) NULL;
+    IF COL_LENGTH('v2.ARTICLE_UTILISE', 'ARTUT_ID_CLIEN') IS NULL ALTER TABLE v2.ARTICLE_UTILISE ADD ARTUT_ID_CLIEN int NULL;
+    IF COL_LENGTH('v2.ARTICLE_UTILISE', 'ARTUT_CODE_ARTICLE') IS NULL ALTER TABLE v2.ARTICLE_UTILISE ADD ARTUT_CODE_ARTICLE varchar(32) NULL;
+    IF COL_LENGTH('v2.ARTICLE_UTILISE', 'ARTUT_LIBELLE') IS NULL ALTER TABLE v2.ARTICLE_UTILISE ADD ARTUT_LIBELLE varchar(512) NULL;
+    IF COL_LENGTH('v2.ARTICLE_UTILISE', 'ARTUT_QUANTITE') IS NULL ALTER TABLE v2.ARTICLE_UTILISE ADD ARTUT_QUANTITE smallint NULL;
+    IF COL_LENGTH('v2.ARTICLE_UTILISE', 'ARTUT_PRIX_UHT') IS NULL ALTER TABLE v2.ARTICLE_UTILISE ADD ARTUT_PRIX_UHT money NULL;
+    IF COL_LENGTH('v2.ARTICLE_UTILISE', 'ARTUT_TAUX_TVA') IS NULL ALTER TABLE v2.ARTICLE_UTILISE ADD ARTUT_TAUX_TVA real NULL;
+    IF COL_LENGTH('v2.ARTICLE_UTILISE', 'ARTUT_MONTANT_BODACC') IS NULL ALTER TABLE v2.ARTICLE_UTILISE ADD ARTUT_MONTANT_BODACC money NULL;
+    IF COL_LENGTH('v2.ARTICLE_UTILISE', 'ARTUT_MONTANT_INPI') IS NULL ALTER TABLE v2.ARTICLE_UTILISE ADD ARTUT_MONTANT_INPI money NULL;
+    IF COL_LENGTH('v2.ARTICLE_UTILISE', 'ARTUT_MONTANT_AUTRE') IS NULL ALTER TABLE v2.ARTICLE_UTILISE ADD ARTUT_MONTANT_AUTRE money NULL;
+    IF COL_LENGTH('v2.ARTICLE_UTILISE', 'ARTUT_COMMENTAIRE') IS NULL ALTER TABLE v2.ARTICLE_UTILISE ADD ARTUT_COMMENTAIRE varchar(8000) NULL;
     ALTER TABLE v2.VENTILATION ADD VENTI_ID_CLIEN int NULL, VENTI_DATE_VENTILATION datetime NULL;
     IF OBJECT_ID(N'v2.CLIENT_SOLDE') IS NULL
         CREATE TABLE v2.CLIENT_SOLDE (CLISO_ID_CLISO int IDENTITY PRIMARY KEY, CLISO_DATE_SOLDE datetime NOT NULL, CLISO_MONTANT money NOT NULL,
@@ -1554,6 +1569,28 @@ await Sql("""
         (2201501, 2201101, 7.50, 2201301, DATEADD(DAY, -5, CAST(GETDATE() AS date))), (2201502, 2201101, 40.00, 2201302, DATEADD(DAY, -5, CAST(GETDATE() AS date)));
     -- 2201302 a un solde valide il y a 30 jours (-5,00) : Client.SoldeClient part de lui
     INSERT INTO v2.CLIENT_SOLDE (CLISO_DATE_SOLDE, CLISO_MONTANT, CLISO_ID_CLIEN, CLISO_ID_UTLST) VALUES (DATEADD(DAY, -30, CAST(GETDATE() AS date)), -5.00, 2201302, 1);
+    -- le detail des articles (colonnes NOT NULL de RIG v2 remplies) : TTC = PUHT x (1 + TVA) x quantite + debours (36,75 x 1,2 + 105,90 = 150,00)
+    UPDATE v2.ARTICLE_UTILISE SET ARTUT_CODE_ARTICLE = 'IMM01', ARTUT_LIBELLE = 'Immatriculation societe', ARTUT_QUANTITE = 1, ARTUT_PRIX_UHT = 36.75,
+        ARTUT_TAUX_TVA = 20, ARTUT_MONTANT_BODACC = 105.90, ARTUT_NUM_DEMANDE = 'D12E001', ARTUT_ID_CLIEN = 2201301 WHERE ARTUT_ID_ARTUT = 2201401;
+    UPDATE v2.ARTICLE_UTILISE SET ARTUT_CODE_ARTICLE = 'LIBRE', ARTUT_LIBELLE = 'Article libre', ARTUT_QUANTITE = 1, ARTUT_PRIX_UHT = 0,
+        ARTUT_TAUX_TVA = 20, ARTUT_COMMENTAIRE = 'Mention gratuite', ARTUT_NUM_DEMANDE = 'D12E001', ARTUT_ID_CLIEN = 2201301 WHERE ARTUT_ID_ARTUT = 2201404;
+    UPDATE v2.ARTICLE_UTILISE SET ARTUT_CODE_ARTICLE = 'MOD02', ARTUT_LIBELLE = 'Modification statutaire', ARTUT_QUANTITE = 1, ARTUT_PRIX_UHT = 33.33,
+        ARTUT_TAUX_TVA = 20, ARTUT_NUM_DEMANDE = 'D12E001', ARTUT_ID_CLIEN = 2201302 WHERE ARTUT_ID_ARTUT = 2201402;
+    UPDATE v2.ARTICLE_UTILISE SET ARTUT_CODE_ARTICLE = 'INP04', ARTUT_LIBELLE = 'Transmission INPI', ARTUT_QUANTITE = 2, ARTUT_PRIX_UHT = 12.50,
+        ARTUT_TAUX_TVA = 20, ARTUT_MONTANT_INPI = 30.00, ARTUT_NUM_DEMANDE = 'D12E002', ARTUT_ID_CLIEN = 2201302 WHERE ARTUT_ID_ARTUT = 2201403;
+    -- L12DOS03 : demande D12E003 sans facture, tarifee. 2201405 (D12E003, client 2201302) donne le client ; 2201406 (une autre demande de
+    -- la meme affaire, meme client, non facturee) en est aussi ; 2201407 (autre client) et 2201408 (deja facture) n'en sont pas.
+    -- L12DOS04 : demande D12E004 sans affaire, ni facture ni tarification.
+    INSERT INTO v2.AFFAIRE (AFFRE_ID_AFFRE, AFFRE_LIBELLE, AFFRE_DATE_CREATION) VALUES (2201103, 'Affaire tarifee', '20260101');
+    INSERT INTO v2.DEMANDE (DMND_ID_DMND, DMND_ID_DSRCS, DMND_NUM_DEMANDE, DMND_NOM, DMND_NUM_INDICATIF, DMND_ETAT_DEMANDE, DMND_EN_COURS, DMND_ID_AFFRE) VALUES
+        (2201003, NULL, 'D12E003', 'Tarification - GAMMA', 'L12DOS03', 'V', 0, 2201103),
+        (2201004, NULL, 'D12E004', 'Sans facture - DELTA', 'L12DOS04', 'V', 0, NULL);
+    INSERT INTO v2.ARTICLE_UTILISE (ARTUT_ID_ARTUT, ARTUT_ID_AFFRE, ARTUT_MONTANT_TTC, ARTUT_NUMERO_FACTURE, ARTUT_NUM_DEMANDE, ARTUT_ID_CLIEN,
+        ARTUT_CODE_ARTICLE, ARTUT_LIBELLE, ARTUT_QUANTITE, ARTUT_PRIX_UHT, ARTUT_TAUX_TVA, ARTUT_MONTANT_BODACC, ARTUT_MONTANT_INPI, ARTUT_MONTANT_AUTRE, ARTUT_COMMENTAIRE) VALUES
+        (2201408, 2201103, 9.00, 'F12E199', 'D12E003', 2201302, 'DIV05', 'Deja facture', 1, 7.50, 20, NULL, NULL, NULL, NULL),
+        (2201406, 2201103, 12.00, NULL, 'D12E099', 2201302, 'DIV05', 'Frais divers', 1, 10.00, 20, NULL, NULL, NULL, 'Autre demande'),
+        (2201405, 2201103, 30.01, '', 'D12E003', 2201302, 'DEP03', 'Depot des comptes annuels', 3, 8.00, 20, NULL, NULL, 1.21, NULL),
+        (2201407, 2201103, 99.00, NULL, 'D12E003', 2201301, 'IMM01', 'Autre client', 1, 82.50, 20, NULL, NULL, NULL, NULL);
     """);
 await using (var cn = new SqlConnection(greffe.Connexion))
 {
@@ -1573,6 +1610,18 @@ await using (var cn = new SqlConnection(greffe.Connexion))
     Exiger((await LectureFactures.LireAsync(cn, "L12DOS02", DateTime.Now, CancellationToken.None)) is { Numero: "D12E002", Abrege: "L12ENB", Adresse: "", Solde: -65.00m }
            && await LectureFactures.LireAsync(cn, "L12AUCUN", DateTime.Now, CancellationToken.None) is null,
         "demande du dossier L12DOS02 : son client sans adresse ; un dossier sans demande : aucune");
+    // Les articles : ceux de SA facture, montants exacts tels qu'en base (aucun recalcul), par ARTUT_ID_ARTUT.
+    Exiger(demandeAlpha is { Facture: "F12E101", Articles: [
+               { Id: 2201401, Code: "IMM01", Libelle: "Immatriculation societe", Quantite: 1, PrixUht: 36.75m, TauxTva: 20m, Bodacc: 105.90m, Inpi: 0m, Autre: 0m, Ttc: 150.00m, Commentaire: "" },
+               { Id: 2201404, Code: "LIBRE", Quantite: 1, Ttc: 0.00m, Commentaire: "Mention gratuite" }] },
+        $"articles de la facture F12E101 : les deux siens, pas ceux de F12E102 ({demandeAlpha?.Facture} ; {string.Join(",", demandeAlpha?.Articles?.Select(a => a.Id) ?? [])})");
+    var gamma = await LectureFactures.LireAsync(cn, "L12DOS03", DateTime.Now, CancellationToken.None);
+    Exiger(gamma is { Numero: "D12E003", Abrege: "L12ENB", Facture: "", Articles: [
+               { Id: 2201405, Code: "DEP03", Quantite: 3, PrixUht: 8.00m, Autre: 1.21m, Ttc: 30.01m },
+               { Id: 2201406, Code: "DIV05", Ttc: 12.00m, Commentaire: "Autre demande" }] },
+        $"demande tarifee L12DOS03 : le client de son premier article tarife (2201302), tous ses articles non factures de l'affaire ; ni l'autre client ni le facture ({gamma?.Abrege} ; {string.Join(",", gamma?.Articles?.Select(a => a.Id) ?? [])})");
+    Exiger((await LectureFactures.LireAsync(cn, "L12DOS04", DateTime.Now, CancellationToken.None)) is { Numero: "D12E004", Abrege: "", Solde: null, Facture: "", Articles: [] },
+        "demande sans facture ni tarification (L12DOS04) : la facture vide de RIG v2, sans client ni article");
 }
 Exiger((await http.GetFromJsonAsync<EncaissementDeDepart>(RoutesEcransMain.Pour(RoutesEncaissements.Depart, Greffe).Replace("{dossier}", "2026B12001"), json)) is { Montant: 142.50m },
     "route de l'encaissement d'un dossier : la lecture");
@@ -1586,10 +1635,16 @@ Exiger((await EcranEncaissements.DepartAsync(client, Greffe, null)) is { Mode: "
        && (await EcranEncaissements.DepartAsync(null, null, "2026B12001")) is { Mode: "demo", Ventilations.Length: 0 }
        && (await EcranEncaissements.DepartAsync(client, GreffeAbsent, "2026B12001")) is { Mode: "erreur", Ventilations.Length: 0, Message: not null },
     "pont Encaissements : depuis l'accueil, un encaissement vide ; sans serveur, la demonstration ; greffe absent, le motif et rien");
-Exiger((await EcranFactures.DemandeDeAsync(client, Greffe, "2026B12001")) is { Mode: "serveur", Numero: "D12E001", Client: "L12ENC", Solde: 142.50m }
-       && await EcranFactures.DemandeDeAsync(client, Greffe, "L12AUCUN") is null
-       && (await EcranFactures.DemandeDeAsync(client, GreffeAbsent, "2026B12001")) is { Mode: "erreur", Numero: "", Client: "", Message: not null },
-    "pont Factures branche : la demande et le client de la base, solde du positif ; sans demande, null ; greffe absent, le motif et rien");
+Exiger((await EcranFactures.DemandeDeAsync(client, Greffe, "2026B12001")) is { Mode: "serveur", Numero: "D12E001", Client: "L12ENC", Solde: 142.50m,
+                                                                               Facture: "F12E101", Articles: [{ Ttc: 150.00m }, { Ttc: 0.00m }] }
+       && (await EcranFactures.DemandeDeAsync(client, Greffe, "L12AUCUN")) is { Mode: "serveur", Numero: "", Client: "", Articles: [] }
+       && (await EcranFactures.DemandeDeAsync(client, GreffeAbsent, "2026B12001")) is { Mode: "erreur", Numero: "", Client: "", Message: not null, Articles: [] },
+    "pont Factures branche : la demande, le client et les articles de la base, solde du positif ; sans demande, une facture vide (jamais la demonstration) ; greffe absent, le motif et rien");
+Exiger((await EcranFactures.DemandeDeAsync(client, Greffe, null)) is { Mode: "serveur", Numero: "", Articles: [] }
+       && (await EcranFactures.DemandeDeAsync(client, null, null)) is { Mode: "sans-greffe", Articles: null or [] }
+       && await EcranFactures.DemandeDeAsync(null, null, null) is null
+       && (await EcranFactures.DemandeDeAsync(null, null, "004182")) is { Mode: "demo", Articles: null },
+    "pont Factures depuis l'accueil : avec un serveur, la facture vide de RIG v2 ; sans greffe, le motif ; sans serveur, la demonstration (null, et des articles null sur un dossier)");
 Exiger(EcranFactures.DateDuJour(client, new DateTime(2026, 11, 27)) == "2026-11-27" && EcranFactures.DateDuJour(null, new DateTime(2026, 11, 27)) != "2026-11-27",
     "date du jour : celle du poste avec un serveur, celle de la demonstration sans");
 

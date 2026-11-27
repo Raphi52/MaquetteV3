@@ -4,9 +4,11 @@ namespace RigV3Desktop.Pont;
 
 /// <summary>La demande RCS d'une affaire, ce qu'une facture en reprend : son numero et l'abrege de son client (colonnes Numero et
 /// Client de JeuDemo.Demandes) ; branche sur la base (lot 12), aussi le nom, l'adresse et le solde DU du client de sa facture (le
-/// solde de RIG v2 change de signe : positif = ce que le client doit, la convention de l'ecran), et d'ou vient la demande.</summary>
+/// solde de RIG v2 change de signe : positif = ce que le client doit, la convention de l'ecran), le numero de sa facture, SES
+/// articles (v2.ARTICLE_UTILISE ; null en demonstration : l'ecran garde son tarif d'exemple), et d'ou vient la demande.</summary>
 public sealed record DemandeFacturee(string Numero, string Client, string? Nom = null, string? Adresse = null, decimal? Solde = null,
-                                     string Mode = LectureEcransMain.Demo, string? Message = null);
+                                     string Mode = LectureEcransMain.Demo, string? Message = null, string Facture = "",
+                                     ArticleDeFacture[]? Articles = null);
 
 /// <summary>
 /// Pont de l'ecran PROC_FACTURE (web/src/ecrans/EcranFactures.tsx).
@@ -17,8 +19,10 @@ public sealed record DemandeFacturee(string Numero, string Client, string? Nom =
 ///
 /// BRANCHE SUR LA BASE (plan « RIG v3 100 % fonctionnel », lot 12, 27/11/2026 ; marche du lot 17, Pont/LectureEcranMain.cs) : avec
 /// un serveur, la date du jour est celle du poste (RIG v2 : DateTime.Today), et la demande du dossier se lit dans la base du greffe
-/// (Serveur/Socle/EcransMain/LectureFactures.cs : la premiere demande du dossier et le client de sa facture). Sans serveur, la
-/// demonstration (JeuDemo), inchangee. En panne : une demande vide qui porte le motif, jamais celle de la demonstration.
+/// (Serveur/Socle/EcransMain/LectureFactures.cs : la premiere demande du dossier, le client et les articles de sa facture, ou de sa
+/// tarification). Sans serveur, la demonstration (JeuDemo), inchangee. En panne : une demande vide qui porte le motif, jamais celle de
+/// la demonstration. Avec un serveur, un dossier sans demande, ou l'ecran ouvert depuis l'accueil, rend une demande VIDE en mode
+/// « serveur » : la facture vide de RIG v2 (PROC_FACTURE.cs:400-424, CreateEmptyFacture), jamais la demonstration.
 /// </summary>
 public static class EcranFactures
 {
@@ -38,18 +42,28 @@ public static class EcranFactures
     /// demande portee par ce dossier.
     /// </summary>
     [JSInvokable("EcranFactures.DemandeDe")]
-    public static Task<DemandeFacturee?> DemandeDe(string dossier) => DemandeDeAsync(ClientServeur.Actif, SessionAgent.CodeGreffe, dossier);
+    public static Task<DemandeFacturee?> DemandeDe(string? dossier) => DemandeDeAsync(ClientServeur.Actif, SessionAgent.CodeGreffe, dossier);
 
-    /// <summary>La demande du dossier <paramref name="dossier"/> du greffe <paramref name="greffe"/> (null serveur : la demonstration).</summary>
-    public static async Task<DemandeFacturee?> DemandeDeAsync(ClientServeur? serveur, string? greffe, string dossier)
+    /// <summary>La demande du dossier <paramref name="dossier"/> du greffe <paramref name="greffe"/> (null serveur : la demonstration ;
+    /// dossier vide, l'ecran ouvert depuis l'accueil).</summary>
+    public static async Task<DemandeFacturee?> DemandeDeAsync(ClientServeur? serveur, string? greffe, string? dossier)
     {
+        if (string.IsNullOrWhiteSpace(dossier))
+        {
+            // Depuis l'accueil, RIG v2 ouvre une facture vide sur une nouvelle demande (PROC_FACTURE.cs:400-424) : rien a lire ; le
+            // greffe ouvert dit seulement si l'ecran est sur la base (meme regle qu'EcranEncaissements.DepartAsync).
+            if (serveur is null) return null;
+            return string.IsNullOrWhiteSpace(greffe)
+                ? new DemandeFacturee("", "", Mode: "sans-greffe", Message: "Aucun greffe n'est ouvert dans cette session : la facture se lit dans la base du greffe choisi à l'ouverture de RIG.")
+                : new DemandeFacturee("", "", Mode: "serveur", Articles: []);
+        }
         var lu = await LectureEcransMain.LireAsync(serveur, greffe, "la demande du dossier", (s, g) =>
             s.LireAsync<DemandeDuDossierLue>(RoutesEcransMain.Pour(RoutesFactures.Demande, g).Replace("{dossier}", Uri.EscapeDataString(dossier.Trim()), StringComparison.Ordinal)));
         if (lu.Mode == LectureEcransMain.Demo)
             return JeuDemo.Demandes.FirstOrDefault(d => d.Dossier == dossier) is { } d ? new DemandeFacturee(d.Numero, d.Client) : null;
-        if (lu.Valeur is not { } v) return new DemandeFacturee("", "", Mode: lu.Mode, Message: lu.Message);
+        if (lu.Valeur is not { } v) return new DemandeFacturee("", "", Mode: lu.Mode, Message: lu.Message, Articles: []);
         return v.Demande is { } x
-            ? new DemandeFacturee(x.Numero, x.Abrege, x.Nom, x.Adresse, x.Solde is { } s ? -s : null, lu.Mode)
-            : null;
+            ? new DemandeFacturee(x.Numero, x.Abrege, x.Nom, x.Adresse, x.Solde is { } s ? -s : null, lu.Mode, null, x.Facture, x.Articles ?? [])
+            : new DemandeFacturee("", "", Mode: lu.Mode, Articles: []);
     }
 }
