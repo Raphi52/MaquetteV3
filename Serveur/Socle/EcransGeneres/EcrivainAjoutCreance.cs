@@ -95,8 +95,9 @@ internal sealed class EcrivainAjoutCreance : IEcrivainEcran
         var (creance, erreur, _) = await CreancesPcV2.IntegrerAdmissionAsync(geste, transitoire, ct);
         if (creance is null) return IssueGeste.Refuser(erreur!);
 
-        // fix-ok: mesure a l'ecriture du jeu PROC_ADDCREANCE.gestes -- le numero de demande (serie DMD de num.Attribuer) depend de
-        // l'etat de la base et des gestes deja joues : un message qui le citait n'etait pas reproductible ; la trace le garde.
+        // fix-ok: mesure le 27/11/2026 -- le numero de la demande (serie DMD, structure « LAQC ») porte le quantieme du jour, son
+        // compteur repart chaque jour (Base/migrations/NUM-001_compteurs.sql:19, :232), et le banc compare le message au mot pres
+        // (tests/EcransGeneresBaseCheck/Program.cs:603) : ce numero va a la trace (CreancesPcV2.Trace, Demande), pas au message.
         var admis = transitoire.Admis.Where(a => a.Key != "REJETE" && a.Value is not null).Sum(a => a.Value!.Value);
         return IssueGeste.Ecrit(
             $"Créance n° {creance.NumeroOrdre} de la PC {creance.NumPc} ajoutée dans la base du greffe pour {transitoire.Nom} " +

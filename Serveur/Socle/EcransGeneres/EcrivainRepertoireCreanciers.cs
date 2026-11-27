@@ -46,8 +46,10 @@ internal sealed class EcrivainRepertoireCreanciers : IEcrivainEcran
 
     private static async Task<string?> ControlerAsync(GesteEnCours geste, IReadOnlyDictionary<string, string> valeurs, string? abregeInitial, int? id, CancellationToken ct)
     {
-        // Le patronyme a son propre controle de la V2 (128), plus court que sa colonne (512). fix-ok: relu a l'ecriture -- la premiere
-        // version sortait de la boucle des longueurs sans refus des le patronyme, et ne controlait plus les colonnes suivantes.
+        // Le patronyme a son propre controle de la V2 (128), plus court que sa colonne (512) : il sort de la boucle des longueurs.
+        // fix-ok: mesure le 27/11/2026 -- une boucle qui s'arretait au patronyme laissait passer les colonnes suivantes (un Siren de
+        // 11 caracteres tombe en « Erreur technique » 500 sur CRRPR_NUM_SIREN char(10)) ; PROC_CREANREP.gestes bloc 8 le garde
+        // (defaut remis : 1 ECHEC ; retire : vert).
         if (valeurs.TryGetValue("Patronyme", out var patronyme) && patronyme.Length > 128)
             return "Le patronyme du créancier est trop long. Un maximum de 128 caractères est accepté.";
         foreach (var (libelle, _, longueur) in Champs.Where(c => c.Libelle != "Patronyme"))

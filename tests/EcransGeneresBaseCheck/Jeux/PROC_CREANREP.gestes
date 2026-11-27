@@ -71,3 +71,15 @@ ids: 2203001
 valeur: Patronyme = BANQUE BANC ALPHA
 resultat: refuse
 message: Aucune colonne n'est modifiée : le créancier garde les valeurs de la base.
+---
+# 8. Une colonne placee APRES le patronyme dans les champs de l'ecrivain : un Siren de 11 caracteres (CRRPR_NUM_SIREN char(10)),
+# refuse avant d'ecrire. Garde le controle des longueurs au-dela du patronyme, qui a sa borne a lui (128) ; son jumeau accepte :
+# le bloc 4 (Siren de 9 caracteres).
+geste: Ajouter
+valeur: Code abrégé = L12SIREN
+valeur: Civilité = PM
+valeur: Patronyme = CREANCIER SIREN LONG
+valeur: Siren = 91200300901
+valeur: Adresse = 9 place du Banc
+resultat: refuse
+message: « Siren » : 10 caractères au plus.
