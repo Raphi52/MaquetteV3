@@ -30,7 +30,8 @@ public sealed record VueMaquettes(MaquetteVue[] Maquettes, int Total, string Mod
 /// Branché au serveur, l'écran montre les maquettes du greffe (Serveur/Socle/EcransMain/LectureMaquettesEdition.cs : MAQUETTE, ses
 /// paramètres d'édition et leurs tables liées). SANS serveur : aucune maquette, mode « demo » -- la démonstration reste celle de
 /// l'écran, marquée « exemple ». En panne : le motif et aucune maquette. L'écran n'a aucun geste (ni Modifier, ni Dupliquer, ni
-/// Supprimer, ni Valider) : ceux de RIG v2 passent par le document Word de la maquette en GED (compte rendu du lot 15).
+/// Supprimer, ni Valider) : ceux de la maquette passent par son document Word en GED ; ceux d'un paramètre d'édition écrivent en
+/// base dans RIG v2 (OPE_PARAM_EDT_MAJ.cs:494-541) et restent à brancher (Serveur/Socle/EcransMain/LectureMaquettesEdition.cs).
 /// </summary>
 public static class EcranMaquettesEdition
 {

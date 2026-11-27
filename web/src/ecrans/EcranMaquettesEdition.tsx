@@ -22,7 +22,8 @@
 // et leurs tables liees, les types que RIG v2 montre a l'agent). Sans serveur, la demonstration ci-dessous reste, marquee « exemple » ;
 // en panne, le motif et aucune maquette. Pour une maquette de la base : « Type de document » = le format de son document
 // (MQTT_EXTENSION), « Type de maquette » = la colonne Type de RIG v2 (RIG, CRYSTAL…), aucune date (MAQUETTE n'en porte pas) ; la choisir
-// remplit le panneau avec son PREMIER parametre d'edition (RIG v2 en ouvre un par etape). L'ecran n'a aucun geste a brancher.
+// remplit le panneau avec son PREMIER parametre d'edition (RIG v2 en ouvre un par etape). L'ecran n'a aucun geste : ceux d'un
+// parametre d'edition (enregistrer, supprimer, en base dans RIG v2) restent a brancher (Serveur/Socle/EcransMain/LectureMaquettesEdition.cs).
 
 import { useEffect, useState } from 'react'
 import { appeler } from '../pont'
