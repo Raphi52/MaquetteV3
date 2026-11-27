@@ -301,7 +301,7 @@ internal sealed class EcrivainSurveillanceIp : IEcrivainEcran
             $"UPDATE v2.EVENEMENT_PROCEDURE SET EVNPR_DELAI_EXPIRE = 1{Texte(colonnes)}{(source is not null && e.NumeroSource is null ? ", EVNPR_NUMERO_SOURCE = @s" : "")} WHERE EVNPR_ID_EVNPR = @id",
             ct, new SqlParameter("@id", e.IdEvenement), new SqlParameter("@s", (object?)source ?? DBNull.Value));
         if (code is null) return (null, null);
-        var idSurvenu = await EcrivainRetourAudience.EvenementSurvenuAsync(geste, e.IdInstance, code, geste.Maintenant.Date, ct);
+        var idSurvenu = (await EvenementsProcedureV2.SurvenuAsync(geste, e.IdInstance, code, geste.Maintenant.Date, avecFutur: false, ct)).IdSurvenu;
         if (source is not null && colonnes.Contains("EVNPR_NUMERO_SOURCE_EP_LIE"))
             await geste.EcrireAsync("UPDATE v2.EVENEMENT_PROCEDURE SET EVNPR_NUMERO_SOURCE_EP_LIE = @s WHERE EVNPR_ID_EVNPR = @id", ct,
                 new SqlParameter("@s", source), new SqlParameter("@id", idSurvenu));
@@ -481,12 +481,12 @@ internal sealed class EcrivainSurveillanceIp : IEcrivainEcran
         // Leurs editions, sur la demande OPE (eveCA.CreateDemandeEdition(ddeOPE), Instance.cs:3471-3476).
         foreach (var eve in (code.EvenementsCreation ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
-            var idEve = await EcrivainRetourAudience.EvenementSurvenuAsync(geste, idOp, eve, jour, ct);
+            var idEve = (await EvenementsProcedureV2.SurvenuAsync(geste, idOp, eve, jour, avecFutur: false, ct)).IdSurvenu;
             bilans.Add(await EditionsEvenement.CreerAsync(geste, demande.Id, demande.Numero, idEve, ct));
         }
 
         // La decision du type du code affaire, et son ordonnance.
-        var decision = (await EcrivainMiseAuPointChambres.CreerDecisionAsync(geste, idOp, role, code.TypeDecision, datePrevue, null, ct))[0];
+        var decision = (await EcrivainMiseAuPointChambres.CreerDecisionAsync(geste, idOp, role, code.TypeDecision, datePrevue, null, ct)).Traces[0];
         var idDecision = int.Parse(decision.IdObjet!, CultureInfo.InvariantCulture);
         await geste.EcrireAsync("""
             UPDATE v2.DECISION_JUDICIAIRE SET DCJDC_ID_JUG = @juge, DCJDC_ID_GRASS = @greffier, DCJDC_RESSORT = '0', DCJDC_CONTRADICTOIRE = '0',

@@ -57,7 +57,8 @@ using RigV3Desktop.Pont.EcransGeneres;
 //          resultat: fait | refuse | sans-ecrivain
 //          message: <texte exact>                   ce que l'ecran affichera (le message de RIG v2 pour un refus)
 //          lignes:                                  facultatif (fait) : puis TOUTES les lignes relues, format .attendu
-//          fiche: <id>                              facultatif : puis des « Section › Libelle = valeur » que la fiche relue porte
+//          fiche: <id>                              facultatif : puis des « Section › Libelle = valeur » que la fiche relue porte ;
+//                                                   la ligne n d'une sous-liste (Tableau) : « Section › Libelle › n = cellule | cellule »
 //          controle: <SELECT d'une valeur> => <attendu>   facultatif : ce que RIG v2 ecrit en plus (dates, etats...)
 //        Un refus est verifie SANS ECRITURE : lignes relues identiques, journal des gestes inchange. Un geste fait ajoute au
 //        moins une ligne au journal des gestes. Chaque refus a son jumeau accepte, dit en commentaire ;
@@ -569,6 +570,19 @@ foreach (var fichier in Directory.GetFiles(dossierJeux, "*.recherches").Order(St
         $"{code} : la recherche passe par la route (texte et criteres en parametres d'adresse), Cherchee ; sans recherche, la liste de travail");
 }
 
+// PREUVE A L'ECRAN SUR LES JEUX (plan-676a4b19, lot 11, accord du chef du 27/11/2026 : « une copie jetable, servie par ton propre
+// serveur ») : RIGV3_BANC_GARDER = un chemin de fichier. Les jeux sont joues, leurs gestes PAS encore : le banc y ecrit sa base
+// commune, son greffe et son agent, puis attend que ce fichier disparaisse. Un serveur lance a part sur cette base commune
+// (ConnectionStrings__RigV3) sert alors a l'application les lignes des jeux, pour y jouer un geste a l'ecran. Le fichier supprime,
+// le banc s'arrete (code 3, gestes et section 4 non joues) et SUPPRIME ses bases (await using). Sans la variable : rien ne change.
+if (Environment.GetEnvironmentVariable("RIGV3_BANC_GARDER") is { Length: > 0 } garde)
+{
+    await File.WriteAllTextAsync(garde, $"commune={commune.Nom}\ngreffe={Greffe}\nbase={greffe.Nom}\nagent={Agent}\n");
+    Console.WriteLine($"Bases gardees pour une preuve a l'ecran (commune {commune.Nom}) : supprimer {garde} pour les rendre.");
+    while (File.Exists(garde)) await Task.Delay(1000);
+    return 3;
+}
+
 // Les GESTES (<PROCEDURE>.gestes), joues par la route POST, dans l'ordre.
 foreach (var fichier in Directory.GetFiles(dossierJeux, "*.gestes").Order(StringComparer.Ordinal))
 {
@@ -605,7 +619,9 @@ foreach (var fichier in Directory.GetFiles(dossierJeux, "*.gestes").Order(String
             var fiche = lecteurs.ParProcedure.GetValueOrDefault(code) is IFicheEcran f ? await f.LireFicheAsync(cn, ficheId, DateTime.Now, CancellationToken.None) : null;
             foreach (var (cle, attendue) in bloc.ValeursFiche)
             {
-                var lue = fiche?.Sections.SelectMany(s => s.Champs.Select(c => (Cle: GesteEcran.Cle(s.Titre, c.Libelle), c.Valeur)))
+                var lue = fiche?.Sections.SelectMany(s => s.Champs.SelectMany(c => c.Lignes
+                        .Select((l, i) => (Cle: $"{GesteEcran.Cle(s.Titre, c.Libelle)} › {i + 1}", Valeur: string.Join(" | ", l)))
+                        .Prepend((Cle: GesteEcran.Cle(s.Titre, c.Libelle), c.Valeur))))
                     .FirstOrDefault(c => c.Cle == cle).Valeur;
                 Exiger(lue == attendue, $"{quoi} : la fiche {ficheId} relue porte « {cle} » = « {attendue} » (lue : « {lue ?? "absent"} »)");
             }

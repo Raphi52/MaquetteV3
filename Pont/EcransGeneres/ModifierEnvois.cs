@@ -382,12 +382,16 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_NUM", Titre = "Documents ocerises", Sujet = "documents océrisés",
+            // Les documents numérisés du greffe (DOCUMENT_OCERISE, hors OCR différé : OPE_PIECENUM.cs:85-107), lus par
+            // LecteurDocumentsOcerises.cs (lot 11). Ses gestes sont des traitements de fichier (export sur disque, PDF_WRITER, pages
+            // blanches, fusion Aspose) que la forme Document ne fait pas : ils disent « Démonstration » (proc_num.md, Détail OPE).
             Forme = FormeEcran.Document,
             Recherche = "Rechercher un document, un titre, une date…",
             Criteres = ["Format (PDF ou TIF)", "Titre", "Nombre de pages"],
             Valider = "Enregistrer une copie",
             Rang = 2,
-            Etats = EtatsEcran.Trois("À vérifier", "En cours", "Enregistré"),
+            // En cours : le document qu'un processus tient (DOCOC_ID_UTLST_EN_COURS) ; la V2 n'a pas d'état « enregistré ».
+            Etats = EtatsEcran.Trois("Disponible", "En cours", "Enregistré"),
             Groupes = ["PDF", "TIF"],
             Sections =
             [
@@ -420,8 +424,13 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_TRANSDOC", Titre = "Transmission", Sujet = "documents dématérialisés",
-            Forme = FormeEcran.File,
-            Recherche = "Rechercher un document, un numéro de rôle, un SIREN…",
+            // Forme Référentiel, pas File (lot 11) : la V2 est une grille dont le numéro d'affaire se saisit dans la colonne, puis
+            // Actualiser l'enregistre (OPE_LISTE_FLUX_DOC.SauveNumAffaire, :586-622 ; proc_transdoc.md, Détail OPE). Rien d'autre ne
+            // s'écrit : ni ajout, ni suppression. Lecteur et geste : LecteurTransmissionDocuments.cs, EcrivainTransmissionDocuments.cs.
+            Forme = FormeEcran.Referentiel,
+            // Les colonnes de la grille V2 (_InitDGV : colDate, colDemande, colLibelle, colNumRole, colNumeroSIREN, colTypeDocument).
+            Colonnes = ["Document", Champ.Date("Reçu le"), "Type de document", "Numéro d'affaire", "SIREN", "Demande"],
+            Recherche = "Rechercher un document, un numéro d'affaire, un SIREN…",
             Criteres = ["Tribunal digital", "Coffre-fort numérique", "Numéro d'affaire"],
             Valider = "Enregistrer les modifications",
             Rang = 2,
@@ -429,131 +438,138 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
             Groupes = ["Tribunal digital", "Coffre-fort numérique"],
             Sections =
             [
-                Marche("Numéro d'affaire", "Saisi dans la colonne éditable. Actualiser enregistre les modifications avant de recharger la liste.", true,
-                    "Numéro d'affaire"),
-                Marche("Visualisation", "Voir le document. Une fois ouvert, il est marqué consulté.", false,
-                    "Document ouvert"),
-                Marche("Visualisation judiciaire", "Lance la visualisation judiciaire de l'instance ou de la procédure du document. Inactive si le document n'est rattaché à aucune entité.", false,
-                    "Instance ou procédure"),
-                Marche("Enregistrement", "Enregistre les numéros d'affaire. Quitter avec des numéros modifiés non enregistrés demande confirmation.", true,
-                    "Enregistrement"),
+                Marche("Document", "Le document reçu et sa demande ; seul le numéro d'affaire se saisit (la colonne éditable de RIG v2).", true,
+                    "Document", Champ.Date("Reçu le"), "Type de document", "Numéro d'affaire", "SIREN", "Demande"),
+                Marche("Visualisation", "Voir le document, ou lancer la visualisation judiciaire de son instance ou de sa procédure : RIG v2 n'écrit rien.", false),
             ],
             Lignes =
             [
                 Ligne("Document DOC-2026-0101", "Dépôt du 02/03/2026 · KBIS · rôle 2026F00901 · SIREN 900 100 001", "Tribunal digital", "AFaire"),
-                Ligne("Document DOC-2026-0102", "Dépôt du 03/03/2026 · acte · rôle 2026F00902", "Tribunal digital", "EnCours", 0),
-                Ligne("Document DOC-2026-0103", "Dépôt du 03/03/2026 · acte · enregistré", "Tribunal digital", "Validee", 0, 3),
-                Ligne("Document DOC-2026-0104", "Dépôt du 04/03/2026 · KBIS · consulté", "Tribunal digital", "EnCours", 1),
+                Ligne("Document DOC-2026-0102", "Dépôt du 03/03/2026 · acte · rôle 2026F00902", "Tribunal digital", "EnCours"),
+                Ligne("Document DOC-2026-0104", "Dépôt du 04/03/2026 · KBIS · numéro à saisir", "Tribunal digital", "AFaire"),
                 Ligne("Document DOC-2026-0105", "Dépôt du 05/03/2026 · pièce · à transmettre", "Coffre-fort numérique", "AFaire"),
-                Ligne("Document DOC-2026-0106", "Dépôt du 06/03/2026 · pièce · numéro saisi", "Coffre-fort numérique", "EnCours", 0),
-                Ligne("Document DOC-2026-0107", "Dépôt du 09/03/2026 · pièce · enregistré", "Coffre-fort numérique", "Validee", 0, 3),
+                Ligne("Document DOC-2026-0106", "Dépôt du 06/03/2026 · pièce · numéro saisi", "Coffre-fort numérique", "EnCours"),
+                Ligne("Document DOC-2026-0107", "Dépôt du 09/03/2026 · pièce · à transmettre", "Coffre-fort numérique", "AFaire"),
             ],
         },
 
         new DescripteurEcran
         {
             Code = "PROC_BORDLR", Titre = "Bordereaux LR", Sujet = "lettres recommandées",
+            // Une ligne par bordereau. Sans période : les bordereaux déjà édités (demandes BORDLR de RIG v2, éditions
+            // « Bordereau LRAR-n » / « Bordereau LR-n »). Avec une période : le bordereau à éditer de chaque type et le nombre
+            // de plis que RIG v2 recompte à chaque saisie (MetierProcBordlr.GetCountDemandeEdition, :86-92). Lecteur et geste :
+            // LecteurBordereauxLr.cs, EcrivainBordereauxLr.cs (lot 11). La case « Mes recommandés » de la V2 n'est pas reprise :
+            // la lecture ne connaît pas l'agent ; son identifiant se saisit dans « Utilisateur ».
             Forme = FormeEcran.Etat,
-            Parametres = [Champ.Periode("Période"), "Utilisateur", Champ.Case("Mes recommandés"), Champ.Liste("Avec ou sans AR", "Avec AR", "Sans AR")],
-            Colonnes = ["Bordereau", Champ.Nombre("Nombre de plis")],
+            // Les champs des deux OPE de saisie (OPE_BORDLR_AVEC_AR.cs / OPE_BORDLR_SANS_AR.cs : dates, heures, utilisateur) ;
+            // « avec ou sans AR » est l'étape de la V2 : ici, le groupe de la ligne.
+            Parametres = [Champ.Periode("Période"), "Heure de début", "Heure de fin", "Utilisateur"],
+            Colonnes = ["Bordereau", "Période", "Utilisateur", Champ.Nombre("Nombre de plis"), "Édition"],
+            // VALIDER de RIG v2 : une demande d'édition BORD_LRAR ou BORD_LR par type (DoGenererLesDemandesEditions).
             Gestes = ["Éditer le bordereau"],
-            Recherche = "Rechercher un bordereau, un utilisateur, une période…",
-            Criteres = ["Période (dates et heures)", "Utilisateur", "Avec ou sans AR"],
+            Recherche = "Rechercher un bordereau, un utilisateur…",
+            // Les critères sont les Paramètres, au libellé près : c'est ce que l'État envoie à la base.
+            Criteres = ["Période", "Heure de début", "Heure de fin", "Utilisateur"],
             Valider = "Éditer le bordereau",
             Rang = 2,
-            Etats = EtatsEcran.Trois("À préparer", "En cours", "Édité"),
+            Etats = EtatsEcran.Trois("À éditer", "En cours", "Édité"),
             Groupes = ["Avec accusé de réception", "Sans accusé de réception"],
             Sections =
             [
                 Marche("Période", "Date et heure de début, date et heure de fin. Sans heure, la plage couvre les journées entières. La date de début doit précéder la date de fin.", true,
                     "Date de début", "Heure de début", "Date de fin", "Heure de fin"),
-                Marche("Utilisateur", "Tous les utilisateurs ayant émis, un utilisateur choisi, ou « mes recommandés » : la case fige le choix sur votre compte.", false,
-                    "Utilisateur", "Mes recommandés"),
-                Marche("Bordereau avec AR", "Lettres avec accusé de réception (LRAR) : la case AR est cochée et les coordonnées de retour du greffe sont imprimées. Un pli avec AR ne se mélange jamais avec un pli sans AR.", false,
+                Marche("Utilisateur", "Tous les utilisateurs ayant émis, ou l'identifiant de l'un d'eux.", false,
+                    "Utilisateur"),
+                Marche("Bordereau avec AR", "Lettres avec accusé de réception (LRAR). Un pli avec AR ne se mélange jamais avec un pli sans AR.", false,
                     "Case AR", "Coordonnées de retour"),
-                Marche("Bordereau sans AR", "Lettres sans accusé de réception (LR) : bordereau simplifié. Une fois la numérotation LRN démarrée, ce bordereau passe en consultation.", false,
+                Marche("Bordereau sans AR", "Lettres sans accusé de réception (LR). Une fois la numérotation LRN démarrée, ce bordereau passe en consultation.", false,
                     "Bordereau simplifié"),
-                Marche("Édition", "Édition par le module d'impression. Aucun pli : « Validation inutile, vous n'avez rien à éditer. » À partir de 1 000 plis, l'édition est refusée : scinder le lot.", true,
+                Marche("Édition", "Édition par le service d'édition de RIG v2. Aucun pli : « Validation inutile vous n'avez rien a éditer. » À partir de 1 000 plis, l'édition est refusée : scinder la période.", true,
                     "Nombre de plis", "Bordereau"),
             ],
             Lignes =
             [
-                Ligne("Bordereau LRAR-1", "02/03/2026 · 14 plis · utilisateur 1", "Avec accusé de réception", "AFaire"),
-                Ligne("Bordereau LRAR-2", "03/03/2026 · 9 plis · mes recommandés", "Avec accusé de réception", "EnCours", 0, 1),
-                Ligne("Bordereau LRAR-3", "04/03/2026 · 22 plis · édité", "Avec accusé de réception", "Validee", 0, 2, 4),
-                Ligne("Bordereau LRAR-4", "05/03/2026 · 6 plis · utilisateur 2", "Avec accusé de réception", "EnCours", 0, 2),
-                Ligne("Bordereau LR-1", "02/03/2026 · 31 plis · utilisateur 1", "Sans accusé de réception", "AFaire"),
-                Ligne("Bordereau LR-2", "03/03/2026 · 12 plis · utilisateur 3", "Sans accusé de réception", "EnCours", 0, 3),
-                Ligne("Bordereau LR-3", "04/03/2026 · 18 plis · édité", "Sans accusé de réception", "Validee", 0, 3, 4),
-                Ligne("Bordereau LR-4", "09/03/2026 · 1 002 plis · édition refusée", "Sans accusé de réception", "EnCours", 0, 3),
+                Ligne("Bordereau LRAR-1 à éditer", "du 02/03/2026 au 02/03/2026 · 14 plis · tous les utilisateurs", "Avec accusé de réception", "AFaire"),
+                Ligne("Bordereau LRAR-1", "créé le 03/03/2026 · 9 plis · en file d'édition", "Avec accusé de réception", "EnCours"),
+                Ligne("Bordereau LRAR-1", "créé le 04/03/2026 · 22 plis · édité", "Avec accusé de réception", "Validee"),
+                Ligne("Bordereau LR-1 à éditer", "du 02/03/2026 au 02/03/2026 · 31 plis · utilisateur 1", "Sans accusé de réception", "AFaire"),
+                Ligne("Bordereau LR-1", "créé le 04/03/2026 · 18 plis · édité", "Sans accusé de réception", "Validee"),
+                Ligne("Bordereau LR-1", "créé le 05/03/2026 · 4 plis · en file d'édition", "Sans accusé de réception", "EnCours"),
             ],
         },
 
         new DescripteurEcran
         {
             Code = "PROC_RETOURLRAR", Titre = "Retours LRAR", Sujet = "retours de recommandés",
-            Forme = FormeEcran.File,
+            // Forme Opération, pas File (lot 11) : l'écran V2 n'a pas de liste, on scanne UN pli, on choisit sa modalité et sa date,
+            // puis l'écran les écrit (ETP_RETOURLRAR_RECEPTION\OPE_RETOURLRAR_RECEPTION.cs, recept :105-157, Reception :705-748).
+            // Choisir (le pli, cherché par son code-barre dans la base), Conséquences (la modalité et la date), Confirmer.
+            // Lecteur et geste : LecteurRetoursLrar.cs, EcrivainRetoursLrar.cs (lot 11).
+            Forme = FormeEcran.Operation,
             Recherche = "Scanner ou saisir le code-barre d'un pli…",
-            Criteres = ["Code-barre du pli", "Numéro LRAR", "Date de réception"],
+            Criteres = ["Code-barre du pli"],
             Valider = "Enregistrer le retour",
             Rang = 2,
-            Etats = EtatsEcran.Trois("À saisir", "En cours", "Retour enregistré"),
-            Groupes = ["Reçus", "NPAI, refusés ou incomplets", "Non réclamés", "Non envoyés"],
+            Etats = EtatsEcran.Trois("À saisir", "Date à saisir", "Retour enregistré"),
+            Groupes = ["Reçus", "NPAI, refusés ou incomplets", "Non réclamés", "Non envoyés", "Sans retour"],
             Sections =
             [
-                Marche("Pli scanné", "Le code-barre retrouve l'événement et la demande d'origine. L'arborescence entité, événement, recommandé s'affiche.", true,
-                    "Code-barre", "Numéro LRAR"),
-                Marche("Modalité de retour", "Reçu, NPAI, non réclamé, refusé, incomplet ou non envoyé. C'est la modalité qui est enregistrée.", true,
-                    "Modalité de retour"),
-                Marche("Date de réception", "Date du retour. Modifiable ensuite : le changement demande confirmation, et peut prévenir le service judiciaire.", true,
-                    "Date de réception"),
-                Marche("Remise en émission", "Si la modalité n'est pas à gérer, les demandes d'édition liées repartent en file d'émission.", false,
-                    "Demandes remises en file"),
-                Marche("Événement lié", "Un événement futur lié passe en survenu. L'instance reste verrouillée pendant l'opération.", false,
-                    "Événement futur"),
+                // Les boutons radio de la V2, à leurs libellés (eTypeReceptionLrar, Description), « Réception » par défaut (:56).
+                Marche("Retour", "La modalité et la date du retour. Sans date, cocher « Date non renseignée » : la V2 refuse sinon.", true,
+                    Champ.Liste("Modalité de retour", "Réception", "NPAI", "Non réclamé", "Pli non envoyé", "Refusé", "Incomplet"),
+                    Champ.Date("Date de réception"), Champ.Case("Date non renseignée")),
+                Marche("Retour déjà saisi", "Un pli dont le retour est saisi sans date se corrige ici ; la V2 demande alors de confirmer l'écrasement des anciennes données.", false),
+                Marche("Remise en émission", "Si la modalité n'est pas à gérer (« Non envoyé »), les demandes d'édition du pli repartent en file d'émission.", false),
             ],
             Lignes =
             [
-                Ligne("Pli 2026-LRAR-0101", "Demande 2026D0101 · aucune modalité saisie", "Reçus", "AFaire"),
-                Ligne("Pli 2026-LRAR-0102", "Demande 2026D0102 · scanné, date à saisir", "Reçus", "EnCours", 0, 1),
-                Ligne("Pli 2026-LRAR-0103", "Demande 2026D0103 · reçu le 04/03/2026", "Reçus", "Validee", 0, 1, 2),
-                Ligne("Pli 2026-LRAR-0104", "Demande 2026D0104 · NPAI le 05/03/2026", "NPAI, refusés ou incomplets", "Validee", 0, 1, 2),
-                Ligne("Pli 2026-LRAR-0105", "Demande 2026D0105 · refusé, remise en émission", "NPAI, refusés ou incomplets", "EnCours", 0, 1, 3),
-                Ligne("Pli 2026-LRAR-0106", "Demande 2026D0106 · non réclamé", "Non réclamés", "EnCours", 0, 1),
-                Ligne("Pli 2026-LRAR-0107", "Demande 2026D0107 · non envoyé", "Non envoyés", "AFaire"),
+                Ligne("Pli 2026-LRAR-0101", "Convocation · émis le 02/03/2026 · aucun retour saisi", "Sans retour", "AFaire"),
+                Ligne("Pli 2026-LRAR-0102", "Incomplet reçu · date non précisée sur l'imprimé", "NPAI, refusés ou incomplets", "EnCours"),
+                Ligne("Pli 2026-LRAR-0103", "Reçu le 04/03/2026", "Reçus", "Validee"),
+                Ligne("Pli 2026-LRAR-0104", "NPAI reçu le 05/03/2026", "NPAI, refusés ou incomplets", "Validee"),
+                Ligne("Pli 2026-LRAR-0106", "Non réclamé reçu le 06/03/2026", "Non réclamés", "Validee"),
+                Ligne("Pli 2026-LRAR-0107", "Non envoyé le 06/03/2026 · demandes d'édition remises en file d'émission", "Non envoyés", "Validee"),
             ],
         },
 
         new DescripteurEcran
         {
             Code = "PROC_ENV_JAL", Titre = "Envoi JAL / BODACC", Sujet = "annonces légales",
-            Forme = FormeEcran.File,
-            Recherche = "Rechercher une annonce, un bordereau, une facture…",
-            Criteres = ["Période d'envoi", "Destinataire (JAL)", "Numéro de bordereau"],
+            // Forme Opération, pas File (lot 11) : la V2 cherche d'abord (date de début obligatoire, OPE_RECH_ANNONCES.cs:331-341),
+            // puis coche des annonces et génère ; une File n'envoie pas de critère au serveur. Le menu l'ouvre en mode JAL
+            // (PROC_ENV_JAL.cs:52-69). Lecteur : LecteurEnvoiJal.cs (lot 11), à envoyer puis déjà envoyées. « Générer le bordereau » :
+            // EcrivainEnvoiJal.cs, le mode EDI de la V2 (JAL_ENVOIE_EDI = 1 dans RIG_DEV) en un geste -- Générer puis Envoyer
+            // (OPE_A_ENVOYER.cs:189-334, :1071-1170) : bordereau RBOE, publicités envoyées ; le fichier XML n'est pas produit (simulé,
+            // dit à l'écran). Le document Word hors EDI (:493-597) n'est pas repris. « Supprimer le bordereau »
+            // (OPE_DEJA_ENVOYER.cs:297-376) est un second geste, qu'une Opération (un seul geste) ne porte pas.
+            Forme = FormeEcran.Operation,
+            Recherche = "Numéro de bordereau…",
+            Criteres = ["Date de début", "Date de fin", "Destinataire (JAL)", "Numéro de PC ou PRV", "Numéro de bordereau"],
             Valider = "Générer le bordereau",
             Rang = 2,
             Etats = EtatsEcran.Trois("À envoyer", "Bordereau généré", "Envoyée"),
             Groupes = ["Procédures collectives", "Préventions"],
             Sections =
             [
-                Marche("Période", "Dates pré-remplies d'après le paramétrage du greffe (JAL ou BODACC). Une recherche par numéro de bordereau ou de facture remplace les dates.", true,
-                    "Date de début", "Date de fin"),
-                Marche("Sélection", "Les annonces à envoyer, filtrées par procédure collective ou par prévention. L'ordre d'affichage suit le paramétrage du greffe.", true,
-                    "Annonces cochées"),
-                Marche("Génération", "Génère le bordereau et le fichier d'envoi. Annuler la génération est refusé si le bordereau a déjà été transmis.", true,
-                    "Bordereau"),
-                Marche("Envoi électronique", "Envoi EDI ou BODACC après génération. Une fois transmis, le bordereau ne s'annule plus.", false,
-                    "Transmission"),
+                // La période de la recherche est dans les critères ; celle du BORDEREAU (BRDRJ_DATE_MIN / MAX, et les publicités
+                // générées : GetPubtoEdit, LigneJal.cs:298) se saisit ici, car une Opération n'envoie que ses sections au geste.
+                // fix-ok: mesuré dans web/src/ecrans/formes/FormeOperation.tsx:57-59 -- le geste Confirmer porte `remplies` (les
+                // champs des sections) et jamais les critères de recherche : sans cette section, l'écrivain ignorait la période.
+                // Vides : les dates que la V2 pré-remplit (JAL_DATE_DEBUT_ENVOI, puis aujourd'hui, OPE_RECH_ANNONCES.cs:275-293).
+                Marche("Période du bordereau", "Les annonces générées sont celles des évènements cochés, encore à envoyer, dont l'envoi est prévu dans cette période (la fin est comprise à 0 h, comme RIG v2). Vide : la période que RIG v2 pré-remplit.", false,
+                    Champ.Date("Date de début"), Champ.Date("Date de fin")),
+                Marche("Envoi électronique", "Un seul journal par envoi. Le bordereau est numéroté et les annonces passent à l'état envoyé ; le fichier XML EDI n'est pas produit par RIG v3 et rien n'est transmis (simulé).", false),
             ],
             Lignes =
             [
                 Ligne("Alpha Services SARL", "Procédure PC 2026P00301 · publicité du 02/03/2026", "Procédures collectives", "AFaire"),
-                Ligne("Bêta Industrie SAS", "Procédure PC 2026P00302 · publicité sélectionnée", "Procédures collectives", "EnCours", 1),
-                Ligne("Gamma Conseil SARL", "Procédure PC 2026P00303 · bordereau 2026-BDX-01 généré", "Procédures collectives", "EnCours", 0, 1, 2),
-                Ligne("Delta Transports SAS", "Procédure PC 2026P00304 · envoyée le 04/03/2026", "Procédures collectives", "Validee", 0, 1, 2, 3),
+                Ligne("Bêta Industrie SAS", "Procédure PC 2026P00302 · publicité sélectionnée", "Procédures collectives", "EnCours"),
+                Ligne("Gamma Conseil SARL", "Procédure PC 2026P00303 · bordereau 2026-BDX-01 généré", "Procédures collectives", "EnCours"),
+                Ligne("Delta Transports SAS", "Procédure PC 2026P00304 · envoyée le 04/03/2026", "Procédures collectives", "Validee"),
                 Ligne("Epsilon Habitat SARL", "Prévention PRV 2026R00401 · publicité à envoyer", "Préventions", "AFaire"),
-                Ligne("Zêta Commerce SAS", "Prévention PRV 2026R00402 · sélectionnée", "Préventions", "EnCours", 1),
-                Ligne("Êta Boulangerie SARL", "Prévention PRV 2026R00403 · envoyée le 06/03/2026", "Préventions", "Validee", 0, 1, 2),
+                Ligne("Zêta Commerce SAS", "Prévention PRV 2026R00402 · sélectionnée", "Préventions", "EnCours"),
+                Ligne("Êta Boulangerie SARL", "Prévention PRV 2026R00403 · envoyée le 06/03/2026", "Préventions", "Validee"),
                 Ligne("Thêta Import SAS", "Prévention PRV 2026R00404 · à envoyer", "Préventions", "AFaire"),
             ],
         },
@@ -561,10 +577,17 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_GESTBOD", Titre = "Publications BODACC", Sujet = "annonces BODACC",
+            // Une ligne par annonce BODACC rejetée (état 9, rectifier) ou remise à renvoyer (état 3) : la liste que RIG v2 ouvre SANS date
+            // (OPE_LST_REJETS.MajSelectionBodacc, :55-90 ; proc_gestbod.md, Détail OPE). Les certificats et les contrôles non conformes
+            // exigent une date ou un numéro de parution (OPE_CERTIF_BOD.cs:80-117, OPE_LST_CTRLNC.cs:50-81), que la forme File ne saisit
+            // pas : leurs groupes restent vides, dit. Lecteur et geste : LecteurPublicationsBodacc.cs, EcrivainPublicationsBodacc.cs (lot 11).
             Forme = FormeEcran.File,
-            Recherche = "Rechercher une annonce, un numéro de parution, une date…",
+            Recherche = "Rechercher une annonce, une procédure, un motif de rejet…",
             Criteres = ["Date d'EP", "Date de parution", "Numéro de parution"],
-            Valider = "Valider la sélection",
+            Valider = "Renvoyer",
+            // « Renvoyer » = la mise à jour des rejets (OPE_LST_LISTE_REJ.DoSauver, :51-57 : état 3). « Vérifier » et les éditions
+            // (certificat, liste des rejets, contrôles) ne sont pas repris : voir EcrivainPublicationsBodacc.cs.
+            Gestes = ["Renvoyer"],
             Rang = 2,
             Etats = [.. EtatsEcran.Trois("À traiter", "Vérifiée", "Certifiée"), new EtatEcran("EnAttente", "À renvoyer", "en-attente")],
             Groupes = ["Certificats de parution", "Rejets", "Contrôles non conformes"],
@@ -576,25 +599,26 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
                     "Vérifier"),
                 Marche("Édition", "Édition de la liste ou du certificat. Pour un certificat, l'annonce cochée passe à l'état certifié.", true,
                     "Édition"),
-                Marche("Renvoi des rejets", "Pour la mise à jour des rejets : cocher « renvoyer » place l'annonce à renvoyer, et Valider enregistre ces renvois.", false,
+                Marche("Renvoi des rejets", "Pour la mise à jour des rejets : cocher « renvoyer » place l'annonce à renvoyer (état 3), que le prochain envoi BODACC reprend.", false,
                     "Renvoyer"),
             ],
             Lignes =
             [
                 Ligne("Alpha Services SARL", "Parution n° 2026-041 · EP du 02/03/2026", "Certificats de parution", "AFaire"),
-                Ligne("Bêta Industrie SAS", "Parution n° 2026-041 · vérifiée", "Certificats de parution", "EnCours", 0, 1),
-                Ligne("Gamma Conseil SARL", "Parution n° 2026-042 · certifiée", "Certificats de parution", "Validee", 0, 1, 2),
-                Ligne("Delta Transports SAS", "Parution n° 2026-042 · certifiée", "Certificats de parution", "Validee", 0, 1, 2),
+                Ligne("Gamma Conseil SARL", "Parution n° 2026-042 · certifiée", "Certificats de parution", "Validee"),
                 Ligne("Epsilon Habitat SARL", "Rejet du 05/03/2026 · à traiter", "Rejets", "AFaire"),
-                Ligne("Zêta Commerce SAS", "Rejet du 06/03/2026 · renvoi coché", "Rejets", "EnAttente", 0, 3),
+                Ligne("Zêta Commerce SAS", "Rejet du 06/03/2026 · renvoi coché", "Rejets", "EnAttente"),
                 Ligne("Êta Boulangerie SARL", "Contrôle de qualité · à traiter", "Contrôles non conformes", "AFaire"),
-                Ligne("Thêta Import SAS", "Contrôle de qualité · vérifié", "Contrôles non conformes", "EnCours", 0, 1),
+                Ligne("Thêta Import SAS", "Rejet du 07/03/2026 · à traiter", "Rejets", "AFaire"),
             ],
         },
 
         new DescripteurEcran
         {
             Code = "PROC_PAPERCUT", Titre = "File d'impression", Sujet = "travaux d'impression",
+            // Reste en EXEMPLE (lot 11) : la file vit dans la table PAPERCUT de la base commune COMMUN_RIG
+            // ([COMMUN_RIG].[dbo].[PAPERCUT], proc_papercut.md, Détail OPE : vue globale et vidage), absente de la base V3 du greffe
+            // (et de RIG_DEV : aucune table PAPERCUT, lu le 27/11/2026) ; « Imprimer » appelle le service WCF d'impression PaperCut.
             Forme = FormeEcran.File,
             Recherche = "Rechercher une imprimante…",
             Criteres = ["Imprimante", "Utilisateur", "Nombre de feuilles"],
@@ -626,6 +650,10 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_LISTEEXCEL", Titre = "Export Excel", Sujet = "listes d'instances",
+            // Lecteur : LecteurListesExcel.cs (lot 11) -- les types de liste d'instances du greffe, leurs colonnes et leurs listes
+            // paramétrées (PARAMETRAGE_LISTE_XLS*). Ni comptage ni export : la V2 exécute le SQL stocké dans PARAMETRAGE_LISTE
+            // (ExcelInstance.cs:39-63) et EXECUTE_EXCEL ouvre un classeur non enregistré (aucun dossier choisi) ; « Lancer l'export
+            // Excel » reste en démonstration.
             Forme = FormeEcran.Etat,
             Parametres = ["Type de liste", Champ.Periode("Période"), "Code d'acte", "Nature d'affaire"],
             Colonnes = ["Liste", Champ.Nombre("Nombre de lignes")],

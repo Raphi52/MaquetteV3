@@ -1,0 +1,46 @@
+# Recherches de « Bordereaux LR » (LecteurBordereauxLr.ChercherAsync), lot 11 du plan-676a4b19, sur les plis 1A21100xx de
+# PROC_BORDLR.sql (le 15/03/2001). Une periode -> le bordereau a editer de chaque type et son nombre de plis, recompte comme RIG v2
+# (MetierProcBordlr._CreeRequete, :45-61) : LRARI_TYPE du type, DMNED_DATE_PRE_EMISSION entre les bornes, DMNED_UTILISATEUR.
+# Chaque refus a son jumeau accepte, de l'autre cote de la meme borne.
+#
+# La journee du 15/03/2001 (fin vide = le debut, OPE_BORDLR_AVEC_AR.cs:82 ; sans heure, 00:00 a 23:59:59.998) : avec AR, 2110001
+# (10 h), 2110002 (16 h) et 2110004 (9 h, LESNIEWSKI) ; sans AR, 2110003. Ecartes : 2110005, lettre electronique CIPREMIUM_LRAR (ni
+# LRAR ni LR -- jumeau 2110001) ; 2110006, le 16 a 0 h (hors de la borne de fin -- jumeau 2110002 a 16 h).
+critere: Période = 2001-03-15|
+lignes:
+Bordereau LRAR à éditer | du 15/03/2001 au 15/03/2001 · 3 plis · tous les utilisateurs | Avec accusé de réception | AFaire | [] | valeurs: Bordereau LRAR à éditer ; du 15/03/2001 au 15/03/2001 ; tous les utilisateurs ; 3 ; à éditer
+Bordereau LR à éditer | du 15/03/2001 au 15/03/2001 · 1 pli · tous les utilisateurs | Sans accusé de réception | AFaire | [] | valeurs: Bordereau LR à éditer ; du 15/03/2001 au 15/03/2001 ; tous les utilisateurs ; 1 ; à éditer
+---
+# Les heures « hh:mm » (AdapteDate, MetierProcBordlr.cs:130-137) : de 10 h a 12 h, 2110001 (10 h, la borne) et 2110003 (11 h) ;
+# ecartes 2110004 (9 h, avant la borne) et 2110002 (16 h, apres).
+critere: Période = 2001-03-15|2001-03-15
+critere: Heure de début = 10:00
+critere: Heure de fin = 12:00
+lignes:
+Bordereau LRAR à éditer | du 15/03/2001 à 10 h 00 au 15/03/2001 à 12 h 00 · 1 pli · tous les utilisateurs | Avec accusé de réception | AFaire | []
+Bordereau LR à éditer | du 15/03/2001 à 10 h 00 au 15/03/2001 à 12 h 00 · 1 pli · tous les utilisateurs | Sans accusé de réception | AFaire | []
+---
+# Un utilisateur (« ='GESA' », le getter User, OPE_BORDLR_AVEC_AR.cs:45-56) : 2110004 (LESNIEWSKI) est ecarte -- jumeaux 2110001 et
+# 2110002 (GESA).
+critere: Période = 2001-03-15|
+critere: Utilisateur = GESA
+lignes:
+Bordereau LRAR à éditer | du 15/03/2001 au 15/03/2001 · 2 plis · GESA | Avec accusé de réception | AFaire | []
+Bordereau LR à éditer | du 15/03/2001 au 15/03/2001 · 1 pli · GESA | Sans accusé de réception | AFaire | []
+---
+# Deux journees : 2110006 (le 16 a 0 h) entre -- c'est le jumeau accepte de son refus du premier bloc.
+critere: Période = 2001-03-15|2001-03-16
+lignes:
+Bordereau LRAR à éditer | du 15/03/2001 au 16/03/2001 · 4 plis · tous les utilisateurs | Avec accusé de réception | AFaire | []
+Bordereau LR à éditer | du 15/03/2001 au 16/03/2001 · 1 pli · tous les utilisateurs | Sans accusé de réception | AFaire | []
+---
+# Un debut apres la fin : rien n'est compte et la ligne porte le message de RIG v2 (OPE_BORDLR_AVEC_AR.cs:87).
+critere: Période = 2001-03-16|2001-03-15
+lignes:
+Bordereau LRAR à éditer | La date de début doit être plus petit que la date de fin. · 0 pli · tous les utilisateurs | Avec accusé de réception | AFaire | []
+Bordereau LR à éditer | La date de début doit être plus petit que la date de fin. · 0 pli · tous les utilisateurs | Sans accusé de réception | AFaire | []
+---
+# Sans periode, un texte : les bordereaux deja edites, cherches par leur numero de demande.
+texte: 26001200301
+lignes:
+Bordereau 26001200301 | validé le {J-3} · par GESA · aucune édition retrouvée, avec ou sans AR inconnu | Avec accusé de réception | EnCours | []

@@ -275,7 +275,7 @@ internal sealed class EcrivainSuiviIp : IEcrivainEcran
 
         if (Lue(ChampDesistement) is { } dd)
         {
-            var idEve = await EcrivainRetourAudience.EvenementSurvenuAsync(geste, n, "IPDESIN", dd, ct);
+            var idEve = (await EvenementsProcedureV2.SurvenuAsync(geste, n, "IPDESIN", dd, avecFutur: false, ct)).IdSurvenu;
             await Editions(idEve);
             Noter("Désistement");
             faits.Add($"désistement du {FormeLigne.Date(dd)} (événement IPDESIN)");
@@ -393,7 +393,7 @@ internal sealed class EcrivainSuiviIp : IEcrivainEcran
         if (executoire2)
         {
             // Le 2e executoire (:2101-2111), une fois.
-            var idEve = await EcrivainRetourAudience.EvenementSurvenuAsync(geste, n, codeExecutoire2, geste.Maintenant.Date, ct);
+            var idEve = (await EvenementsProcedureV2.SurvenuAsync(geste, n, codeExecutoire2, geste.Maintenant.Date, avecFutur: false, ct)).IdSurvenu;
             await Editions(idEve);
             faits.Add($"2e exécutoire (événement {codeExecutoire2})");
             nonRepris.Add("la réédition de l'ordonnance en titre exécutoire (fichier de la GED)");
@@ -624,7 +624,7 @@ internal sealed class EcrivainSuiviIp : IEcrivainEcran
         // Les evenements de creation du code affaire, survenus du jour, et leurs editions sur la demande OIPE (:2040-2050).
         foreach (var eve in (code.Creation ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
         {
-            var idEve = await EcrivainRetourAudience.EvenementSurvenuAsync(geste, idJ, eve, jour, ct);
+            var idEve = (await EvenementsProcedureV2.SurvenuAsync(geste, idJ, eve, jour, avecFutur: false, ct)).IdSurvenu;
             bilans.Add(await EditionsEvenement.CreerAsync(geste, demande.Id, demande.Numero, idEve, ct));
         }
 

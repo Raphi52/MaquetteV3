@@ -25,11 +25,16 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///     (LRARI_SLN_CITATION) -> cochee d'office, « À citer » (AFaire) ; sinon -> « Sans retour » (EnCours : pas de retour de LRAR).
 ///   ORDRE : cabinet (date, heure), numero de role, date de la LRAR.
 ///
-/// LE GESTE : « Citer par huissier » (l'evenement CITATION), EcrivainConvocations.cs ; ses editions et sa facture n'y sont pas.
+/// LE GESTE : « Citer par huissier » (l'evenement CITATION et ses editions dans la file), EcrivainConvocations.cs ; la facture n'y
+/// est pas. LA FICHE de la ligne depliee : FichesAudienceV2.cs.
 /// </summary>
-internal sealed class LecteurConvocations : IRechercheEcran
+internal sealed class LecteurConvocations : IRechercheEcran, IFicheEcran
 {
     public string Procedure => "PROC_GCONV";
+
+    /// <summary>La fiche de l'instance depliee (FichesAudienceV2.cs : ses sections, ses sources V2, ce qu'elle ne lit pas).</summary>
+    public async Task<FicheEcran?> LireFicheAsync(SqlConnection baseGreffe, string id, DateTime maintenant, CancellationToken ct)
+        => await FichesAudienceV2.ConvocationAsync(baseGreffe, Procedure, id, (await CodesAsync(baseGreffe, ct)).Citation, ct);
 
     /// <summary>Les groupes du descripteur (Surveiller.cs), au mot pres.</summary>
     internal const string ACiter = "Citations à envoyer", Citees = "Citées", SansRetour = "LRAR sans retour", RecuesNpai = "Reçues ou NPAI";

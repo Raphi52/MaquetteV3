@@ -97,8 +97,11 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             [
                 Marche("Audience", "Une ou plusieurs audiences se choisissent. Une audience déjà chargée n'est pas ajoutée une seconde fois.", true,
                     "Audience", "Cabinet"),
+                // La liste d'ordre de RIG v2 (OPE_ORDRE_INSTANCE.cs:50-59 : n° rôle, juge, nom, heure, type de classement, n° d'appel ;
+                // en mode « Procédures collectives », mandataire et administrateur judiciaires), lue avec l'audience dépliée
+                // (FichesAudienceV2.cs).
                 Marche("Ordre des affaires", "Les numéros d'appel se calculent par affaire ; ils se reconstruisent si l'un manque.", true,
-                    "Numéro d'appel", "Type de classement"),
+                    Champ.Tableau("Affaires dans l'ordre d'appel")),
                 Marche("Options", "Plumitif simplifié, notes d'audience, composition : trois cases à cocher au besoin.", false,
                     "Plumitif simplifié", "Notes de l'audience", "Avec la composition"),
                 Marche("Destinataires", "Envoi par courriel ou dépôt dans le coffre. Sans destinataire coché, rien n'est envoyé.", false,
@@ -124,9 +127,10 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             Forme = FormeEcran.Audience,
             // Le cabinet : la recherche de RIG v2, type cabinet, fenêtre INTERV_AUD_DATE_*_PREAUD (OPE_CITATIONS.cs:157-167) ; ses
             // instances et leur LRAR (:46-95). Lecteur : Serveur/Socle/EcransGeneres/LecteurConvocations.cs (lot 7). « Citer par
-            // huissier » enregistre la citation des instances cochées (EcrivainConvocations.cs ; OPE_CITATIONS.cs:241-332) ; ses
-            // éditions (citation, copie conforme, KBIS) et sa facture ne sont pas faites.
-            Parametres = [Champ.Date("Date de l'audience"), "Huissier"],
+            // huissier » enregistre la citation des instances cochées et met ses éditions dans la file, avec le KBIS si sa case est
+            // cochée (CheckBoxEditerKbis, OPE_CITATIONS.cs:436) (EcrivainConvocations.cs ; OPE_CITATIONS.cs:241-459) ; la copie conforme
+            // (GED) et la facture ne sont pas faites.
+            Parametres = [Champ.Date("Date de l'audience"), "Huissier", Champ.Case("Éditer le Kbis")],
             Recherche = "Rechercher une instance, un numéro de rôle, un dossier, une LRAR…",
             Criteres = ["Date de l'audience"],
             Valider = "Citer par huissier", // proc_gconv.md, Rôle : « Gérer les citations et significations par huissier (LRAR) ».
@@ -169,7 +173,8 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             // mêmes paramètres. Lecteur : Serveur/Socle/EcransGeneres/LecteurMiseAuPointChambres.cs (lot 7). « Valider la décision »
             // valide en lot (mode MultiInstance), dans l'ordre de ApplyModifications (PROC_MPCS.cs:1204-1251) : la composition (son
             // numéro dans l'audience), le résultat, le prochain appel (audience du jour saisi, type de classement), une décision du
-            // type saisi et sa mesure liée (EcrivainMiseAuPointChambres.cs).
+            // type saisi et sa mesure liée, puis l'édition de la décision dans la file des éditions si son type a un réglage d'édition
+            // (PROC_MPCS.cs:757-762, :1337-1346 ; EcrivainMiseAuPointChambres.cs).
             // fix-ok: second contrôle du lot 7 (26/11/2026) -- ces descripteurs n'avaient pas les paramètres des écritures et recherches
             // de RIG v2 désormais branchées (composition et prochain appel, PROC_MPCS.cs:1204-1238 ; cases des types, Designer :491-522) ;
             // une cause, portée par un remplacement par descripteur (MPCS, Délibérés, Taxes), aucun autre descripteur touché.
@@ -187,12 +192,16 @@ public sealed class DomaineSurveiller : IDomaineEcrans
                     "Affaires sélectionnées", "Numéro de minute"),
                 Marche("Instance", "En affaire unique seulement : données de l'instance.", false,
                     "Numéro de rôle", "Date d'enrôlement"),
+                // Parties et événements : des listes de l'instance, lues avec l'affaire dépliée (FichesAudienceV2.cs).
+                // fix-ok: contrôle final du lot 7 (27/11/2026, capture c21.png) -- l'affaire dépliée n'avait pas de fiche lue
+                // (ModuleEcransGeneres.cs:55-56), et ces champs, typés Texte, ne pouvaient pas montrer une liste : seul un Tableau
+                // s'affiche en sous-liste (web/src/ecrans/formes/commun.tsx:479-485). Une cause, trois descripteurs (PREAUD, MPCS, RETAUD).
                 Marche("Parties", "Demandeur, défendeur et intervenants.", false,
-                    "Demandeurs", "Défendeurs", "Intervenants"),
+                    Champ.Tableau("Demandeurs"), Champ.Tableau("Défendeurs"), Champ.Tableau("Intervenants")),
                 Marche("Décision judiciaire", "Si une décision existe déjà pour l'appel, il faut choisir : la réutiliser, ou en créer une nouvelle.", true,
                     "Décision existante", "Nouvelle décision", "Type de décision"),
                 Marche("Événements", "Événements de procédure de l'affaire : survenus, puis à venir.", false,
-                    "Événements survenus", "Événements à venir"),
+                    Champ.Tableau("Événements survenus"), Champ.Tableau("Événements à venir")),
                 Marche("Facturation", "Facturation si l'affaire est facturable. En lot, aucune facturation.", false,
                     "Articles"),
                 Marche("Prochain appel", "Passage à l'affaire suivante.", false,
@@ -236,8 +245,9 @@ public sealed class DomaineSurveiller : IDomaineEcrans
                     "Audience", "Cabinet"),
                 Marche("Résultat par affaire", "Le résultat de chaque appel est saisi : décision, prochaine audience, modèle de jugement, minute. Une couleur signale un juge interdit ou un calendrier.", true,
                     "Résultat", "Prochaine audience", "Modèle de jugement", "Numéro de minute"),
+                // « Décision judiciaire » : les décisions de l'instance, sur lesquelles ouvre le menu de la ligne (FichesAudienceV2.cs).
                 Marche("Décision", "Depuis le menu de la ligne : décision judiciaire, procédure collective, modification des parties.", false,
-                    "Décision judiciaire", "Procédure collective", "Modification des parties"),
+                    Champ.Tableau("Décision judiciaire"), "Procédure collective", "Modification des parties"),
                 Marche("Facturation", "Tarif et solde de l'affaire, depuis la grille.", false,
                     "Tarif", "Solde"),
                 Marche("Publicités", "Publicités et impressions légales en attente, à traiter avant de clore l'audience.", false,

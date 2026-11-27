@@ -21,9 +21,13 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// LE GESTE : « Valider » enregistre la composition de l'audience cochee (juges, greffier, parquetier) : EcrivainComposition.cs,
 /// qui nomme ce que la V3 ne reprend pas (plusieurs compositions, invitations calendrier envoyees par courriel).
 /// </summary>
-internal sealed class LecteurComposition : IRechercheEcran
+internal sealed class LecteurComposition : IRechercheEcran, IFicheEcran
 {
     public string Procedure => "PROC_COMPO";
+
+    /// <summary>La fiche de l'audience depliee (FichesAudienceV2.cs : ses sections, ses sources V2, ce qu'elle ne lit pas).</summary>
+    public Task<FicheEcran?> LireFicheAsync(SqlConnection baseGreffe, string id, DateTime maintenant, CancellationToken ct)
+        => FichesAudienceV2.CompositionAsync(baseGreffe, Procedure, id, ct);
 
     /// <summary>Le groupe du descripteur (Surveiller.cs), au mot pres.</summary>
     internal const string Audiences = "Audiences";
