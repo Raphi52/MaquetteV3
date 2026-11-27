@@ -99,8 +99,7 @@ internal sealed class LecteurModelesRedaction : IRechercheEcran, IFicheEcran
                          "SELECT GLOSS_TEXTE FROM v2.GLOSSAIRE WHERE GLOSS_CODE_GLOSSAIRE = @code AND GLOSS_PROPRIETAIRE = '*'", ct, new SqlParameter("@code", code)))
             if (await r.ReadAsync(ct)) texte = FormeLigne.Texte(r, "GLOSS_TEXTE");
         return new FicheEcran(Procedure, id, ligne.Nom,
-            [new SectionFiche(SectionGlossaire, [new ChampFiche("Code", c), new ChampFiche("Libellé", libelle),
-                new ChampFiche(ChampTexte, texte) { Modifiable = true },
+            [new SectionFiche(SectionGlossaire, [new ChampFiche(ChampTexte, texte) { Modifiable = true },
                 // Public, donc fige : une entree publique ne redevient pas privee (OPE_EDT_GLOSSAIRE.cs:122).
                 new ChampFiche(ChampPrive, FormeLigne.Case(false))])]);
     }

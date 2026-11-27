@@ -598,7 +598,8 @@ public sealed class DomaineConfigurer : IDomaineEcrans
                 new MarcheEcran("Section", "Les sections réutilisables de la décision (requête SQL, fusion, génération, occurrence, persistance) ; éditées par l'équipe Amitel seulement, dans RIG v2.", false,
                     ["Code", "Libellé"]),
                 new MarcheEcran("Entrée du glossaire", "Le code (fixé une fois enregistré) et le texte associé sont obligatoires, la description facultative. Une entrée privée n'appartient qu'à vous ; une entrée publique ne redevient pas privée. La liste montre le glossaire public.", false,
-                    ["Code", "Libellé", Champ.Zone("Texte associé"), Champ.Case("Privé")]),
+                    // Le code et la description sont les cellules de la ligne : la section ne porte que ce que la grille n'a pas.
+                    [Champ.Zone("Texte associé"), Champ.Case("Privé")]),
                 new MarcheEcran("Fonctions avancées", "Outils techniques de la rédaction, dans un onglet à part.", false,
                     ["Fonctions avancées"]),
             ],
