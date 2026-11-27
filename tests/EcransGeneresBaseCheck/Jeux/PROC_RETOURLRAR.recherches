@@ -1,0 +1,32 @@
+# Recherches de « Retours LRAR » (LecteurRetoursLrar.ChercherAsync), lot 11 du plan-676a4b19 : le code-barre SCANNE retrouve son pli,
+# revenu ou non (« WHERE LRARI_NUM_LRAR = » du code scanne, OPE_RETOURLRAR_RECEPTION.cs:165-172, 487-512), LRAR ou LR. Plis :
+# PROC_RETOURLRAR.sql. Chaque refus a son jumeau accepte.
+#
+# Un pli pas encore revenu, emis par une convocation : la ligne « A saisir », avec sa demande d'edition.
+texte: 1A2110101
+lignes:
+Pli 1A2110101 | Convocation du banc 11 · à RETOUR ALPHA SARL · émis le 20/03/2001 · aucun retour saisi | Sans retour | AFaire | []
+---
+# Le meme pli par le critere « Code-barre du pli » (le scan de la V2).
+critere: Code-barre du pli = 1A2110101
+lignes:
+Pli 1A2110101 | Convocation du banc 11 · à RETOUR ALPHA SARL · émis le 20/03/2001 · aucun retour saisi | Sans retour | AFaire | []
+---
+# Un pli qu'aucune demande d'edition n'a emis : trouve, mais la V2 ne le reconnait pas (l. 133) -- la ligne le dit, le geste le
+# refuse (PROC_RETOURLRAR.gestes, bloc 3).
+texte: 1A2110103
+lignes:
+Pli 1A2110103 | Ce code à barre n'est pas reconnu dans base de données du greffe. | Sans retour | AFaire | []
+---
+# Un retour deja saisi se retrouve aussi par son code-barre.
+texte: 1A1200001
+lignes:
+Pli 1A1200001 | Reçu le {J-1} | Reçus | Validee | []
+---
+# Refus : une lettre electronique (CIPREMIUM_LRAR) n'est pas un pli papier de cet ecran -- jumeau 1A2110101 (bloc 1).
+texte: 1A2110105
+lignes:
+---
+# Refus : le code-barre se compare EGAL, pas en debut de numero -- jumeau 1A2110101 (bloc 1).
+texte: 1A21101
+lignes:
