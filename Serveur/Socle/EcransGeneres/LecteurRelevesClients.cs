@@ -5,7 +5,7 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 
 /// <summary>
 /// « Releve de compte » (PROC_RELCLI) : les comptes clients debiteurs a qui editer un releve. Mode d'emploi : LecteurEcran.cs. Plan
-/// « RIG v3 100 % fonctionnel », lot 12, 27/11/2026. Lecture seule : aucun geste n'est branche (en tete, NON REPRIS).
+/// « RIG v3 100 % fonctionnel », lot 12, 27/11/2026. Le geste « Valider les soldes » : EcrivainRelevesClients.cs.
 ///
 /// SOURCE (ancien RIG) : MetierReleveClient.DoSearch (D:\RigApplication\Source\RIG\DLL\Processus\PROC_RELCLI ; le Detail OPE de
 /// proc_relcli.md, « 1bis. La requete de recherche », fait foi), aux criteres de l'ouverture (SearchCriteriaReleveClient.cs:15-18) :
@@ -19,9 +19,8 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///     (27/11/2026, « Invalid object name v2.GREFFE_PARAMETRE », erreur 500 a l'ecran) -- le rompu se lit dans soc.ParametreGreffe.
 /// Dans la base V3, CLIENT est la fiche rec.Client (REC-013). GROUPES : Standard / Greffes. ETAT : AFaire « À éditer » (l'edition et
 /// la validation des soldes n'ont pas de trace lue ici).
-/// NON REPRIS (nomme) : l'apercu et l'edition des releves (etats Crystal, envoi par courriel) ; « Valider les soldes » (DoValider,
-/// proc_relcli.md:140-160 : un solde mensuel CLIENT_SOLDE par compte actif jusqu'a la derniere periode achevee avant la premiere
-/// piece non comptabilisee, et la completion des soldes anterieurs) -- la V3 ne le fait pas encore.
+/// NON REPRIS (nomme) : l'apercu et l'edition des releves (etats Crystal, envoi par courriel) -- la raison en tete
+/// d'EcrivainRelevesClients.cs.
 /// </summary>
 internal sealed class LecteurRelevesClients : ILecteurEcran
 {

@@ -53,7 +53,10 @@ public sealed class DomaineFacturer : IDomaineEcrans
             Forme = FormeEcran.File,
             Recherche = "Rechercher un client, un compte…",
             Criteres = ["Statut du compte (actifs par défaut)", "Type de compte (standard et greffes par défaut)", "Solde minimum (seuil du greffe)"],
-            // Action citée par la fiche (proc_relcli.md) : « valider les soldes mensuels ».
+            // La période de l'étape Édition (OPE_EDITION.cs:96-97, :120, :126) part avec le geste : vide, le mois précédent, comme
+            // RIG v2 la pose à l'ouverture (EcrivainRelevesClients, lot 12).
+            Parametres = [Champ.Date("Date de début"), Champ.Date("Date de fin")],
+            // Action citée par la fiche (proc_relcli.md) : « valider les soldes mensuels » (PROC_RELCLI.DoValider, :161-251).
             Valider = "Valider les soldes",
             Rang = 6,
             Etats = EtatsEcran.Trois("À éditer", "Relevé édité", "Soldes validés"),
@@ -66,7 +69,7 @@ public sealed class DomaineFacturer : IDomaineEcrans
                     "Case à cocher", "Client", "Compte"),
                 Marche("Relevés", "Aperçu d'une ligne, ou édition en masse : envoi par e-mail si une adresse valide existe, sinon impression. Un aperçu est refusé si la fin de période précède son début.", true,
                     "Aperçu", "Édition", "Envoi par e-mail"),
-                Marche("Validation des soldes", "Demande le droit de comptabilité. Un solde se fige seulement si la période est achevée, et jamais au-delà de la première pièce non comptabilisée, nommée dans l'avertissement.", true,
+                Marche("Validation des soldes", "Demande le droit comptable (EXPCOMPTA). Complète d'abord les soldes antérieurs des comptes cochés ; puis, si la période est achevée, un solde par mois pour TOUS les comptes actifs, jamais au-delà de la première pièce non comptabilisée, nommée dans l'avertissement. Les relevés eux-mêmes ne sont pas édités par la V3.", true,
                     "Droit comptable", "Pièce bloquante", "Soldes mensuels"),
             ],
             Lignes =
