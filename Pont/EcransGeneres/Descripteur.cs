@@ -231,6 +231,11 @@ public sealed record DescripteurEcran
     /// une liasse deja analysee affiche son resultat sans relancer (PROC_IA.cs:60-64). Vide pour toute autre forme.</summary>
     public MarcheEcran[] Resultat { get; init; } = [];
 
+    /// <summary>Le titre de la section que l'ecran dessine en EXTRAIT KBIS (web/src/composants/ApercuKbis.tsx) au lieu de ses
+    /// champs : sa fiche lue devient l'apercu par Pont/ApercuKbisDossier.cs. PROC_XEX (edition interne d'un Kbis, lot 13 du plan
+    /// « RIG v3 100 % fonctionnel ») ; null pour tout autre ecran.</summary>
+    public string? ApercuKbis { get; init; }
+
     /// <summary>Les parties que comptent les <see cref="LigneEcran.Faites"/> d'une ligne : les etapes d'une Saisie,
     /// les sections des autres formes. Pas envoye a l'ecran (il les a deja).</summary>
     [JsonIgnore]

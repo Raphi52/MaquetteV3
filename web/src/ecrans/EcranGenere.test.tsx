@@ -1118,5 +1118,55 @@ describe('socle fonctionnel : recherche et fiche sur Referentiel, Audience et Op
       await waitFor(() => expect(container.querySelector('[aria-label="Forme juridique"]')?.textContent).toBe('SARL'))
       expect(pont.appels).toHaveBeenCalledWith('EcranGenere.Fiche', 'ECRAN_TEST', 'Fond', '1200777')
     })
+
+    // Lot 13 (PROC_XEX, edition interne d'un Kbis) : la section que le descripteur nomme apercuKbis se dessine en EXTRAIT KBIS
+    // (composants/ApercuKbis.tsx, calcule par Pont/ApercuKbisDossier.cs sur la fiche lue), pas en champs.
+    const xex = () => descripteur({
+      forme: 'Operation', valider: 'Éditer le Kbis', objetUnique: true, criteres: ['Numéro de gestion du dossier RCS'], groupes: ['Fond'],
+      sections: [{ titre: 'Dossier RCS', consigne: '', obligatoire: true, champs: [champ('Désignation')] },
+                 { titre: 'Extrait Kbis', consigne: '', obligatoire: false, champs: [champ('Forme juridique')] }],
+      apercuKbis: 'Extrait Kbis',
+    })
+    const dossierXex: LigneEcranVue = { nom: '2013B60001', precisions: 'KBIS ALPHA', groupe: 'Fond', etat: 'EnCours', faites: [], id: '2300601' }
+    const saisirDossier = async (container: HTMLElement) => {
+      await waitFor(() => expect(container.querySelector('input[aria-label="Numéro de gestion du dossier RCS"]')).not.toBeNull())
+      fireEvent.change(container.querySelector('input[aria-label="Numéro de gestion du dossier RCS"]')!, { target: { value: '2013B60001' } })
+    }
+
+    it('sur UN dossier : la section apercuKbis est l’extrait Kbis du dossier lu, a la place de ses champs (lot 13)', async () => {
+      const kbis = {
+        greffeLibelle: 'Greffe du Tribunal de Commerce de Grenoble', greffeAdresse: '', gestion: '2013B60001', fraicheur: '27/11/2026',
+        sections: [{ titre: 'IDENTIFICATION DE LA PERSONNE MORALE', lignes: [{ titre: 'Forme juridique', libelle: 'Société à responsabilité limitée' }] }],
+        villeRcs: 'GRENOBLE', horodatage: '27/11/2026 10:00:00', numero: '2013B60001',
+      }
+      const pont = installerFauxPont({
+        'EcranGenere.Lignes': () => base([dossierXex], { recherche: true }),
+        'EcranGenere.Chercher': () => base([dossierXex], { recherche: true, cherchees: ['Fond'] }),
+        'EcranGenere.Fiche': () => ficheDe('2300601', '2013B60001', [{ titre: 'Dossier RCS', champs: [lu('Désignation', 'KBIS ALPHA')] }]),
+        'ApercuKbis.Dossier': () => ({ mode: 'base', message: null, kbis }),
+      })
+      const { container } = render(<EcranGenere descripteur={xex()} />)
+      await saisirDossier(container)
+      await waitFor(() => expect(container.querySelector('[aria-label="Extrait Kbis"] .rig-kbis')).not.toBeNull())
+      expect(pont.appels).toHaveBeenCalledWith('ApercuKbis.Dossier', 'ECRAN_TEST', 'Fond', '2300601')
+      expect(container.querySelector('.rig-kbis')!.textContent).toContain('Société à responsabilité limitée')
+      expect(container.querySelector('.rig-kbis')!.textContent).toContain('Numero de gestion 2013B60001')
+      // Les autres sections gardent leurs champs lus ; celle de l'extrait n'a plus de champ.
+      expect(container.querySelector('[aria-label="Désignation"]')?.textContent).toBe('KBIS ALPHA')
+      expect(container.querySelector('[aria-label="Forme juridique"]')).toBeNull()
+    })
+
+    it('sur UN dossier sans extrait lu (exemple, panne) : le motif, jamais un extrait invente (lot 13)', async () => {
+      installerFauxPont({
+        'EcranGenere.Lignes': () => base([dossierXex], { recherche: true }),
+        'EcranGenere.Chercher': () => base([dossierXex], { recherche: true, cherchees: ['Fond'] }),
+        'EcranGenere.Fiche': () => ficheDe('2300601', '2013B60001', []),
+        'ApercuKbis.Dossier': () => ({ mode: 'erreur', message: 'La base du greffe 3801 ne répond pas.', kbis: null }),
+      })
+      const { container } = render(<EcranGenere descripteur={xex()} />)
+      await saisirDossier(container)
+      await waitFor(() => expect(container.querySelector('[aria-label="Extrait Kbis"]')?.textContent).toContain('La base du greffe 3801 ne répond pas.'))
+      expect(container.querySelector('.rig-kbis')).toBeNull()
+    })
   })
 })
