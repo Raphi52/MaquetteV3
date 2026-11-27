@@ -38,7 +38,9 @@ public enum TypeGeste
 /// <param name="Type">Ce que la forme fait.</param>
 /// <param name="Ids">Les objets vises (<see cref="LigneLue.Id"/>) ; vide pour une creation ou un ajout.</param>
 /// <param name="Valeurs">Les valeurs SAISIES, au format de FicheEcran.cs : cle « Section › Libelle » pour un champ de
-/// section (Fiche, Saisie, Operation), le libelle de la colonne (Referentiel) ou du parametre (Audience). Une Fiche
+/// section (Fiche, Saisie, Operation), le libelle de la colonne (Referentiel) ou du parametre (Audience) ; une Operation
+/// sur une liste y joint aussi les criteres remplis de sa recherche, sous leur libelle (lot 11 : un geste RIG v2 qui porte sur
+/// toute la liste recherchee, les listes BODACC d'EcrivainPublicationsBodacc). Une Fiche
 /// (Enregistrer) et un Referentiel (Modifier) n'envoient que les champs modifies : un champ absent garde la valeur de la
 /// base.</param>
 public sealed record GesteEcran(TypeGeste Type, string[] Ids, IReadOnlyDictionary<string, string> Valeurs)

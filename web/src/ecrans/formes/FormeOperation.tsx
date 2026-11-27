@@ -61,7 +61,10 @@ function OperationSurLaListe({ d }: { d: DescripteurEcranVue }) {
       annoncer(`Contrôle de la fiche RIG v2 : « ${manque.join(' », « ')} » ${manque.length > 1 ? 'sont obligatoires' : 'est obligatoire'}. ${DEMONSTRATION}.`)
       return
     }
-    const remplies = Object.fromEntries(Object.entries(saisies).filter(([, v]) => v.trim() !== ''))
+    // Les criteres de la recherche partent aussi, sous leur libelle (comme les parametres d'une audience) : un geste RIG v2
+    // qui porte sur toute la liste recherchee (les listes BODACC, OPE_LST_LISTE_REJ.cs:73-94) les lit ; les champs des
+    // sections ont la cle « Section › Libelle », sans collision.
+    const remplies = Object.fromEntries([...Object.entries(criteres), ...Object.entries(saisies)].filter(([, v]) => v.trim() !== ''))
     void jouer({ type: 'Confirmer', nom: geste, groupe: choisies[0]?.groupe ?? p.titre, ids: choisies.map((l) => l.id), valeurs: remplies },
       refus(geste, `sur ${choisies.length} objet${choisies.length > 1 ? 's' : ''} : rien n’est modifié dans la base`),
       () => { poserCochees(new Set()); poserSaisies({}); poserTemps(0); relire() })

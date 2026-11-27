@@ -15,7 +15,7 @@ ids: R-2110203
 resultat: refuse
 message: Annonce introuvable dans sa liste BODACC (R-2110203) : relisez la liste.
 ---
-# Refus : « Valider » sur un controle non conforme -- sa liste n'a pas de case (OPE_LST_CTRLNC_BOD, :108-119), « Editer » l'edite (bloc 12).
+# Refus : « Valider » sur un controle non conforme -- sa liste n'a pas de case (OPE_LST_CTRLNC_BOD, :108-119), « Editer » l'edite (bloc 17).
 # Jumeau accepte : bloc 5,
 # la meme annonce 2110207 dans la liste des certificats.
 geste: Confirmer Valider
@@ -74,6 +74,10 @@ message: 2 éditions placées dans la file des éditions : Certificat de parutio
 controle: SELECT CONCAT(DMND_ETAT_DEMANDE, '/', DMND_CODE_PROSS, '/', CONVERT(int, DMND_EN_COURS), '/', (SELECT COUNT(*) FROM v2.DEMANDE_EDITION WHERE DMNED_ID_DMND = d.DMND_ID_DMND)) FROM v2.DEMANDE AS d WHERE DMND_ID_DMND = (SELECT MAX(DMND_ID_DMND) FROM v2.DEMANDE WHERE DMND_CODE_PROSS = 'GESTBOD') => V/GESTBOD/0/2
 controle: SELECT CONCAT(DMNED_LIBELLE_DOCUMENT, '|', DMNED_CODE_MAQUETTE, '|', CONVERT(int, DMNED_ENVOI_AU_COFFRE), '|', CONVERT(int, DMNED_IMPRESSION), '|', DMNED_CODE_CFECP, '|', DMNED_CODE_ENTITE_SOURCE, '|', DMNED_VALEUR_ID_SOURCE, '|', DMNED_LIBELLE_SOURCE, '|', DMNED_CODE_PROCESSUS, '|', DMNED_TYPE_DOCUMENT, '|', DMNED_PHASE_TRAITEMENT) FROM v2.DEMANDE_EDITION WHERE DMNED_ID_DMND = (SELECT MAX(DMND_ID_DMND) FROM v2.DEMANDE WHERE DMND_CODE_PROSS = 'GESTBOD') AND DMNED_ENVOI_AU_COFFRE = 1 => Certificat de parution au Bodacc, 1990P14101 EP BANC11C du 15/05/2001 00:00:00|3801_CERTIF_BOD|1|0|BODACC|BODACC|NS-2110210|Jgt ouverture du banc|EDT_CRTBOD|BODAC|C
 controle: SELECT CONCAT(e.value('@PAR_DEFAUT', 'varchar(1)'), '|', e.value('@CODE', 'varchar(10)'), '|', e.value('@VALEUR', 'varchar(10)'), '|', e.value('@LIBELLE', 'nvarchar(100)'), '|', e.value('@EMAIL', 'varchar(100)'), '|', e.value('@NOM_COFFRE', 'varchar(100)'), '|', e.value('@KEY_DESTINATAIRE', 'varchar(100)'), '|', e.value('@ADRESSE', 'nvarchar(400)')) FROM v2.DEMANDE_EDITION CROSS APPLY (SELECT CONVERT(xml, CONVERT(xml, CONVERT(nvarchar(max), DMNED_PARAMETRE_GENERATION)).value('(/PARAMETRES/@LISTE_ENTITE_DESTINATION)[1]', 'nvarchar(max)')) AS l) AS x CROSS APPLY x.l.nodes('/LISTE_ENTITES/ENTITE') AS t(e) WHERE DMNED_ID_DMND = (SELECT MAX(DMND_ID_DMND) FROM v2.DEMANDE WHERE DMND_CODE_PROSS = 'GESTBOD') AND DMNED_ENVOI_AU_COFFRE = 1 => 1|MDJ|1400551|Me MANDAUN Selarl|mandaun@banc.test|COFFRE-MANDAUN|GERER_PC_MDJ_1400551|Toque n° 42&amp;crlf;Résidence du Banc&amp;crlf;12 bis avenue des Essais &amp; Mesures&amp;crlf;BP 7&amp;crlf;38000 GRENOBLE CEDEX 1
+# La reference du mandataire (GRRPC_NUMERO_INTERNE de sa mission 1400761) et le pays de son adresse (ADRBS_PAYS : BEL, PROC_GESTBOD.sql),
+# comme RIG v2 (DestinatairesEditionsLot2.cs:1643, :1647) ; le document interne garde le defaut d'ENTITE : pas de reference, PAYS FRA.
+controle: SELECT CONCAT(COALESCE(e.value('@REFERENCE_DESTINATAIRE', 'varchar(15)'), 'absente'), '|', e.value('@PAYS', 'varchar(3)')) FROM v2.DEMANDE_EDITION CROSS APPLY (SELECT CONVERT(xml, CONVERT(xml, CONVERT(nvarchar(max), DMNED_PARAMETRE_GENERATION)).value('(/PARAMETRES/@LISTE_ENTITE_DESTINATION)[1]', 'nvarchar(max)')) AS l) AS x CROSS APPLY x.l.nodes('/LISTE_ENTITES/ENTITE') AS t(e) WHERE DMNED_ID_DMND = (SELECT MAX(DMND_ID_DMND) FROM v2.DEMANDE WHERE DMND_CODE_PROSS = 'GESTBOD') AND DMNED_ENVOI_AU_COFFRE = 1 => MDJ-2110-11|BEL
+controle: SELECT CONCAT(COALESCE(e.value('@REFERENCE_DESTINATAIRE', 'varchar(15)'), 'absente'), '|', e.value('@PAYS', 'varchar(3)')) FROM v2.DEMANDE_EDITION CROSS APPLY (SELECT CONVERT(xml, CONVERT(xml, CONVERT(nvarchar(max), DMNED_PARAMETRE_GENERATION)).value('(/PARAMETRES/@LISTE_ENTITE_DESTINATION)[1]', 'nvarchar(max)')) AS l) AS x CROSS APPLY x.l.nodes('/LISTE_ENTITES/ENTITE') AS t(e) WHERE DMNED_ID_DMND = (SELECT MAX(DMND_ID_DMND) FROM v2.DEMANDE WHERE DMND_CODE_PROSS = 'GESTBOD') AND DMNED_ENVOI_AU_COFFRE = 0 => absente|FRA
 controle: SELECT CONCAT(CONVERT(int, DMNED_IMPRESSION), '|', CONVERT(int, DMNED_ENVOI_AU_COFFRE), '|', ISNULL(DMNED_CODE_CFECP, 'null'), '|', CONVERT(xml, CONVERT(xml, CONVERT(nvarchar(max), DMNED_PARAMETRE_GENERATION)).value('(/PARAMETRES/@LISTE_ENTITE_DESTINATION)[1]', 'nvarchar(max)')).value('count(/LISTE_ENTITES/ENTITE[@PAR_DEFAUT="1" and @CODE="" and @VALEUR="" and @LIBELLE=""])', 'int')) FROM v2.DEMANDE_EDITION WHERE DMNED_ID_DMND = (SELECT MAX(DMND_ID_DMND) FROM v2.DEMANDE WHERE DMND_CODE_PROSS = 'GESTBOD') AND DMNED_ENVOI_AU_COFFRE = 0 => 1|0|null|1
 ---
 # Certificat 2110211 de la prevention 1990V14201, sans mandataire : CERTIF_BODPR (:66-68), le document interne seul ; la prevention
@@ -84,26 +88,68 @@ resultat: fait
 message: 1 édition placée dans la file des éditions : Certificat de parution au Bodacc, 1990V14201 EP BANC11D du 16/05/2001 00:00:00 → document interne. Impression simulée : le service d'édition de RIG v2 imprime, RIG v3 ne l'appelle pas.
 controle: SELECT CONCAT(DMNED_CODE_MAQUETTE, '|', DMNED_CODE_PROCESSUS, '|', DMNED_LIBELLE_SOURCE, '|', DMNED_VALEUR_ID_SOURCE, '|', CONVERT(int, DMNED_IMPRESSION)) FROM v2.DEMANDE_EDITION WHERE DMNED_ID_DMND = (SELECT MAX(DMND_ID_DMND) FROM v2.DEMANDE WHERE DMND_CODE_PROSS = 'GESTBOD') => 3801_CERTIF_BOD_PR|EDT_CRTBPR|Jgt rectifié du banc|NS-2110211|1
 ---
-# Refus : le rejet 2110203 est deja a renvoyer (etat 3), il n'est plus dans la liste des rejets que la V2 edite. Jumeau accepte : bloc 12.
+# Refus : le rejet 2110203 est deja a renvoyer (etat 3), il n'est plus dans la liste des rejets que la V2 edite. Jumeau accepte : bloc 13.
 geste: Confirmer Éditer
 ids: R-2110203
 resultat: refuse
 message: Annonce introuvable dans sa liste BODACC (R-2110203) : relisez la liste.
 ---
-# Rejet 2110201 : UNE demande LISTE_REJETS_BODACC (OPE_LST_LISTE_REJ.cs:62-120) -- source « DEMANDE » (la demande du processus),
-# libelle source « », sans liste de destinataires ; dans le XML de generation : TitreEtat (« Bodacc rejeté », un seul), GreffeNom
-# (le type du greffe 9201, une espace, PRMED_DE_NOM_MAJ dont « | » devient « <BR> ») et la requete de l'etat, qui vise l'annonce.
+# Les deux LISTES (lot 11, reprise 7) : RIG v2 edite TOUTE la liste de sa recherche, sans case (OPE_LST_LISTE_REJ.cs:62-120,
+# OPE_LST_CTRLNC_BOD.cs:49-103) ; l'ecran envoie ses criteres avec le geste (FormeOperation, sous leur libelle). La clause de date et
+# la periode du titre sont celles de la V2 (:73-94, :61-83), N le nombre d'annonces de la liste. Une annonce cochee hors de la liste
+# de ces criteres : refus.
+# Refus : le rejet 2110201 (envoye le 02/04/2001) n'est pas dans la liste des rejets envoyes le 03/04/2001. Jumeau accepte : bloc 13.
+geste: Confirmer Éditer
+ids: R-2110201
+valeur: Critère de date = Date d'envoi
+valeur: Date du = 2001-04-03
+resultat: refuse
+message: Annonce introuvable dans sa liste BODACC (R-2110201) : relisez la liste.
+---
+# Rejet 2110201, recherche « date d'envoi le 02/04/2001 » : UNE demande LISTE_REJETS_BODACC -- source « DEMANDE » (la demande du
+# processus), libelle source « », sans liste de destinataires ; dans le XML de generation : TitreEtat (« Bodacc rejeté », un seul, et
+# la periode), GreffeNom (le type du greffe 9201, une espace, PRMED_DE_NOM_MAJ dont « | » devient « <BR> ») et la requete de l'etat,
+# sur la date d'envoi (la seule rejetee P% ce jour-la ; 2110204 est de type N).
+geste: Confirmer Éditer
+ids: R-2110201
+valeur: Critère de date = Date d'envoi
+valeur: Date du = 2001-04-02
+resultat: fait
+message: 1 édition placée dans la file des éditions : Liste des rejets du BODACC (1 annonce, toute la liste de la recherche dont la date envoi est 02/04/2001). Impression simulée : le service d'édition de RIG v2 imprime, RIG v3 ne l'appelle pas.
+controle: SELECT CONCAT(DMNED_LIBELLE_DOCUMENT, '|', DMNED_CODE_MAQUETTE, '|', DMNED_NUM_GROUPE, '|', DMNED_CODE_ENTITE_SOURCE, '|', CASE WHEN DMNED_VALEUR_ID_SOURCE = CONVERT(varchar(20), DMNED_ID_DMND) THEN 'la demande' ELSE DMNED_VALEUR_ID_SOURCE END, '|[', DMNED_LIBELLE_SOURCE, ']') FROM v2.DEMANDE_EDITION WHERE DMNED_ID_DMND = (SELECT MAX(DMND_ID_DMND) FROM v2.DEMANDE WHERE DMND_CODE_PROSS = 'GESTBOD') => Liste des rejets du BODACC|LOT2_LISTE_REJETS|ListeRejetsBodacc|DEMANDE|la demande|[ ]
+controle: SELECT CONCAT(x.p.value('(/PARAMETRES/@TitreEtat)[1]', 'nvarchar(200)'), '|', x.p.value('(/PARAMETRES/@GreffeNom)[1]', 'nvarchar(200)'), '|', x.p.exist('/PARAMETRES/@LISTE_ENTITE_DESTINATION')) FROM v2.DEMANDE_EDITION CROSS APPLY (SELECT CONVERT(xml, CONVERT(nvarchar(max), DMNED_PARAMETRE_GENERATION)) AS p) AS x WHERE DMNED_ID_DMND = (SELECT MAX(DMND_ID_DMND) FROM v2.DEMANDE WHERE DMND_CODE_PROSS = 'GESTBOD') => Bodacc rejeté dont la date envoi est 02/04/2001|GREFFE DU TRIBUNAL DE COMMERCE DU BANC<BR>ONZE|0
+controle: SELECT CONCAT('[', CONVERT(xml, CONVERT(nvarchar(max), DMNED_PARAMETRE_GENERATION)).value('(/PARAMETRES/@SQL)[1]', 'nvarchar(max)'), ']') FROM v2.DEMANDE_EDITION WHERE DMNED_ID_DMND = (SELECT MAX(DMND_ID_DMND) FROM v2.DEMANDE WHERE DMND_CODE_PROSS = 'GESTBOD') => [ Select Isnull(PREVE_NUM_PRV,PRCLL_NUM_PC) as NUM_PC_OU_PRV , EVNPR_CODE_EVE_PRO, EVNPR_DATE, BDCCR_DATE_ENVOI, isnull(BDCCR_MOTIF_REJET_BODACC_1,'') + ' ' + isnull(BDCCR_MOTIF_REJET_BODACC_2,'') + case isnull(BDCCR_COMMENTAIRE,'') when '' then '' else ' Commentaire : ' + BDCCR_COMMENTAIRE end as BDCCR_MOTIF_REJET, convert(varchar(8000),BDCCR_TEXTE_BODACC)  From BODACC With (nolock) INNER JOIN EVENEMENT_PROCEDURE With (nolock) ON BDCCR_ID_EVNPR = EVNPR_ID_EVNPR LEFT OUTER JOIN PROCEDURE_COLLECTIVE With (nolock) ON EVNPR_ID_PRCLL = PRCLL_ID_PRCLL LEFT OUTER JOIN PREVENTION With (nolock) ON EVNPR_ID_PREVE = PREVE_ID_PREVE  Where BDCCR_DATE_ENVOI = convert(datetime, '02/04/2001',103) And (BDCCR_ETAT_BODACC = '9' AND BDCCR_TYPE_BODACC like 'P%') UNION  Select Isnull(PREVE_NUM_PRV,PRCLL_NUM_PC) as NUM_PC_OU_PRV , EVNPR_CODE_EVE_PRO, EVNPR_DATE, BDCCR_DATE_ENVOI, isnull(BDCCR_MOTIF_REJET_BODACC_1,'') + ' ' + isnull(BDCCR_MOTIF_REJET_BODACC_2,'') + case isnull(BDCCR_COMMENTAIRE,'') when '' then '' else ' Commentaire : ' + BDCCR_COMMENTAIRE end as BDCCR_MOTIF_REJET, convert(varchar(8000),BDCCR_TEXTE_BODACC)  From BODACC With (nolock) INNER JOIN EVENEMENT_PROCEDURE With (nolock) ON BDCCR_ID_EVNPR = EVNPR_ID_EVNPR LEFT OUTER JOIN PROCEDURE_COLLECTIVE With (nolock) ON EVNPR_ID_PRCLL = PRCLL_ID_PRCLL LEFT OUTER JOIN PREVENTION With (nolock) ON EVNPR_ID_PREVE = PREVE_ID_PREVE  WHERE BDCCR_ID_PREC_BOD in (Select BDCCR_ID_BDCRC From BODACC With (nolock)  Where BDCCR_DATE_ENVOI = convert(datetime, '02/04/2001',103) And (BDCCR_ETAT_BODACC = '9' AND BDCCR_TYPE_BODACC like 'P%') AND BDCCR_ID_EVNPR is null)]
+---
+# Refus : la V2 n'offre pas la date de parution aux rejets (OPE_LST_REJETS, :63-85) : avec ce critere, la liste des rejets n'est pas a
+# l'ecran (PROC_GESTBOD.recherches, bloc 2). Jumeau accepte : bloc 13 (date d'envoi).
+geste: Confirmer Éditer
+ids: R-2110201
+valeur: Critère de date = Date de parution
+valeur: Date du = 2001-04-02
+resultat: refuse
+message: Annonce introuvable dans sa liste BODACC (R-2110201) : relisez la liste.
+---
+# Sans critere : la liste des rejets que la V2 ouvre sans date (etat 9) -- 1908304 (PROC_SDEMATJUD.sql) et 2110201 ; 2110202 est a
+# renvoyer depuis le bloc 4, 2110203 l'etait deja. Titre sans periode, la clause sans date de la V2 (« Where (BDCCR_ETAT_BODACC ... »).
 geste: Confirmer Éditer
 ids: R-2110201
 resultat: fait
-message: 1 édition placée dans la file des éditions : Liste des rejets du BODACC (1 annonce). Impression simulée : le service d'édition de RIG v2 imprime, RIG v3 ne l'appelle pas.
-controle: SELECT CONCAT(DMNED_LIBELLE_DOCUMENT, '|', DMNED_CODE_MAQUETTE, '|', DMNED_NUM_GROUPE, '|', DMNED_CODE_ENTITE_SOURCE, '|', CASE WHEN DMNED_VALEUR_ID_SOURCE = CONVERT(varchar(20), DMNED_ID_DMND) THEN 'la demande' ELSE DMNED_VALEUR_ID_SOURCE END, '|[', DMNED_LIBELLE_SOURCE, ']') FROM v2.DEMANDE_EDITION WHERE DMNED_ID_DMND = (SELECT MAX(DMND_ID_DMND) FROM v2.DEMANDE WHERE DMND_CODE_PROSS = 'GESTBOD') => Liste des rejets du BODACC|LOT2_LISTE_REJETS|ListeRejetsBodacc|DEMANDE|la demande|[ ]
-controle: SELECT CONCAT(x.p.value('(/PARAMETRES/@TitreEtat)[1]', 'nvarchar(200)'), '|', x.p.value('(/PARAMETRES/@GreffeNom)[1]', 'nvarchar(200)'), '|', x.p.exist('/PARAMETRES/@LISTE_ENTITE_DESTINATION')) FROM v2.DEMANDE_EDITION CROSS APPLY (SELECT CONVERT(xml, CONVERT(nvarchar(max), DMNED_PARAMETRE_GENERATION)) AS p) AS x WHERE DMNED_ID_DMND = (SELECT MAX(DMND_ID_DMND) FROM v2.DEMANDE WHERE DMND_CODE_PROSS = 'GESTBOD') => Bodacc rejeté|GREFFE DU TRIBUNAL DE COMMERCE DU BANC<BR>ONZE|0
-controle: SELECT CONCAT('[', CONVERT(xml, CONVERT(nvarchar(max), DMNED_PARAMETRE_GENERATION)).value('(/PARAMETRES/@SQL)[1]', 'nvarchar(max)'), ']') FROM v2.DEMANDE_EDITION WHERE DMNED_ID_DMND = (SELECT MAX(DMND_ID_DMND) FROM v2.DEMANDE WHERE DMND_CODE_PROSS = 'GESTBOD') => [ Select Isnull(PREVE_NUM_PRV,PRCLL_NUM_PC) as NUM_PC_OU_PRV , EVNPR_CODE_EVE_PRO, EVNPR_DATE, BDCCR_DATE_ENVOI, isnull(BDCCR_MOTIF_REJET_BODACC_1,'') + ' ' + isnull(BDCCR_MOTIF_REJET_BODACC_2,'') + case isnull(BDCCR_COMMENTAIRE,'') when '' then '' else ' Commentaire : ' + BDCCR_COMMENTAIRE end as BDCCR_MOTIF_REJET, convert(varchar(8000),BDCCR_TEXTE_BODACC)  From BODACC With (nolock) INNER JOIN EVENEMENT_PROCEDURE With (nolock) ON BDCCR_ID_EVNPR = EVNPR_ID_EVNPR LEFT OUTER JOIN PROCEDURE_COLLECTIVE With (nolock) ON EVNPR_ID_PRCLL = PRCLL_ID_PRCLL LEFT OUTER JOIN PREVENTION With (nolock) ON EVNPR_ID_PREVE = PREVE_ID_PREVE  Where BDCCR_ID_BDCRC IN (2110201) And (BDCCR_ETAT_BODACC = '9' AND BDCCR_TYPE_BODACC like 'P%') UNION  Select Isnull(PREVE_NUM_PRV,PRCLL_NUM_PC) as NUM_PC_OU_PRV , EVNPR_CODE_EVE_PRO, EVNPR_DATE, BDCCR_DATE_ENVOI, isnull(BDCCR_MOTIF_REJET_BODACC_1,'') + ' ' + isnull(BDCCR_MOTIF_REJET_BODACC_2,'') + case isnull(BDCCR_COMMENTAIRE,'') when '' then '' else ' Commentaire : ' + BDCCR_COMMENTAIRE end as BDCCR_MOTIF_REJET, convert(varchar(8000),BDCCR_TEXTE_BODACC)  From BODACC With (nolock) INNER JOIN EVENEMENT_PROCEDURE With (nolock) ON BDCCR_ID_EVNPR = EVNPR_ID_EVNPR LEFT OUTER JOIN PROCEDURE_COLLECTIVE With (nolock) ON EVNPR_ID_PRCLL = PRCLL_ID_PRCLL LEFT OUTER JOIN PREVENTION With (nolock) ON EVNPR_ID_PREVE = PREVE_ID_PREVE  WHERE BDCCR_ID_PREC_BOD in (Select BDCCR_ID_BDCRC From BODACC With (nolock)  Where BDCCR_ID_BDCRC IN (2110201) And (BDCCR_ETAT_BODACC = '9' AND BDCCR_TYPE_BODACC like 'P%') AND BDCCR_ID_EVNPR is null)]
+message: 1 édition placée dans la file des éditions : Liste des rejets du BODACC (2 annonces, toute la liste de la recherche). Impression simulée : le service d'édition de RIG v2 imprime, RIG v3 ne l'appelle pas.
+controle: SELECT CONCAT(x.p.value('(/PARAMETRES/@TitreEtat)[1]', 'nvarchar(200)'), '|', CASE WHEN CHARINDEX('PREVE_ID_PREVE  Where (BDCCR_ETAT_BODACC = ''9'' AND BDCCR_TYPE_BODACC like ''P%'') UNION ', x.p.value('(/PARAMETRES/@SQL)[1]', 'nvarchar(max)')) > 0 THEN 1 ELSE 0 END) FROM v2.DEMANDE_EDITION CROSS APPLY (SELECT CONVERT(xml, CONVERT(nvarchar(max), DMNED_PARAMETRE_GENERATION)) AS p) AS x WHERE DMNED_ID_DMND = (SELECT MAX(DMND_ID_DMND) FROM v2.DEMANDE WHERE DMND_CODE_PROSS = 'GESTBOD') => Listes des 2 Bodaccs rejetés|1
 ---
-# Controles non conformes 2110207 et 2110208 : UNE demande LISTE_BODACC_QUALITE (OPE_LST_CTRLNC_BOD.cs:49-103), « Listes des 2 ... ».
+# Refus : la liste des controles non conformes se cherche par date (OPE_LST_CTRLNC, :50-81) ; sans critere, elle n'est pas a l'ecran.
+# Jumeau accepte : bloc 17.
 geste: Confirmer Éditer
 ids: Q-2110207,Q-2110208
+resultat: refuse
+message: Annonce introuvable dans sa liste BODACC (Q-2110207) : relisez la liste.
+---
+# Controles non conformes, date d'EP (le critere par defaut) du 01/04/2001 au 01/04/2001 : 2110207 et 2110208 (EP BANC11B) -- UNE demande
+# LISTE_BODACC_QUALITE (OPE_LST_CTRLNC_BOD.cs:49-103), « Listes des 2 ... » et la periode, la clause « EVNPR_DATE between » de la V2.
+geste: Confirmer Éditer
+ids: Q-2110207,Q-2110208
+valeur: Date du = 2001-04-01
+valeur: Date au = 2001-04-01
 resultat: fait
-message: 1 édition placée dans la file des éditions : Liste des BODACC de qualité non conforme (2 annonces). Impression simulée : le service d'édition de RIG v2 imprime, RIG v3 ne l'appelle pas.
-controle: SELECT CONCAT(DMNED_CODE_MAQUETTE, '|', x.p.value('(/PARAMETRES/@TitreEtat)[1]', 'nvarchar(200)'), '|', CASE WHEN CHARINDEX(' Where BDCCR_ID_BDCRC IN (2110207, 2110208) And (BDCCR_ETAT_BODACC = ''5'' or BDCCR_ETAT_BODACC = ''6'' or BDCCR_ETAT_BODACC = ''10'') And BDCCR_CONTROLE_QUALITE is not null', x.p.value('(/PARAMETRES/@SQL)[1]', 'nvarchar(max)')) > 0 THEN 1 ELSE 0 END) FROM v2.DEMANDE_EDITION CROSS APPLY (SELECT CONVERT(xml, CONVERT(nvarchar(max), DMNED_PARAMETRE_GENERATION)) AS p) AS x WHERE DMNED_ID_DMND = (SELECT MAX(DMND_ID_DMND) FROM v2.DEMANDE WHERE DMND_CODE_PROSS = 'GESTBOD') => LOT2_LISTE_QUALITENC|Listes des 2 Bodaccs en contrôle qualité non conforme|1
+message: 1 édition placée dans la file des éditions : Liste des BODACC de qualité non conforme (2 annonces, toute la liste de la recherche dont la date d'évènement est comprise entre le 01/04/2001 et le 01/04/2001). Impression simulée : le service d'édition de RIG v2 imprime, RIG v3 ne l'appelle pas.
+controle: SELECT CONCAT(DMNED_CODE_MAQUETTE, '|', x.p.value('(/PARAMETRES/@TitreEtat)[1]', 'nvarchar(200)'), '|', CASE WHEN CHARINDEX('PREVE_ID_PREVE  Where EVNPR_DATE between convert(datetime, ''01/04/2001'',103) and convert(datetime, ''01/04/2001'',103) And (BDCCR_ETAT_BODACC = ''5'' or BDCCR_ETAT_BODACC = ''6'' or BDCCR_ETAT_BODACC = ''10'') And BDCCR_CONTROLE_QUALITE is not null', x.p.value('(/PARAMETRES/@SQL)[1]', 'nvarchar(max)')) > 0 THEN 1 ELSE 0 END) FROM v2.DEMANDE_EDITION CROSS APPLY (SELECT CONVERT(xml, CONVERT(nvarchar(max), DMNED_PARAMETRE_GENERATION)) AS p) AS x WHERE DMNED_ID_DMND = (SELECT MAX(DMND_ID_DMND) FROM v2.DEMANDE WHERE DMND_CODE_PROSS = 'GESTBOD') => LOT2_LISTE_QUALITENC|Listes des 2 Bodaccs en contrôle qualité non conforme dont la date d'évènement est comprise entre le 01/04/2001 et le 01/04/2001|1
