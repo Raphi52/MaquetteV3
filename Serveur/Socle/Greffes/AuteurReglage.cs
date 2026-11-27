@@ -1,5 +1,7 @@
 using System.Security.Claims;
+using Microsoft.Data.SqlClient;
 using RigV3.Contrats.Socle;
+using RigV3.Serveur.Socle.Comptes;
 using RigV3.Serveur.Socle.Identite;
 
 namespace RigV3.Serveur.Socle.Greffes;
@@ -17,4 +19,17 @@ public static class AuteurReglage
     /// <returns>L'auteur a ecrire ; null si l'appelant n'a aucune identite (modification refusee).</returns>
     public static string? De(IdentiteAgent? identite, ClaimsPrincipal utilisateur)
         => identite?.Agent is { } agent ? agent.Nom : ServiceIdentite.CompteDe(utilisateur);
+
+    /// <summary>
+    /// Le meme auteur pour un GESTE d'ecran genere (EcrivainEcran.cs), qui n'a pas la requete mais l'agent admis
+    /// (<see cref="Appelant"/>, lu dans soc.Compte de la base du greffe) : son NOM, soc.Compte.Nom -- pas
+    /// <see cref="Appelant.NomAffiche"/> (« Prenom Nom »). Un appelant est toujours reconnu ; son compte (sans domaine)
+    /// ne sert que si sa ligne a disparu entre-temps.
+    /// </summary>
+    public static async Task<string> DeLAgentAsync(SqlConnection cn, SqlTransaction tx, Appelant agent, CancellationToken ct)
+    {
+        await using var cmd = new SqlCommand("SELECT Nom FROM soc.Compte WHERE Id = @id;", cn, tx);
+        cmd.Parameters.Add(new SqlParameter("@id", System.Data.SqlDbType.Int) { Value = agent.Id });
+        return await cmd.ExecuteScalarAsync(ct) is string { Length: > 0 } nom ? nom : agent.CompteWindows;
+    }
 }
