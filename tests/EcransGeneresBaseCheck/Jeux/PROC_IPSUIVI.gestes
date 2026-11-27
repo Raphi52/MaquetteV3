@@ -157,22 +157,105 @@ resultat: fait
 message: Enregistré sur l'IP 2026IP81702 : réception de la LRAR du 20/01/2099 (événement IPAROPOS, IPCONSOPOS attendu). Non repris par la V3 : le tableau récapitulatif.
 controle: SELECT e.EVNPR_CODE_EVE_PRO + '|' + ISNULL(CONVERT(varchar(10), e.EVNPR_DATE, 103), '-') + '|' + ISNULL(CONVERT(varchar(10), e.EVNPR_DATE_MAXI, 103), '-') + '|' + CAST(CAST(e.EVNPR_SURVENU AS int) AS varchar(1)) + CAST(CAST(e.EVNPR_DELAI_EXPIRE AS int) AS varchar(1)) + '|' + ISNULL(e.EVNPR_NUMERO_SOURCE_EP_LIE, '-') FROM v2.EVENEMENT_PROCEDURE AS e WHERE e.EVNPR_ID_INSTN = 1801702 AND e.EVNPR_CODE_EVE_PRO = 'IPAROPOS' => IPAROPOS|20/01/2099|-|10|SRC-1801772
 controle: SELECT e.EVNPR_CODE_EVE_PRO + '|' + CONVERT(varchar(10), e.EVNPR_DATE_MAXI, 103) + '|' + CAST(CAST(e.EVNPR_SURVENU AS int) AS varchar(1)) + CAST(CAST(e.EVNPR_DELAI_EXPIRE AS int) AS varchar(1)) FROM v2.EVENEMENT_PROCEDURE AS e WHERE e.EVNPR_ID_INSTN = 1801702 AND e.EVNPR_CODE_EVE_PRO = 'IPCONSOPOS' => IPCONSOPOS|04/02/2099|00
+fiche: 1801702
+Audience › Type de classement = ANL
+---
+# L'APPEL A L'AUDIENCE DE L'INSTANCE AU FOND (blocs 16a a 16h, puis 17 ; EcrivainSuiviIp.AppelAuFondAsync). fix-ok: mesure le
+# 27/11/2026 (controle final du lot 8) -- l'enrolement au fond ne creait pas l'appel que RIG v2 rend obligatoire (OPE_IPSUIVI.cs:3211-3225,
+# OPE_APP_AFFAIRE.cs:324-337). Les audiences : fin de PROC_SURVIP.sql (1802001 seule le 16/02/2099 ; 1802002 CH18A 09:00 et 1802003
+# CH18B 14:00 le 17/02/2099 ; 1802004 passee le 16/02/2001). Chaque refus a pour jumeau accepte le bloc 17 ; aucun n'ecrit rien (le
+# bloc 17 trouve 1801702 encore a enroler).
+# 16a. Refus : la provision de 1801702 dans les delais, sans audience -- l'appel est obligatoire.
+geste: Enregistrer
+ids: 1801702
+valeur: Actes après l'ordonnance › Provision = 2099-01-25
+resultat: refuse
+message: « Audience › Date » est obligatoire. RIG v2 rend l'appel à l'audience de l'instance au fond obligatoire (OPE_APP_AFFAIRE.cs:324-337).
+---
+# 16b. Refus : aucune audience le 18/02/2099 -- RIG v2 ouvrirait la creation d'audience (PROC_AUDIENCE), non reprise.
+geste: Enregistrer
+ids: 1801702
+valeur: Actes après l'ordonnance › Provision = 2099-01-25
+valeur: Audience › Date = 2099-02-18
+resultat: refuse
+message: Aucune audience le 18/02/2099 dans la base du greffe : RIG v2 ouvre alors la création d'audience (PROC_AUDIENCE, OPE_APP_AFFAIRE_AUDIENCE.cs:384-420), que la V3 ne reprend pas. Rien n'est enregistré.
+---
+# 16c. Refus : deux audiences le 17/02/2099 (CH18A et CH18B), au message de RIG v2 (OPE_APP_AFFAIRE_AUDIENCE.cs:432-439).
+geste: Enregistrer
+ids: 1801702
+valeur: Actes après l'ordonnance › Provision = 2099-01-25
+valeur: Audience › Date = 2099-02-17
+resultat: refuse
+message: 2 audiences correspondent au(x) critère(s), veuillez lancer la recherche. Précisez « Audience › Heure » ou « Audience › Chambre » (le 17/02/2099).
+---
+# 16d. Refus : le 17/02/2099 a 14:00 pour la chambre CH18A -- l'heure ET la chambre filtrent (l'audience de 14:00 est en CH18B).
+geste: Enregistrer
+ids: 1801702
+valeur: Actes après l'ordonnance › Provision = 2099-01-25
+valeur: Audience › Date = 2099-02-17
+valeur: Audience › Heure = 14:00
+valeur: Audience › Chambre = CH18A
+resultat: refuse
+message: Aucune audience le 17/02/2099 à 14:00 pour la chambre CH18A dans la base du greffe : RIG v2 ouvre alors la création d'audience (PROC_AUDIENCE, OPE_APP_AFFAIRE_AUDIENCE.cs:384-420), que la V3 ne reprend pas. Rien n'est enregistré.
+---
+# 16e. Refus : l'audience 1802004 du 16/02/2001 existe mais est passee -- VerifierDates (OPE_APP_AFFAIRE_AUDIENCE.cs:660-661), la
+#      saisine de l'instance au fond etant du jour.
+geste: Enregistrer
+ids: 1801702
+valeur: Actes après l'ordonnance › Provision = 2099-01-25
+valeur: Audience › Date = 2001-02-16
+resultat: refuse
+message: La date de 1ère audience ne peut être antérieure à la date de saisine du tribunal !
+---
+# 16f. Refus : une date passee sans audience, au message de RIG v2 (OPE_APP_AFFAIRE_AUDIENCE.cs:386-387).
+geste: Enregistrer
+ids: 1801702
+valeur: Actes après l'ordonnance › Provision = 2099-01-25
+valeur: Audience › Date = 2001-02-17
+resultat: refuse
+message: La date d'audience renseignée est antérieure à la date du jour. Impossible en création d'instance.
+---
+# 16g. Refus : un type de classement hors de la liste TYPE_CLASSEMENT (la combo de RIG v2, OPE_APP_AFFAIRE_AUDIENCE.cs:110).
+geste: Enregistrer
+ids: 1801702
+valeur: Actes après l'ordonnance › Provision = 2099-01-25
+valeur: Audience › Date = 2099-02-16
+valeur: Audience › Type de classement = ZZ18
+resultat: refuse
+message: Le type de classement « ZZ18 » n'est pas dans la base du greffe.
+---
+# 16h. Refus : l'audience saisie avec « Enrôlement » decochee -- RIG v2 cache alors l'audience (OPE_IPSUIVI.cs:3211-3228). Jumeaux
+#      acceptes : bloc 17 (cochee, avec audience) et bloc 27 (decochee, sans audience).
+geste: Enregistrer
+ids: 1801702
+valeur: Actes après l'ordonnance › Provision = 2099-01-25
+valeur: Options du traitement › Enrôlement =
+valeur: Audience › Date = 2099-02-16
+resultat: refuse
+message: « Audience › Date » se saisit avec l'enrôlement au fond d'une provision reçue dans les délais : RIG v2 ne montre l'audience qu'avec « Enrôlement » cochée (OPE_IPSUIVI.cs:3211-3228).
 ---
 # 17. FAIT : la provision de 1801702 au 25/01/2099, avant sa date prevue (04/02/2099, bloc 16) -- l'opposition est ENROLEE AU FOND
 #     (:2033-2052) : instance TIP1 (serie JRCT, repertoire JGAFF ; acte a la date d'opposition du bloc 15), jointe a l'IP ; son chef de
 #     demande et ses parties dupliques (DOIP, FOIP ; numeros source neufs, adresse du demandeur gardee) ; l'evenement de creation NOIP
 #     survient et sa convocation part au demandeur en LRAR, a son ADRESSE (rec.Adresse 1801991) ; la demande OIPE est validee ; puis la
-#     provision IPCONSOPOS survient, sans suivant. Relue : la fiche porte la date ; bloc 17b, l'IP est desormais enrolee.
+#     provision IPCONSOPOS survient, sans suivant. L'instance au fond est APPELEE (appel n° 1) a l'audience 1802003 du 17/02/2099 a
+#     14:00, chambre CH18B (la chambre departage les deux audiences du jour, bloc 16c), heure d'appel 14:30, type de classement ANL
+#     de TIP1 (non saisi), etats « 0 » d'un appel neuf. Relue : la fiche porte la date ; bloc 17b, l'IP est desormais enrolee.
 geste: Enregistrer
 ids: 1801702
 valeur: Actes après l'ordonnance › Provision = 2099-01-25
+valeur: Audience › Date = 2099-02-17
+valeur: Audience › Chambre = CH18B
+valeur: Audience › H. appel = 14:30
 resultat: fait
-message: Enregistré sur l'IP 2026IP81702 : provision du 25/01/2099 (événement IPCONSOPOS ; opposition enrôlée au fond sous le n° 2026J81901, code affaire TIP1). 2 éditions en file : « Convo dem. suite à opposition - LRAR » → CREANCIER OMICRON ; « Imprimé LRAR La Poste - Imprimé LR La Poste » → CREANCIER OMICRON. Non repris par la V3 : le tableau récapitulatif, la facture et l'encaissement de la provision, l'appel à l'audience et les mots directeurs de l'instance au fond.
+message: Enregistré sur l'IP 2026IP81702 : provision du 25/01/2099 (événement IPCONSOPOS ; opposition enrôlée au fond sous le n° 2026J81901, code affaire TIP1, appelée à l'Audience du 17/02/2099 à 14:00 - Chambre Seconde chambre IP du banc (CH18B), appel à 14:30, classement ANL). 2 éditions en file : « Convo dem. suite à opposition - LRAR » → CREANCIER OMICRON ; « Imprimé LRAR La Poste - Imprimé LR La Poste » → CREANCIER OMICRON. Non repris par la V3 : le tableau récapitulatif, la facture et l'encaissement de la provision, le commentaire de l'appel et les mots directeurs de l'instance au fond.
 fiche: 1801702
 Actes après l'ordonnance › Provision = 2099-01-25
 controle: SELECT i.INSTN_CODE_AFFAIRE + '|' + i.INSTN_TYPE_INSTANCE + '|' + i.INSTN_NUM_ROLE + '|' + CASE WHEN i.INSTN_NUM_REP_GENERAL IS NULL THEN 'sans repertoire' ELSE 'repertoire' END + '|' + i.INSTN_NOM_COURANT + '|' + ISNULL(i.INSTN_NATURE_AFFAIRE, '-') + '|' + ISNULL(i.INSTN_NAT_AFF_PART, '-') + '|' + ISNULL(i.INSTN_CODE_ACTE_PROCE, '-') + '|' + CONVERT(varchar(10), i.INSTN_DATE_ACTE, 103) + '|' + CASE WHEN DATEDIFF(DAY, i.INSTN_DATE_JONCTION, SYSDATETIME()) = 0 THEN 'jointe du jour' ELSE 'jonction ?' END FROM v2.INSTANCE AS i WHERE i.INSTN_ID_INSTN_INSTANCE_PRINCIPA = 1801702 AND i.INSTN_CODE_AFFAIRE = 'TIP1' => TIP1|07|2026J81901|repertoire|CREANCIER OMICRON # DEBITEUR OMICRON|-|1B|LOI|15/01/2099|jointe du jour
 controle: SELECT STRING_AGG(p.PRT_QUALIF_PARTIE + '|' + p.PRT_DESIGNATION + '|' + ISNULL(CAST(p.PRT_ID_ADRBS AS varchar(10)), '-') + '|' + CASE WHEN p.PRT_NUMERO_SOURCE IS NULL THEN 'sans source' WHEN p.PRT_NUMERO_SOURCE LIKE 'PRT-%' THEN 'source de l''IP' ELSE 'source neuve' END, ' / ') WITHIN GROUP (ORDER BY p.PRT_NUM_ORDRE, p.PRT_ID_PRT) FROM v2.PARTIE AS p JOIN v2.INSTANCE AS i ON i.INSTN_ID_INSTN = p.PRT_ID_INSTN WHERE i.INSTN_ID_INSTN_INSTANCE_PRINCIPA = 1801702 AND i.INSTN_CODE_AFFAIRE = 'TIP1' => DOIP|CREANCIER OMICRON|1801991|source neuve / FOIP|DEBITEUR OMICRON|-|source neuve
 controle: SELECT STRING_AGG(c.CHFDM_CODE_CHEF + '|' + c.CHFDM_TEXTE_LIBRE, ' / ') FROM v2.CHEF_DEMANDE AS c JOIN v2.INSTANCE AS i ON i.INSTN_ID_INSTN = c.CHFDM_ID_INSTN WHERE i.INSTN_ID_INSTN_INSTANCE_PRINCIPA = 1801702 AND i.INSTN_CODE_AFFAIRE = 'TIP1' => NCPC|Facture impayee lot 8
+controle: SELECT STRING_AGG(CAST(a.APPAF_NUM_ORDRE AS varchar(3)) + '|' + CAST(a.APPAF_ID_ADNC AS varchar(10)) + '|' + a.APPAF_TYPE_CLASSEMENT + '|' + ISNULL(a.APPAF_HEURE_APPEL, '-') + '|' + a.APPAF_ETAT_PREPARATION + a.APPAF_ETAT_RETOUR + '|' + ISNULL(a.APPAF_CODE_PLUMITIF, '-'), ' / ') FROM v2.APPEL_AFFAIRE AS a JOIN v2.INSTANCE AS i ON i.INSTN_ID_INSTN = a.APPAF_ID_INSTN WHERE i.INSTN_ID_INSTN_INSTANCE_PRINCIPA = 1801702 AND i.INSTN_CODE_AFFAIRE = 'TIP1' => 1|1802003|ANL|14:30|00|-
+controle: SELECT COUNT(*) FROM v2.APPEL_AFFAIRE WHERE APPAF_ID_INSTN = 1801702 => 0
 controle: SELECT STRING_AGG(e.EVNPR_CODE_EVE_PRO + '|' + CAST(CAST(e.EVNPR_SURVENU AS int) AS varchar(1)) + '|' + CASE WHEN DATEDIFF(DAY, e.EVNPR_DATE, SYSDATETIME()) = 0 THEN 'du jour' ELSE 'autre date' END, ' / ') FROM v2.EVENEMENT_PROCEDURE AS e JOIN v2.INSTANCE AS i ON i.INSTN_ID_INSTN = e.EVNPR_ID_INSTN WHERE i.INSTN_ID_INSTN_INSTANCE_PRINCIPA = 1801702 AND i.INSTN_CODE_AFFAIRE = 'TIP1' => NOIP|1|du jour
 controle: SELECT d.DMND_ETAT_DEMANDE + '|' + d.DMND_NOM + '|' + d.DMND_NUM_INDICATIF + '|' + d.DMND_LES_NUMEROS + '|' + CASE WHEN d.DMND_DATE_VALIDATION IS NULL THEN 'non validee' ELSE 'validee' END FROM v2.DEMANDE AS d JOIN v2.DOSSIER_DEMANDE AS dd ON dd.DSSDM_ID_DMND = d.DMND_ID_DMND AND dd.DSSDM_CODE_SEQUENCEUR = '2J' JOIN v2.INSTANCE AS i ON CAST(i.INSTN_ID_INSTN AS varchar(20)) = dd.DSSDM_VALEUR_SEQUENCEUR WHERE d.DMND_CODE_PROSS = 'OIPE' AND i.INSTN_ID_INSTN_INSTANCE_PRINCIPA = 1801702 => V|CREANCIER OMICRON # DEBITEUR OMICRON|2026J81901|2026J81901 2026IP81702|validee
 controle: SELECT STRING_AGG(x.DMNED_LIBELLE_DOCUMENT + '|' + x.DMNED_CODE_ENTITE_DESTINATAIRE + '|' + x.DMNED_DESIGNATION_DESTINATAIRE + '|' + ISNULL(x.DMNED_BLOC_ADRESSE_DESTINATAIRE, '-'), ' / ') WITHIN GROUP (ORDER BY x.DMNED_ID_DMNED) FROM v2.DEMANDE_EDITION AS x JOIN v2.DEMANDE AS d ON d.DMND_ID_DMND = x.DMNED_ID_DMND AND d.DMND_CODE_PROSS = 'OIPE' JOIN v2.DOSSIER_DEMANDE AS dd ON dd.DSSDM_ID_DMND = d.DMND_ID_DMND AND dd.DSSDM_CODE_SEQUENCEUR = '2J' JOIN v2.INSTANCE AS i ON CAST(i.INSTN_ID_INSTN AS varchar(20)) = dd.DSSDM_VALEUR_SEQUENCEUR WHERE i.INSTN_ID_INSTN_INSTANCE_PRINCIPA = 1801702 => Convo dem. suite à opposition - LRAR|PART_D|CREANCIER OMICRON|Bâtiment B|7 Boulevard des Essais|38000 GRENOBLE CEDEX 5 / Imprimé LRAR La Poste - Imprimé LR La Poste|PART_D|CREANCIER OMICRON|Bâtiment B|7 Boulevard des Essais|38000 GRENOBLE CEDEX 5

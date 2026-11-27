@@ -731,8 +731,8 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             // pas au code (proc_ipsuivi.md:165-171). Lot 8 : lue dans la base -- LecteurSuiviIp.cs (26/11/2026) ; Valider
             // enregistre la date saisie (desistement, signification, certificat, opposition, LRAR, provision) ou le 2e executoire :
             // l'evenement attendu survient (ou expire hors delai : non-avenue, caducite), son suivant est cree, l'opposition est
-            // enrolee au fond (TIP1) ou une OP de caducite ouverte, les editions partent -- EcrivainSuiviIp.cs (27/11/2026). La
-            // facture de la provision (facultative dans RIG v2) n'est pas reprise.
+            // enrolee au fond (TIP1, avec son appel a l'audience) ou une OP de caducite ouverte, les editions partent --
+            // EcrivainSuiviIp.cs (27/11/2026). La facture de la provision (facultative dans RIG v2) n'est pas reprise.
             Forme = FormeEcran.Fiche,
             Recherche = "Rechercher une injonction de payer par son numéro…",
             Criteres = ["N° IP"], // le champ de saisie de la V2 (ETP_IPSUIVI.cs:14-15, GetUltByMetierTitre("N° IP"))
@@ -758,6 +758,11 @@ public sealed class DomaineSurveiller : IDomaineEcrans
                 Marche("Options du traitement", "Dans les délais : garder une provision reçue après sa date prévue. Enrôlement : enrôler l'opposition au fond (sans juridiction extérieure). Enrôler une OP : ouvrir l'opposition de caducité, avec son juge. Envoi en LRAR ou en LR : la lettre de l'événement créé. 2ème exécut. : le second exécutoire.", false,
                     Champ.Case("Dans les délais"), Champ.Case("Envoi en LRAR"), Champ.Case("Envoi en LR"), Champ.Case("Enrôlement"),
                     Champ.Case("Enrôler une OP"), Champ.Case("2ème exécut."), "Juge", "Greffier", Champ.Date("Date Prévue")),
+                // L'appel a l'audience de l'instance au fond, obligatoire avec l'enrolement (opE_APP_AFFAIRE, OPE_IPSUIVI.cs:3211-3225 ;
+                // OPE_APP_AFFAIRE() = this(true), OPE_APP_AFFAIRE.cs:324-337) ; MetierTitre d'OPE_APP_AFFAIRE_AUDIENCE.Designer.cs
+                // (:232, :142, :131, :118, :170, :190) ; regles : AppelAuFondAsync d'EcrivainSuiviIp.cs.
+                Marche("Audience", "Avec l'enrôlement au fond : l'audience où l'instance est appelée, parmi celles du greffe (sa date, et son heure ou sa chambre s'il y en a plusieurs ce jour-là). Le type de classement est celui du code affaire TIP1, sauf saisie.", false,
+                    Champ.Date("Date"), "Heure", "Chambre", "Type de classement", "H. appel"),
             ],
             Lignes =
             [

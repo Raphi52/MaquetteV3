@@ -51,6 +51,11 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// (ult_EnrolementJ, :289, coche d'office sans juridiction exterieure) ; « Enrôler une OP » (ult_EnrolementOP, :400, coche
 /// d'office) ; « 2ème exécut. » (ult_EditerExecutoire2, :564 -- cochee et grisee si un IPEXECU2 est survenu, :870-879) ; « Juge »,
 /// « Greffier », « Date Prévue » (l'OP de caducite : Rendre_visible_juge, :3064 ; Designer :350-372).
+///
+/// SECTION « Audience » : l'appel a l'audience de l'instance au fond, que RIG v2 montre des qu'« Enrôlement » est cochee pour une
+/// provision recue (opE_APP_AFFAIRE, OPE_IPSUIVI.cs:3211-3228 ; « Audience » par defaut et sans choix en IPSUIVI,
+/// OPE_APP_AFFAIRE.cs:185-187). Ses champs, au MetierTitre d'OPE_APP_AFFAIRE_AUDIENCE.Designer.cs : « Date », « Heure »,
+/// « Chambre » (l'audience existante du greffe qu'ils designent), « Type de classement » (pre-rempli de TIP1, :3221), « H. appel ».
 /// </summary>
 internal sealed class LecteurSuiviIp : IRechercheEcran, IFicheEcran
 {
@@ -75,6 +80,14 @@ internal sealed class LecteurSuiviIp : IRechercheEcran, IFicheEcran
 
     internal static readonly string[] ChampsOptions =
         [ChampDansLesDelais, ChampLrar, ChampLr, ChampEnrolement, ChampEnrolerOp, ChampExecutoire2, ChampJuge, ChampGreffier, ChampDatePrevue];
+
+    /// <summary>L'appel a l'audience de l'instance au fond (opE_APP_AFFAIRE, OPE_IPSUIVI.cs:3211-3225) : la section porte le
+    /// MetierTitre d'OPE_APP_AFFAIRE_AUDIENCE (« Audience », Designer :232) et ses champs les leurs (:142, :131, :118, :170, :190).</summary>
+    internal const string SectionAudience = "Audience";
+    internal const string ChampDateAudience = "Date", ChampHeureAudience = "Heure", ChampChambre = "Chambre", ChampClassement = "Type de classement",
+                          ChampHeureAppel = "H. appel";
+
+    internal static readonly string[] ChampsAudience = [ChampDateAudience, ChampHeureAudience, ChampChambre, ChampClassement, ChampHeureAppel];
 
     /// <summary>controle_date (OPE_IPSUIVI.cs:2658-2668), applique aux dates maxi que Remplir_IP garde (:1057, :1065, :1098) : un
     /// samedi passe au lundi, un dimanche au lundi.</summary>
@@ -221,7 +234,8 @@ internal sealed class LecteurSuiviIp : IRechercheEcran, IFicheEcran
         if (zones.Contains(ChampProvision))
         {
             if (e.MaxiProvision is not null) zones.UnionWith([ChampDansLesDelais, ChampEnrolerOp, ChampJuge, ChampGreffier, ChampDatePrevue, ChampLrar, ChampLr]);
-            if (!e.Exterieure) zones.Add(ChampEnrolement);
+            // L'audience se saisit avec l'enrolement au fond (opE_APP_AFFAIRE visible avec ult_EnrolementJ, :3211-3228).
+            if (!e.Exterieure) zones.UnionWith([ChampEnrolement, .. ChampsAudience]);
         }
         if (zones.Contains(ChampSignification) && !e.NouvelleLoi && e.MaxiSignification is not null) zones.UnionWith([ChampLrar, ChampLr]);
         if ((e.NouvelleLoi || e.PremierExecutoire) && !e.SecondExecutoire) zones.UnionWith([ChampExecutoire2, ChampLrar]);
@@ -326,6 +340,11 @@ internal sealed class LecteurSuiviIp : IRechercheEcran, IFicheEcran
             etat = etat with { Exterieure = exterieure };
             zones = ZonesModifiables(etat);
         }
+        // Le type de classement de l'appel, pre-rempli comme RIG v2 : celui du code affaire TIP1 (OPE_IPSUIVI.cs:3221).
+        var classementTip1 = "";
+        if (zones.Contains(ChampClassement) && (await Colonnes("v2.CODE_AFFAIRE")).Contains("R_CODEAFFAIR_TYPE_CLASSEMENT"))
+            await using (var rt = await LectureV2.LireAsync(baseGreffe, SqlClassementTip1, ct))
+                if (await rt.ReadAsync(ct)) classementTip1 = FormeLigne.Texte(rt, "R_CODEAFFAIR_TYPE_CLASSEMENT").Trim();
         await using var r = await LectureV2.LireAsync(baseGreffe, UneIp, ct, new SqlParameter("@id", n));
         if (!await r.ReadAsync(ct)) return null;
         var ligne = Ligne(r);
@@ -360,8 +379,17 @@ internal sealed class LecteurSuiviIp : IRechercheEcran, IFicheEcran
                     _ => "",
                 }) { Modifiable = zones.Contains(c) }),
             ]),
+            // L'appel a l'audience de l'instance au fond, vide a l'ouverture (un AppelAffaire neuf, :3212-3221), le type de
+            // classement de TIP1 pre-rempli ; saisissable avec l'enrolement au fond seulement.
+            new SectionFiche(SectionAudience,
+            [
+                .. ChampsAudience.Select(c => new ChampFiche(c, c == ChampClassement ? classementTip1 : "") { Modifiable = zones.Contains(c) }),
+            ]),
         ]);
     }
+
+    /// <summary>Le type de classement du code affaire de l'instance au fond (codeAffaireInsJ = « TIP1 », OPE_IPSUIVI.cs:95).</summary>
+    internal const string SqlClassementTip1 = "SELECT R_CODEAFFAIR_TYPE_CLASSEMENT FROM v2.CODE_AFFAIRE WHERE R_CODEAFFAIR_VALEUR = 'TIP1'";
 
     private static LigneLue Ligne(SqlDataReader r)
     {

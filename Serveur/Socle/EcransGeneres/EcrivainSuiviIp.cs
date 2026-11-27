@@ -32,7 +32,9 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///      la fois (le 2e executoire compte comme une date : il est grise des qu'une date est saisie) ;
 ///   4. les controles de saisie, au mot pres (VerifierSaisie) ; « Date incorrect » pour le desistement (:1764-1767) ; l'OP de
 ///      caducite exige son juge (Juge.GetJuge(Convert.ToInt32(ult_Juge.Valeur)), :2070) et son code affaire IPCADSO, l'enrolement
-///      au fond le code affaire TIP1 (codeAffaireInsJ, :95).
+///      au fond le code affaire TIP1 (codeAffaireInsJ, :95) et son APPEL A L'AUDIENCE, obligatoire (AppelAuFondAsync : une audience
+///      existante du greffe, a venir, designee par sa date, son heure et sa chambre ; le type de classement, de TIP1 par defaut) ;
+///      l'audience saisie hors enrolement au fond est refusee (RIG v2 ne la montre qu'avec « Enrôlement » cochee, :3211-3228).
 ///
 /// CE QUI S'ECRIT (loi « nouvelle » = decision acceptee rendue a partir du 01/03/2022, DecisionJudiciaireExtentions.cs:13, :29-34) :
 ///   Desistement   : l'evenement IPDESIN SURVENU a la date (:1768-1770) ; la note « Information » completee de « Désistement »
@@ -62,8 +64,8 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///                   « role J role IP », lien 2J, :2497-2504) ; l'instance du code affaire TIP1 (nature de l'IP, nature particuliere et
 ///                   acte du code, acte a la date d'opposition sinon du jour, saisine et enrolement du jour, role de la serie du code
 ///                   et repertoire JGAFF, :1556-1561), jointe a l'IP ; ses chefs de demande et ses parties dupliques (demandeurs
-///                   « DOIP », defendeurs « FOIP ») ; ses evenements de creation survenus du jour, et leurs editions sur la demande
-///                   OIPE. Avec une juridiction exterieure, la note recoit « Dossier à renvoyer à la nouvelle juridiction » (:3086-3092).
+///                   « DOIP », defendeurs « FOIP ») ; son appel n° 1 a l'audience saisie (section « Audience », AppelAuFondAsync) ;
+///                   ses evenements de creation survenus du jour, et leurs editions sur la demande OIPE. Avec une juridiction exterieure, la note recoit « Dossier à renvoyer à la nouvelle juridiction » (:3086-3092).
 ///                   Puis la provision attendue (IPCONSOPOS / ICONSOIP) SURVIENT a la date (creee si absente), sans suivant, et ses
 ///                   editions ; forcee, la note recoit « Date de provision forcée, malgré Caducité » (:3230-3232) ;
 ///                   HORS DELAI : CADUCITE, la note recoit « Caducité » (:3054-3056) -- avec le reglage
@@ -79,8 +81,8 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///   les dates du code (mois, jours ou semaines de CODE_EVE_PRO apres la date survenue).
 ///
 /// NON REPRIS (le message du geste le dit) : la facture (bouton FACTURATION, facultatif, :489-494) et l'encaissement de la provision
-/// (EncaissementProvision) ; l'appel a l'audience de l'instance au fond (opE_APP_AFFAIRE, :3211-3225) et ses mots directeurs
-/// (:1570-1576) ; les mots directeurs de l'OP ; la reedition de l'ordonnance en titre executoire (TrtTitreExecu, :2192-2230 : le
+/// (EncaissementProvision) ; le « Commentaire pour l'audience » de l'appel (APPAF_NOTE_AUDIENCE, facultatif) ; la creation d'une
+/// audience absente (PROC_AUDIENCE) ; les mots directeurs de l'instance au fond (:1570-1576) ; les mots directeurs de l'OP ; la reedition de l'ordonnance en titre executoire (TrtTitreExecu, :2192-2230 : le
 /// fichier de la GED, service externe) ; les pieces scannees et le code-barre ; le tableau recapitulatif (:2520-2600). Ce que les
 /// editions ne reprennent pas est dit par EditionsEvenement.
 /// </summary>
@@ -125,6 +127,7 @@ internal sealed class EcrivainSuiviIp : IEcrivainEcran
         {
             var (section, champ) = ChampsSaisis.FirstOrDefault(c => GesteEcran.Cle(SectionActes, c) == cle) is { } a ? (SectionActes, a)
                                  : ChampsOptions.FirstOrDefault(c => GesteEcran.Cle(SectionOptions, c) == cle) is { } o ? (SectionOptions, o)
+                                 : ChampsAudience.FirstOrDefault(c => GesteEcran.Cle(SectionAudience, c) == cle) is { } au ? (SectionAudience, au)
                                  : ("", (string?)null);
             if (champ is null) return IssueGeste.Refuser($"« {cle} » n'est pas une date de la fiche que RIG v2 laisse saisir.");
             saisies[champ] = valeur.Trim();
@@ -201,6 +204,7 @@ internal sealed class EcrivainSuiviIp : IEcrivainEcran
         var provision = Lue(ChampProvision);
         var horsDelai = false;
         CodeTip1? codeJ = null;
+        AppelAuFond? appelJ = null;
         EcrivainSurveillanceIp.CodeOp? codeOp = null;
         EcrivainSurveillanceIp.Juge? juge = null;
         int? idGreffier = null;
@@ -219,6 +223,10 @@ internal sealed class EcrivainSuiviIp : IEcrivainEcran
                 codeJ = await CodeTip1Async(geste, ct);
                 if (codeJ is null)
                     return IssueGeste.Refuser("Le code affaire « TIP1 » est absent ou incomplet dans la base du greffe (type de numéro de rôle, type d'instance) : RIG v2 y enrôle l'opposition au fond (OPE_IPSUIVI.cs:95, :3098). Rien n'est enregistré.");
+                // L'appel a l'audience de l'instance au fond, obligatoire (en tete du fichier).
+                var (appel, refusAppel) = await AppelAuFondAsync(geste, Saisie, codeJ, ct);
+                if (appel is null) return IssueGeste.Refuser(refusAppel!);
+                appelJ = appel;
             }
             if (horsDelai && reglages.Caducite is null && (!saisies.ContainsKey(ChampEnrolerOp) || Coche(Saisie(ChampEnrolerOp))))
             {
@@ -243,6 +251,9 @@ internal sealed class EcrivainSuiviIp : IEcrivainEcran
                 if (codeOp is null || juge is null) return IssueGeste.Refuser($"Problème à la création de l'OP pour l'instance {etat.Role}.");
             }
         }
+        // Hors enrolement au fond (pas de provision, provision hors delai, « Enrôlement » decochee), RIG v2 cache l'audience.
+        if (appelJ is null && saisies.Keys.FirstOrDefault(c => sections[c] == SectionAudience) is { } horsEnrolement)
+            return IssueGeste.Refuser($"« {SectionAudience} › {horsEnrolement} » se saisit avec l'enrôlement au fond d'une provision reçue dans les délais : RIG v2 ne montre l'audience qu'avec « {ChampEnrolement} » cochée (OPE_IPSUIVI.cs:3211-3228).");
         var codeExecutoire2 = lrar ? "IPEXECU2LR" : "IPEXECU2";
         if (executoire2 && await RelancesRsurv.Scalaire(geste, "SELECT R_CODEEVEPRO_VALEUR FROM v2.CODE_EVE_PRO WHERE R_CODEEVEPRO_VALEUR = @c", ct,
                                                          new SqlParameter("@c", codeExecutoire2)) is null or DBNull)
@@ -254,6 +265,7 @@ internal sealed class EcrivainSuiviIp : IEcrivainEcran
         if (idDemande is null) return IssueGeste.Refuser(refusDemande!);
         var faits = new List<string>();
         var bilans = new List<EditionsEvenement.Bilan>();
+        var traces = new List<TraceGeste>();
         var nonRepris = new List<string> { "le tableau récapitulatif" };
         var apres = new Dictionary<string, string?> { ["Demande"] = numeroDemande };
         var note = etat.Note ?? "";
@@ -329,18 +341,19 @@ internal sealed class EcrivainSuiviIp : IEcrivainEcran
             string? enrolee = null;
             if (codeJ is not null)
             {
-                var (roleJ, refusJ) = await EnrolerAuFondAsync(geste, n, etat, codeJ, bilans, ct);
+                var (roleJ, refusJ) = await EnrolerAuFondAsync(geste, n, etat, codeJ, appelJ!, bilans, traces, ct);
                 if (roleJ is null) return IssueGeste.Refuser(refusJ!);
                 enrolee = roleJ;
                 apres["InstanceAuFond"] = roleJ;
-                nonRepris.Add("la facture et l'encaissement de la provision, l'appel à l'audience et les mots directeurs de l'instance au fond");
+                apres["Audience"] = appelJ!.Libelle;
+                nonRepris.Add("la facture et l'encaissement de la provision, le commentaire de l'appel et les mots directeurs de l'instance au fond");
             }
             else if (etat.Exterieure) Noter("Dossier à renvoyer à la nouvelle juridiction");
             var code = etat.CodeFuturConso ?? "IPCONSOPOS";
             var (idEve, _) = await SurvenirAsync(geste, n, code, dprov, null, false, colEve, ct);
             await Editions(idEve);
             if (etat.MaxiProvision is { } mp && dprov > mp) Noter("Date de provision forcée, malgré Caducité");
-            faits.Add($"provision du {FormeLigne.Date(dprov)} (événement {code}{(enrolee is null ? "" : $" ; opposition enrôlée au fond sous le n° {enrolee}, code affaire TIP1")})");
+            faits.Add($"provision du {FormeLigne.Date(dprov)} (événement {code}{(enrolee is null ? "" : $" ; opposition enrôlée au fond sous le n° {enrolee}, code affaire TIP1, appelée à l'{appelJ!.Libelle}{(appelJ.HeureAppel is { } ha ? $", appel à {ha}" : "")}, classement {appelJ.TypeClassement}")})");
             apres["Provision"] = FormeLigne.Date(dprov);
         }
         else if (provision is { } dcad)
@@ -397,8 +410,8 @@ internal sealed class EcrivainSuiviIp : IEcrivainEcran
 
         var message = $"Enregistré sur l'IP {etat.Role} : {string.Join(" ; ", faits)}.{EditionsEvenement.Message(bilans)} Non repris par la V3 : {string.Join(", ", nonRepris)}.";
         return IssueGeste.Ecrit(message, [id],
-            new TraceGeste("affaire", $"l'injonction de payer {etat.Role}", id, "a modifie",
-                new Dictionary<string, string?> { ["Information"] = etat.Note }, apres));
+            [new TraceGeste("affaire", $"l'injonction de payer {etat.Role}", id, "a modifie",
+                new Dictionary<string, string?> { ["Information"] = etat.Note }, apres), .. traces]);
     }
 
     /// <summary>Les anomalies de _VerifierCoherenceIP (OPE_IPSUIVI.cs:1149-1176), au mot pres.</summary>
@@ -421,7 +434,8 @@ internal sealed class EcrivainSuiviIp : IEcrivainEcran
 
     /// <summary>Le code affaire de l'instance au fond (codeAffaireInsJ = CODE_AFFAIRE « TIP1 », OPE_IPSUIVI.cs:95) : ce que
     /// Instance.CreateInstance et la numerotation lisent (:3098-3107, :1556-1561). Null s'il manque, sans serie ou sans type.</summary>
-    internal sealed record CodeTip1(string TypeNumRole, string TypeInstance, bool Repertoire, string? NatAffPart, string? Acte, string? Creation);
+    internal sealed record CodeTip1(string TypeNumRole, string TypeInstance, bool Repertoire, string? NatAffPart, string? Acte, string? Creation,
+                                    string? TypeClassement);
 
     private static async Task<CodeTip1?> CodeTip1Async(GesteEnCours geste, CancellationToken ct)
     {
@@ -430,14 +444,92 @@ internal sealed class EcrivainSuiviIp : IEcrivainEcran
         string C(string c) => col.Contains(c) ? c : $"CAST(NULL AS varchar(255)) AS {c}";
         await using var r = await geste.LireAsync($"""
             SELECT R_CODEAFFAIR_TYPE_NUM_ROLE, R_CODEAFFAIR_TYPE_INSTANCE, {C("R_CODEAFFAIR_NUM_REPERTOIRE")}, {C("R_CODEAFFAIR_NAT_AFF_PART")},
-                   {C("R_CODEAFFAIR_CODE_ACTE_PRO")}, {C("R_CODEAFFAIR_CODE_EVE_PRO_CREA")}
+                   {C("R_CODEAFFAIR_CODE_ACTE_PRO")}, {C("R_CODEAFFAIR_CODE_EVE_PRO_CREA")}, {C("R_CODEAFFAIR_TYPE_CLASSEMENT")}
             FROM v2.CODE_AFFAIRE WHERE R_CODEAFFAIR_VALEUR = 'TIP1'
             """, ct);
         if (!await r.ReadAsync(ct)) return null;
         string? O(string c) => FormeLigne.Texte(r, c).Trim() is { Length: > 0 } s ? s : null;
         if (O("R_CODEAFFAIR_TYPE_NUM_ROLE") is not { } num || O("R_CODEAFFAIR_TYPE_INSTANCE") is not { } type) return null;
         return new CodeTip1(num, type, r["R_CODEAFFAIR_NUM_REPERTOIRE"] is true or 1 or "1", O("R_CODEAFFAIR_NAT_AFF_PART"),
-                            O("R_CODEAFFAIR_CODE_ACTE_PRO"), O("R_CODEAFFAIR_CODE_EVE_PRO_CREA"));
+                            O("R_CODEAFFAIR_CODE_ACTE_PRO"), O("R_CODEAFFAIR_CODE_EVE_PRO_CREA"), O("R_CODEAFFAIR_TYPE_CLASSEMENT"));
+    }
+
+    // ------------------------------------------------------------------ L'APPEL A L'AUDIENCE DE L'INSTANCE AU FOND
+
+    /// <summary>L'audience choisie pour l'instance au fond, son type de classement et l'heure d'appel.</summary>
+    internal sealed record AppelAuFond(int IdAudience, string Libelle, string TypeClassement, string? HeureAppel);
+
+    /// <summary>
+    /// L'appel a l'audience que RIG v2 fait saisir avec l'enrolement au fond (opE_APP_AFFAIRE, OPE_IPSUIVI.cs:3211-3225 : un AppelAffaire
+    /// neuf, son type de classement pris du code affaire TIP1 ; rattache a l'instance au fond, devenue le MetierBase du processus,
+    /// :3209 et OPE_APP_AFFAIRE.cs:1022-1042, puis enregistre avec elle). OBLIGATOIRE : l'operation est construite par
+    /// OPE_APP_AFFAIRE() = this(true) (OPE_APP_AFFAIRE.cs:324-337), et ses champs Date, Heure, Chambre, Type de classement sont
+    /// MetierObligatoire (OPE_APP_AFFAIRE_AUDIENCE.Designer.cs:117-169). En IPSUIVI c'est une AUDIENCE, sans choix du cabinet
+    /// (OPE_APP_AFFAIRE.cs:185-187). RIG v2 la choisit parmi les audiences du greffe : celles du jour saisi (AUDNC_AUDIENCE = 1, a
+    /// l'heure saisie ; GetListAudienceCabinetParDate, AudienceCabinet.cs:802-824), a la chambre saisie (OPE_APP_AFFAIRE_AUDIENCE.cs:243,
+    /// :281) ; une seule est prise d'office (:422-430), plusieurs demandent la recherche (:432-439), aucune ouvre la creation d'audience
+    /// (PROC_AUDIENCE, :384-420), que la V3 ne reprend pas. Controles : la date d'audience passee (:386-387 sans audience ; sinon
+    /// VerifierDates, :660-661 : la saisine de l'instance au fond est du jour). Le type de classement saisi doit etre une valeur de
+    /// TYPE_CLASSEMENT (la liste de la combo, :110) ; l'heure d'appel tient en cinq caracteres (APPAF_HEURE_APPEL varchar(5)).
+    /// Rend l'appel, ou le refus (rien n'est ecrit).
+    /// </summary>
+    private static async Task<(AppelAuFond? Appel, string? Refus)> AppelAuFondAsync(GesteEnCours geste, Func<string, string> saisie, CodeTip1 code,
+                                                                                     CancellationToken ct)
+    {
+        string Nom(string champ) => $"{SectionAudience} › {champ}";
+        var jour = geste.Maintenant.Date;
+        if (saisie(ChampDateAudience).Length == 0)
+            return (null, CreationV2.Obligatoire(Nom(ChampDateAudience)) + " RIG v2 rend l'appel à l'audience de l'instance au fond obligatoire (OPE_APP_AFFAIRE.cs:324-337).");
+        if (AudiencesV2.Date(saisie(ChampDateAudience)) is not { } date)
+            return (null, $"« {Nom(ChampDateAudience)} » : date illisible ({saisie(ChampDateAudience)}).");
+        var heure = saisie(ChampHeureAudience) is { Length: > 0 } h ? h : null;
+        var chambre = saisie(ChampChambre) is { Length: > 0 } c ? c : null;
+        var heureAppel = saisie(ChampHeureAppel) is { Length: > 0 } ha ? ha : null;
+        if (heureAppel is { Length: > 5 }) return (null, $"« {Nom(ChampHeureAppel)} » : cinq caractères au plus (« 09:30 »).");
+        var classement = saisie(ChampClassement) is { Length: > 0 } tc ? tc : code.TypeClassement ?? "";
+        if (classement.Length == 0) return (null, CreationV2.Obligatoire(Nom(ChampClassement)));
+        if (await RelancesRsurv.Scalaire(geste, "SELECT R_TYPECLASSE_VALEUR FROM v2.TYPE_CLASSEMENT WHERE R_TYPECLASSE_VALEUR = @t", ct,
+                                         new SqlParameter("@t", classement)) is null or DBNull)
+            return (null, $"Le type de classement « {classement} » n'est pas dans la base du greffe.");
+
+        var trouvees = new List<(int Id, string Libelle)>();
+        await using (var r = await geste.LireAsync($$"""
+            SELECT a.AUDNC_ID_ADNC AS Id, {{AudiencesV2.Libelle}} AS Libelle
+            FROM v2.AUDIENCE_CABINET AS a {{AudiencesV2.Jointures}}
+            WHERE a.AUDNC_DATE >= @jour AND a.AUDNC_DATE < DATEADD(day, 1, @jour) AND a.AUDNC_AUDIENCE = 1
+              AND (@heure IS NULL OR a.AUDNC_HEURE = @heure) AND (@chambre IS NULL OR a.AUDNC_CHAMBRE = @chambre)
+            ORDER BY a.AUDNC_HEURE, a.AUDNC_ID_ADNC
+            """, ct, new SqlParameter("@jour", date), new SqlParameter("@heure", (object?)heure ?? DBNull.Value),
+            new SqlParameter("@chambre", (object?)chambre ?? DBNull.Value)))
+            while (await r.ReadAsync(ct)) trouvees.Add((Convert.ToInt32(r["Id"], CultureInfo.InvariantCulture), FormeLigne.Texte(r, "Libelle")));
+        var criteres = $"le {FormeLigne.Date(date)}{(heure is null ? "" : $" à {heure}")}{(chambre is null ? "" : $" pour la chambre {chambre}")}";
+        if (trouvees.Count == 0)
+            return (null, date < jour
+                ? "La date d'audience renseignée est antérieure à la date du jour. Impossible en création d'instance."
+                : $"Aucune audience {criteres} dans la base du greffe : RIG v2 ouvre alors la création d'audience (PROC_AUDIENCE, OPE_APP_AFFAIRE_AUDIENCE.cs:384-420), que la V3 ne reprend pas. Rien n'est enregistré.");
+        if (trouvees.Count > 1)
+            return (null, $"{trouvees.Count} audiences correspondent au(x) critère(s), veuillez lancer la recherche. Précisez « {Nom(ChampHeureAudience)} » ou « {Nom(ChampChambre)} » ({criteres}).");
+        if (date < jour) return (null, "La date de 1ère audience ne peut être antérieure à la date de saisine du tribunal !");
+        return (new AppelAuFond(trouvees[0].Id, trouvees[0].Libelle, classement, heureAppel), null);
+    }
+
+    /// <summary>Ecrit l'appel n° 1 de l'instance au fond : un AppelAffaire neuf (new AppelAffaire, OPE_IPSUIVI.cs:3214-3221), ses etats
+    /// de preparation et de retour a leur valeur par defaut « 0 » (APPEL_AFFAIRE.cs:100, et le DEFAULT ((0)) de RIG_DEV ; l'etat « A »
+    /// est celui d'un renvoi, AppelAffaire.CreateAppelAffaire :684). Mesure sur RIG_DEV le 27/11/2026 : les 161 instances TIP1 enrolees
+    /// depuis 2024 ont toutes leur appel n° 1 (type ANL, celui de TIP1).</summary>
+    private static async Task<TraceGeste> InsererAppelAsync(GesteEnCours geste, int idInstance, string role, AppelAuFond appel, CancellationToken ct)
+    {
+        var colApp = await RelancesRsurv.ColonnesAsync(geste, "v2.APPEL_AFFAIRE", ct);
+        var valeurs = new Dictionary<string, object?>
+        {
+            ["APPAF_ID_INSTN"] = idInstance, ["APPAF_NUM_ORDRE"] = (short)1, ["APPAF_ID_ADNC"] = appel.IdAudience,
+            ["APPAF_TYPE_CLASSEMENT"] = appel.TypeClassement, ["APPAF_HEURE_APPEL"] = appel.HeureAppel,
+            ["APPAF_ETAT_PREPARATION"] = "0", ["APPAF_ETAT_RETOUR"] = "0",
+        };
+        var id = await geste.InsererAsync("v2.APPEL_AFFAIRE", "APPAF_ID_APPAF",
+            valeurs.Where(v => v.Value is not null && colApp.Contains(v.Key)).ToDictionary(v => v.Key, v => v.Value), ct);
+        return new TraceGeste("affaire", $"l'appel du rôle {role} à l'{appel.Libelle}", id.ToString(CultureInfo.InvariantCulture), "a cree", null,
+                              new { Instance = role, Audience = appel.Libelle, appel.TypeClassement, appel.HeureAppel, NumOrdre = 1 });
     }
 
     /// <summary>
@@ -446,7 +538,7 @@ internal sealed class EcrivainSuiviIp : IEcrivainEcran
     /// refus de la numerotation.
     /// </summary>
     private static async Task<(string? Role, string? Refus)> EnrolerAuFondAsync(GesteEnCours geste, int idIp, EtatIp ip, CodeTip1 code,
-        List<EditionsEvenement.Bilan> bilans, CancellationToken ct)
+        AppelAuFond appel, List<EditionsEvenement.Bilan> bilans, List<TraceGeste> traces, CancellationToken ct)
     {
         var jour = geste.Maintenant.Date;
         var (role, refusRole) = await CreationV2.NumeroAsync(geste, code.TypeNumRole, geste.Maintenant.Year, ct);
@@ -525,6 +617,9 @@ internal sealed class EcrivainSuiviIp : IEcrivainEcran
             if (colPrt.Contains("PRT_NUMERO_SOURCE")) v["PRT_NUMERO_SOURCE"] = Guid.NewGuid().ToString().ToUpperInvariant();
             await CreationV2.InsererAsync(geste, "v2.PARTIE", "PRT_ID_PRT", v.Where(x => x.Value is not null).ToDictionary(x => x.Key, x => x.Value), ct);
         }
+
+        // L'appel a l'audience (en tete de AppelAuFondAsync) : rattache a l'instance au fond, enregistre avec elle.
+        traces.Add(await InsererAppelAsync(geste, idJ, role, appel, ct));
 
         // Les evenements de creation du code affaire, survenus du jour, et leurs editions sur la demande OIPE (:2040-2050).
         foreach (var eve in (code.Creation ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
