@@ -1,6 +1,7 @@
 # « Occultations » (EcrivainOccultations) : « Enregistrer » les cases et les mots d'une decision (ETP_OCCULTATIONS.DoSauveAfterOperation,
 # :63-70 ; OPE_OCCULTATIONS_MOTS, :69-106). Lignes du jeu : PROC_DJ_OCCULTATIONS.sql et .attendu.
-# fix-ok: une « valeur: » du banc tient sur une ligne et « \n » n'y est pas un retour a la ligne (Program.cs, Paire, :774-778) : un seul mot par liste.
+# fix-ok: une « valeur: » du banc tient sur une ligne (Blocs.Lire lit ligne a ligne, tests/EcransGeneresBaseCheck/Program.cs:813-836) et
+# Paire (:792-796) ne decode rien, donc « \n » y reste deux caracteres, pas un retour a la ligne : un seul mot par liste.
 
 # Refus : une decision absente. Jumeau accepte : bloc 3.
 geste: Enregistrer
