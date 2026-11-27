@@ -113,6 +113,12 @@ public sealed record ChampEcran(string Libelle, TypeChamp Type = TypeChamp.Texte
     // circonstances, faute de toute regle d'affichage dans le descripteur ; ReferentielParGroupe.test.tsx est rouge (3 tests) sans elles.
     public string? BloqueSi { get; init; }
 
+    /// <summary>Une CASE qui, cochee, decoche au clic ces cases de SA section ; null sinon. PROC_GTABREF, un etat de PC : ouverture,
+    /// cloture, conversion LJ et extension s'excluent (OPE_AFFICHE_SQLBASE_PC_ETAT.cs:89-108).</summary>
+    // fix-ok: controle final du lot 14 (27/11/2026, 5e reprise) -- cocher Cloture laissait Ouverture cochee a l'ecran, faute de
+    // regle d'exclusion dans le descripteur ; ReferentielParGroupe.test.tsx rouge sans elle.
+    public string[]? Exclut { get; init; }
+
     public static implicit operator ChampEcran(string libelle) => new(libelle, Deviner(libelle));
 
     /// <summary>Le type qu'annonce le libelle de la fiche, UNE regle pour tous les ecrans : « Date de fin » est une

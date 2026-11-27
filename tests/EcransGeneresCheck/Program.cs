@@ -476,6 +476,14 @@ foreach (var d in descripteurs)
             foreach (var (regle, cible) in new[] { ("visible si", c.VisibleSi), ("bloque si", c.BloqueSi) })
                 if (cible is not null && (cible == c.Libelle || !s.Champs.Any(x => x.Libelle == cible && x.Type == TypeChamp.Case)))
                     defauts.Add($"champ « {c.Libelle} » ({s.Titre}) {regle} « {cible} » : pas une case de sa section");
+    // L'exclusion (lot 14, 5e reprise) : posee sur une CASE, elle nomme d'autres cases de sa section (sinon rien ne se decoche).
+    foreach (var s in d.Marches.Concat(d.Sections))
+        foreach (var c in s.Champs.Where(c => c.Exclut is { Length: > 0 }))
+        {
+            if (c.Type != TypeChamp.Case) defauts.Add($"champ « {c.Libelle} » ({s.Titre}) exclut d'autres cases sans etre une case");
+            foreach (var cible in c.Exclut!.Where(x => x == c.Libelle || !s.Champs.Any(y => y.Libelle == x && y.Type == TypeChamp.Case)))
+                defauts.Add($"champ « {c.Libelle} » ({s.Titre}) exclut « {cible} » : pas une autre case de sa section");
+        }
     if (!reuni)
     {
         switch (d.Forme)

@@ -370,8 +370,12 @@ public sealed class DomaineConfigurer : IDomaineEcrans
                 // :111-114 -> _PC_ETAT_DJ_EP.cs:393-401, _PC_ETAT_SAISIE.cs:706-714, que la grille ne porte pas), le regime des statistiques
                 // (equipe Amitel, :52-55) et le code processus (liste PROCESSUS_ET_FONCTIONALITE absente de la base V3).
                 new MarcheEcran("Champs d'un état de PC", "Le formulaire d'un état de procédure collective (OPE_AFFICHE_SQLBASE_PC_ETAT.cs:64-82), avec ses règles : ouverture, clôture, conversion et extension s'excluent (en cocher une décoche les autres) ; « Résolution du plan » ne se montre que sur un état d'ouverture et se décoche avec elle ; le code clôture ne se montre que sur résolution du plan, y est obligatoire et se vide sans elle ; « À sauver » est bloqué quand « Mise à jour de la PC » est cochée. En lecture : les modalités (les changer recalcule dans RIG v2 les décisions et la saisie rattachées à l'état), le régime des statistiques (équipe Amitel) et le code procédure (sa liste n'est pas dans la base V3).", false,
-                    [Champ.Liste("Régime", "Général", "Simplifié facultatif", "Simplifié obligatoire"), "Modalité PA", "Modalité AJ", Champ.Case("Ouverture"),
-                     Champ.Case("Clôture"), Champ.Case("Conversion LJ"), Champ.Case("Extension"),
+                    [Champ.Liste("Régime", "Général", "Simplifié facultatif", "Simplifié obligatoire"), "Modalité PA", "Modalité AJ",
+                     // Les quatre cases s'excluent AU CLIC, comme dans la V2 (:89-108) : chacune decoche les trois autres.
+                     Champ.Case("Ouverture") with { Exclut = ["Clôture", "Conversion LJ", "Extension"] },
+                     Champ.Case("Clôture") with { Exclut = ["Ouverture", "Conversion LJ", "Extension"] },
+                     Champ.Case("Conversion LJ") with { Exclut = ["Ouverture", "Clôture", "Extension"] },
+                     Champ.Case("Extension") with { Exclut = ["Ouverture", "Clôture", "Conversion LJ"] },
                      // Montres et bloques comme dans la V2 : « Résolution du plan » avec « Ouverture » (:135-142), « Code clôture » avec
                      // « Résolution du plan » (:149-156), « À sauver » bloque sous « Mise à jour de la PC » (:116-119).
                      Champ.Case("Résolution du plan") with { VisibleSi = "Ouverture" }, Champ.Texte("Code clôture") with { VisibleSi = "Résolution du plan" },

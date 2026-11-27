@@ -231,7 +231,8 @@ export type TypeChampVue = 'Texte' | 'Zone' | 'Date' | 'Periode' | 'Nombre' | 'M
  * case cochee, il se montre sans se saisir -- les regles d'affichage de la fiche RIG v2 (ChampEcran.VisibleSi / BloqueSi).
  * fix-ok: controle final du lot 14 (27/11/2026, 4e reprise) -- sans elles, « Résolution du plan », « Code clôture » et « À sauver »
  * d'un etat de PC s'affichaient et se saisissaient toujours ; ReferentielParGroupe.test.tsx rouge (3 tests) sans la regle. */
-export interface ChampEcranVue { libelle: string; type: TypeChampVue; options: string[]; visibleSi?: string | null; bloqueSi?: string | null }
+/** exclut : une case qui, cochee, decoche ces cases de sa section (ChampEcran.Exclut ; OPE_AFFICHE_SQLBASE_PC_ETAT.cs:89-108). */
+export interface ChampEcranVue { libelle: string; type: TypeChampVue; options: string[]; visibleSi?: string | null; bloqueSi?: string | null; exclut?: string[] | null }
 /** Une tuile : son code (AFaire, EnCours, Validee, EnAttente, Rejetee) et son icone de l'accueil. */
 export interface EtatEcranVue { code: string; libelle: string; icone: string }
 /** Une etape (Saisie) ou une section (les autres formes). */

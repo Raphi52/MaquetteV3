@@ -118,8 +118,11 @@ describe('Referentiel : les sections d’une ligne selon son groupe (sectionsPar
 // plan » ne se montre qu'avec « Ouverture », « Code clôture » qu'avec « Résolution du plan », « À sauver » est bloque sous « Mise a jour
 // de la PC ». Controle final du lot 14 (27/11/2026, 4e reprise) : la grille les montrait et les laissait saisir en toutes circonstances.
 const Case = (libelle: string, partiel: Partial<ChampEcranVue> = {}): ChampEcranVue => ({ libelle, type: 'Case', options: [], ...partiel })
+// Les quatre cases qui s'excluent (OPE_AFFICHE_SQLBASE_PC_ETAT.cs:89-108) : chacune nomme les trois autres.
+const Exclusives = ['Ouverture', 'Clôture', 'Conversion LJ', 'Extension']
+const exclusive = (libelle: string, regles: boolean) => Case(libelle, regles ? { exclut: Exclusives.filter((x) => x !== libelle) } : {})
 const champsEtat = (regles: boolean): ChampEcranVue[] => [
-  Case('Ouverture'),
+  exclusive('Ouverture', regles), exclusive('Clôture', regles), exclusive('Conversion LJ', regles), exclusive('Extension', regles),
   Case('Résolution du plan', regles ? { visibleSi: 'Ouverture' } : {}),
   { libelle: 'Code clôture', type: 'Texte', options: [], ...(regles ? { visibleSi: 'Résolution du plan' } : {}) },
   Case('Mise à jour de la PC'),
@@ -179,5 +182,38 @@ describe('Sections : les regles d’affichage de la fiche RIG v2 (visibleSi, blo
     expect(champ('Résolution du plan')).not.toBeNull()
     expect(champ('Code clôture')).not.toBeNull()
     expect(champ('À sauver')?.disabled).toBe(false)
+  })
+
+  // Controle final du lot 14 (27/11/2026, 5e reprise) : cocher « Clôture » laissait « Ouverture » cochee a l'ecran (capture
+  // lot14-captures-reprise5\08), quand la V2 la decoche au clic ; l'enregistrement etait ensuite refuse par le serveur.
+  // fix-ok: mesure -- sans la regle exclut dans Sections (commun.tsx), ce test est rouge (Ouverture reste cochee), vert avec.
+  it('cocher « Clôture » décoche « Ouverture » au clic, vide ce qu’elle montre, et envoie l’état d’une seule case cochée', async () => {
+    const { pont, container, champ } = await ouvrirEtat(true, { Ouverture: 'oui', 'Clôture': '', 'Conversion LJ': '', Extension: '',
+      'Résolution du plan': 'oui', 'Code clôture': 'RESOL', 'Mise à jour de la PC': '', 'À sauver': 'oui' })
+    fireEvent.click(champ('Clôture')!)
+    expect(champ('Clôture')?.checked).toBe(true)
+    expect(champ('Ouverture')?.checked).toBe(false)
+    expect(champ('Conversion LJ')?.checked).toBe(false)
+    expect(champ('Résolution du plan')).toBeNull()
+    expect(champ('Code clôture')).toBeNull()
+    fireEvent.click(bouton(container, 'Enregistrer')!)
+    await waitFor(() => expect(pont.appels).toHaveBeenCalledWith('EcranGenere.Geste', 'ECRAN_TEST', Etats, 'Modifier', null, ['PC_ETAT|RJ'],
+      { [`${SectionEtat} › Clôture`]: 'oui', [`${SectionEtat} › Ouverture`]: '', [`${SectionEtat} › Résolution du plan`]: '', [`${SectionEtat} › Code clôture`]: '' }))
+  })
+
+  it('jumeau : décocher une case exclusive ne coche ni ne décoche les autres', async () => {
+    const avec = await ouvrirEtat(true, { Ouverture: '', 'Clôture': 'oui', 'Conversion LJ': '', Extension: '',
+      'Résolution du plan': '', 'Code clôture': '', 'Mise à jour de la PC': '', 'À sauver': 'oui' })
+    fireEvent.click(avec.champ('Clôture')!)
+    expect(avec.champ('Clôture')?.checked).toBe(false)
+    expect(avec.champ('Ouverture')?.checked).toBe(false)
+  })
+
+  it('jumeau : sans règle au descripteur, cocher « Clôture » laisse « Ouverture » cochée', async () => {
+    const sans = await ouvrirEtat(false, { Ouverture: 'oui', 'Clôture': '', 'Conversion LJ': '', Extension: '',
+      'Résolution du plan': '', 'Code clôture': '', 'Mise à jour de la PC': '', 'À sauver': 'oui' })
+    fireEvent.click(sans.champ('Clôture')!)
+    expect(sans.champ('Clôture')?.checked).toBe(true)
+    expect(sans.champ('Ouverture')?.checked).toBe(true)
   })
 })
