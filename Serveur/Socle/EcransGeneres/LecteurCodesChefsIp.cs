@@ -19,8 +19,8 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// le retirer, le monter ou le descendre d'un rang (RigListViewUpDown._MoveItem) ; liste vide refusee, « La liste ne contient aucun code
 /// chef » (ETP_PARAM_IP.cs:43-50) ; la liste jointe par « ; » sans « ; » final (l. 52-68). Ils ecrivent soc.Reglage par
 /// geste.ModifierReglageAsync, la meme ecriture que la route des reglages (Serveur/Socle/Greffes/EcritureReglage.cs ; decision du chef
-/// msg-cab1a60f, 27/11/2026), avec le droit « modifier le greffe ». Ils repartent de la liste que lit cet ecran (CodesRangesAsync,
-/// ResolusAsync) : ce que l'agent voit est ce qui est reecrit.
+/// msg-cab1a60f, 27/11/2026), au nom de l'agent admis comme tout geste (la V2 n'y controle aucun droit). Ils repartent de la liste
+/// que lit cet ecran (CodesRangesAsync, ResolusAsync) : ce que l'agent voit est ce qui est reecrit.
 ///
 /// SOURCE (ancien RIG) : D:\RigApplication\Source\RIG\DLL\Processus\PROC_PARAM_IP\ETP_PARAM_IP.
 ///   - LA LISTE : ETP_PARAM_IP.DoInitGraphique (l. 14-26) -- Parametrage.GetValeurParametrage("IP_CODE_CHEF") coupe sur « ; », chaque code

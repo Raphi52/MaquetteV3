@@ -12,11 +12,12 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// EcrivainEcran.cs ; les lignes : LecteurCodesChefsIp.cs. Plan « RIG v3 100 % fonctionnel », lot 14, 27/11/2026.
 ///
 /// OU IL ECRIT : le reglage est dans soc.Reglage (la reprise de PARAMETRAGE, RepriseReglages.cs:57), pas dans v2.* : l'ecriture
-/// passe par geste.ModifierReglageAsync, la meme que la route des reglages (Serveur/Socle/Greffes/EcritureReglage.cs) -- droit de
-/// modifier le greffe (ServiceDroits.PeutModifierLeGreffe), reglage existant, auteur = le nom de l'agent, date. Decision du chef
-/// (msg-cab1a60f, 27/11/2026) : c'est l'equivalent exact de Parametrage.Sauve de la V2. ECART NOMME : la V2 ouvre l'ecran sous la
-/// fonction de sa procedure, sans le droit « modifier le greffe » (ServiceDroits.cs:60-70) ; la V3 exige ce droit, celui de
-/// l'ecriture des reglages.
+/// passe par geste.ModifierReglageAsync, la meme que la route des reglages (Serveur/Socle/Greffes/EcritureReglage.cs) -- reglage
+/// existant, 1 000 caracteres au plus, auteur = le nom de l'agent, date. Decision du chef (msg-cab1a60f, 27/11/2026) : c'est
+/// l'equivalent exact de Parametrage.Sauve de la V2.
+/// LE DROIT : celui de tout geste, l'agent admis (EcrivainEcran.cs, « Le droit »). La V2 ne controle aucun droit dans PROC_PARAM_IP
+/// (grep droit/habilit/admin : rien) ; le droit de modifier le greffe (OPE_EDITER_GREFFE, l'outil d'exploitation PROC_GREFFE) reste
+/// a la route « Reglages du greffe ». Refus du chef du 27/11/2026.
 ///
 /// SOURCE (ancien RIG) : D:\RigApplication\Source\RIG\DLL\Processus\PROC_PARAM_IP\ETP_PARAM_IP, controle RigListViewUpDown
 /// (D:\RigApplication\Source\Outils\DLL\RigControls\RigListViewUpDown.cs).
@@ -32,12 +33,13 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///     hors des bornes, rien ne bouge (l. 135).
 ///   - ENREGISTRER (ETP_PARAM_IP.DoVerifier, l. 43-50) : une liste vide est refusee -- titre « Liste sans code chef », message
 ///     « La liste ne contient aucun code chef », complement « il en faut au moins un » ; le refus rend le message. DoSauveAfterOperation
-///     (l. 52-68) : les codes joints par « ; », sans « ; » final (l. 60-63), dans PARAM_VALEUR d'IP_CODE_CHEF.
+///     (l. 52-68) : les codes joints par « ; », sans « ; » final (l. 60-63), dans PARAM_VALEUR d'IP_CODE_CHEF. Une liste de plus de
+///     1 000 caracteres est refusee par l'ecriture des reglages, au message de la V2 (PARAMETRAGE.Verifier, PARAMETRAGE.cs:242 :
+///     « PARAMETRAGE.PARAM_VALEUR est limité à 1000 caractères »).
 /// MESSAGES SANS SOURCE V2 (nommes) : la V2 n'a pas de message quand un code est deja dans la liste ou hors de CODE_CHEF (le clic ne
 /// fait rien), ni quand le premier code monte ou le dernier descend (le bouton ne fait rien) : la V3 le dit, car un geste qui n'ecrit
 /// rien est un refus (EcrivainEcran.cs, point 5). Champ d'ajout vide : la liste deroulante de la V2 n'a pas de valeur vide. Le reglage
-/// absent : la V2 leve (Parametrage.GetParametrage rend null, ETP_PARAM_IP.cs:65-66). Une liste de plus de 1 000 caracteres : la
-/// colonne soc.Reglage.Valeur en tient 1 000 (SOC-003_reglages.sql:18) ; la V3 refuse au lieu de couper.
+/// absent : la V2 leve (Parametrage.GetParametrage rend null, ETP_PARAM_IP.cs:65-66).
 /// NON REPRIS (nomme) : les boutons « tout en haut » / « tout en bas » de RigListViewUpDown (Top, Bottom, l. 118-119), que l'ordre du
 /// lot ne demande pas ; « Modifier » une ligne n'existe pas en V2 (la grille le propose, il reste « Demonstration »).
 /// TRACE : la ligne que rend l'ecriture du reglage -- famille « reglage », « le reglage IP_CODE_CHEF », « a modifie », valeur avant /
@@ -61,7 +63,6 @@ internal sealed class EcrivainCodesChefsIp : IEcrivainEcran
     internal static string HorsDeLaListe(string code) => $"Le code chef « {code} » n'est pas dans la liste.";
     internal static string DejaEnTete(string code) => $"Le code chef « {code} » est déjà en tête de liste.";
     internal static string DejaEnFin(string code) => $"Le code chef « {code} » est déjà en fin de liste.";
-    internal const string TropLong = "La liste dépasse les 1 000 caractères du réglage IP_CODE_CHEF : retirez un code avant d'en ajouter un.";
 
     public async Task<IssueGeste> JouerAsync(GesteEnCours geste, CancellationToken ct)
     {
@@ -112,12 +113,10 @@ internal sealed class EcrivainCodesChefsIp : IEcrivainEcran
         }
 
         // DoSauveAfterOperation (l. 55-63) : joints par « ; », sans « ; » final.
-        var valeur = string.Join(";", liste);
-        if (valeur.Length > 1000) return IssueGeste.Refuser(TropLong);
-        return await geste.ModifierReglageAsync(Reglage, valeur, ct) switch
+        return await geste.ModifierReglageAsync(Reglage, string.Join(";", liste), ct) switch
         {
             ReglageEcrit.Modifie ecrit => IssueGeste.Ecrit(message, [vise], ecrit.Trace),
-            ReglageEcrit.SansLeDroit refus => IssueGeste.Refuser(refus.Motif),
+            ReglageEcrit.TropLong refus => IssueGeste.Refuser(refus.Motif),
             _ => IssueGeste.Refuser(ReglageAbsent),
         };
     }

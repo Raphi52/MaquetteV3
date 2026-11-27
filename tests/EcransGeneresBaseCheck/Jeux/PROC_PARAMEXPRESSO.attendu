@@ -3,7 +3,7 @@
 # (OPE_PIED_PAGE), Lettres chèques (OPE_LETTRES_CHEQUES), Spécificités judiciaires (OPE_SPECIFICITE_JUDICIAIRE), Comptabilité
 # (OPE_COMPTABILITE_PARAMETRES_GENERAUX, MetierCompta), Banques et modes (OPE_ASSOCIATION_BANQUES). Chacune lue « PARAMETRAGE d'abord,
 # sinon GREFFE_PARAMETRE » (soc.Reglage puis soc.ParametreGreffe) ; renseignee -> Validee, vide ou absente -> AFaire (« non renseigné » ;
-# EXPRESSO_MODE_PAIEMENT_PROFIT, present et vide, dit « réglage »). Puis la banque de chaque mode ACTIF (MetierBanques) : sans banque ->
+# EXPRESSO_MODE_PAIEMENT_PROFIT et EXPRESSO_RELEVE_MAIL_COPIE, presents et vides, disent « réglage »). Puis la banque de chaque mode ACTIF (MetierBanques) : sans banque ->
 # AFaire ; L15VI (inactif) et les modes inactifs des autres jeux sont ecartes -- jumeau L15CH. Les modes actifs des jeux du lot 12
 # (L12…, PV) y entrent.
 GRPAR_ROMPU | 1.52 · paramètre du greffe | Paramètres généraux | Validee | []
@@ -16,7 +16,7 @@ GRPAR_COMMENTAIRE_DIVERS | non renseigné | Paramètres généraux | AFaire | []
 GRPAR_RELEVE_CLT_IS_SOLDE | non renseigné | Paramètres généraux | AFaire | []
 EXPRESSO_EDITIONS_SYNTHETIQUES | 0 · réglage | Paramètres généraux | Validee | []
 EXPRESSO_RELEVE_MAIL_ENVOI | non renseigné | Paramètres généraux | AFaire | []
-EXPRESSO_RELEVE_MAIL_COPIE | non renseigné | Paramètres généraux | AFaire | []
+EXPRESSO_RELEVE_MAIL_COPIE | non renseigné · réglage | Paramètres généraux | AFaire | []
 GRPAR_PUB_COMPTE_LIGNE1 | non renseigné | Corps de facture | AFaire | []
 GRPAR_PUB_COMPTE_LIGNE2 | non renseigné | Corps de facture | AFaire | []
 GRPAR_PUB_DIVERS_LIGNE1 | non renseigné | Corps de facture | AFaire | []

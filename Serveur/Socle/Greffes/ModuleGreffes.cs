@@ -99,8 +99,9 @@ internal sealed class ModuleGreffes : IModuleServeur
         // absent ne se cree pas (404). L'agent est celui que la politique AgentAdmis vient de
         // juger dans la base de CE greffe : DeLAppelantAsync le reprend de la requete.
         // fix-ok: la route ecrivait le compte de la session (« AMITEL\banc.socle », banc rouge du 2026-11-21) au lieu du nom UTLST_NOM de la V2.
-        // fix-ok: pas un correctif -- lot 14 (27/11/2026, ordre du chef msg-cab1a60f) : droit, UPDATE et relecture extraits dans
-        // EcritureReglage.ModifierAsync, appelee aussi par le geste « Codes chefs IP » ; le journal reste ecrit ici, avec l'ecran de la saisie.
+        // fix-ok: pas un correctif -- lot 14 (27/11/2026, ordre du chef msg-cab1a60f) : UPDATE et relecture extraits dans
+        // EcritureReglage.ModifierAsync, appelee aussi par les gestes d'ecran ; le DROIT de modifier le greffe reste ICI, propre a cette
+        // route (refus du chef : la V2 n'en exige aucun sur PROC_PARAM_IP) ; le journal aussi, avec l'ecran de la saisie.
         greffes.MapPut(RoutesGreffes.Reglage, async (string greffe, string reglage, SaisieReglage saisie, HttpContext http,
                                                    CatalogueGreffes c, ServiceIdentite identites, ServiceDroits droits, BaseRig b,
                                                    CancellationToken ct) =>
@@ -110,11 +111,12 @@ internal sealed class ModuleGreffes : IModuleServeur
             return await SurBaseV3(c, greffe, ct, async cn =>
             {
                 if (await droits.AppelantAsync(http, b, cn, ct) is not { } moi) return SansAuteur();
+                if (!ServiceDroits.PeutModifierLeGreffe(moi)) return SansLeDroit(moi);
                 await using var tx = (SqlTransaction)await cn.BeginTransactionAsync(ct);
-                // Le droit, l'UPDATE et la relecture : EcritureReglage, la seule ecriture d'un reglage (un geste d'ecran l'appelle aussi).
-                switch (await EcritureReglage.ModifierAsync(cn, tx, moi, auteur, reglage, saisie.Valeur, ct))
+                // L'UPDATE et la relecture : EcritureReglage, la seule ecriture d'un reglage (un geste d'ecran l'appelle aussi).
+                switch (await EcritureReglage.ModifierAsync(cn, tx, auteur, reglage, saisie.Valeur, ct))
                 {
-                    case ReglageEcrit.SansLeDroit refus: return Refus(StatusCodes.Status403Forbidden, refus.Motif);
+                    case ReglageEcrit.TropLong refus: return Refus(StatusCodes.Status400BadRequest, refus.Motif);
                     case ReglageEcrit.Modifie ecrit:
                         var t = ecrit.Trace;
                         await JournalGestes.EcrireAsync(cn, tx, moi, saisie.Ecran, t.Famille, t.Objet, t.IdObjet, t.Verbe, t.Avant, t.Apres, ct);
@@ -192,11 +194,9 @@ internal sealed class ModuleGreffes : IModuleServeur
             "Modification refusee : la requete n'a pas d'identite (session Windows), son auteur ne serait pas garde.");
 
     /// <summary>403 : l'agent est admis mais n'a pas le droit de modifier le greffe ; rien n'a ete lu ni ecrit.</summary>
-    private static IResult SansLeDroit(Appelant moi) => Refus(StatusCodes.Status403Forbidden, MotifSansLeDroit(moi));
-
-    /// <summary>Pourquoi <paramref name="moi"/> ne modifie pas le greffe (sa fiche, un reglage) : la route et un geste d'ecran le disent pareil.</summary>
-    internal static string MotifSansLeDroit(Appelant moi)
-        => $"Modification refusee : le compte {moi.CompteWindows} n'a pas le droit de modifier le greffe (il faut etre {ServiceDroits.QuiPeutModifierLeGreffe}).";
+    private static IResult SansLeDroit(Appelant moi)
+        => Refus(StatusCodes.Status403Forbidden,
+            $"Modification refusee : le compte {moi.CompteWindows} n'a pas le droit de modifier le greffe (il faut etre {ServiceDroits.QuiPeutModifierLeGreffe}).");
 
     private static IResult Refus(int statut, string motif) => Results.Json(new RefusGreffe(motif), statusCode: statut);
 }

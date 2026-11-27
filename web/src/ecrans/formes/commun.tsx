@@ -436,10 +436,12 @@ export function ChampSaisie({ champ, valeur, changer, lecture = false, compact =
 export const champLu = (fiche: FicheVue | null | undefined, section: string, libelle: string) =>
   fiche?.sections.find((s) => s.titre === section)?.champs.find((c) => c.libelle === libelle)
 
-/** Une valeur lue, comme l'agent l'ecrit : une date en jj/mm/aaaa, une case en Oui, le vide en « — ». */
+/** Une valeur lue, comme l'agent l'ecrit : une date en jj/mm/aaaa, une case en Oui / Non, le vide en « — ». Une case NON cochee vaut ''
+ * (LecteurEcran.Case cote serveur) : c'est « Non », comme dans la grille (lisible, FormeReferentiel.tsx), pas une valeur vide
+ * (FicheCaseNon.test.tsx ; lot 14, refus du chef du 27/11/2026). */
 const lue = (c: ChampEcranVue, valeur: string) =>
-  valeur === '' ? '—'
-    : c.type === 'Case' ? (valeur === 'oui' ? 'Oui' : 'Non')
+  c.type === 'Case' ? (valeur === 'oui' ? 'Oui' : 'Non')
+    : valeur === '' ? '—'
       : c.type === 'Date' && /^\d{4}-\d{2}-\d{2}$/.test(valeur) ? valeur.split('-').reverse().join('/') : valeur
 
 /** Une sous-liste lue avec l'objet (Tableau) : ses colonnes et ses lignes. */

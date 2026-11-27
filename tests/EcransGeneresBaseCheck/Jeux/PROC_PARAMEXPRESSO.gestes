@@ -1,17 +1,10 @@
 # Les gestes de EcrivainFacturationExpresso (« Facturation Expresso », PROC_PARAMEXPRESSO), joues dans l'ordre par la route POST,
 # sur les reglages de PROC_PARAMEXPRESSO.sql. Format : en tete de tests/EcransGeneresBaseCheck/Program.cs (section 3c). Un refus
 # n'ecrit rien ; chaque refus a son jumeau accepte (meme borne, autre cote). L'ecriture : l'ecriture partagee des reglages
-# (EcritureReglage.cs, lot 14), comme Parametrage.UpdateValeurParametrage (MetierParametrage.cs:42-47) : un geste qui ecrit est joue au
-# nom de banc.admin.l15 (« agent: », cree par PROC_PARAMEXPRESSO.sql), seul a avoir le droit de modifier le greffe.
+# (EcritureReglage.cs, lot 14), comme Parametrage.UpdateValeurParametrage (MetierParametrage.cs:42-47). Tous les blocs sont joues par
+# l'agent du banc, ni Amitel ni administrateur : la V2 ne controle aucun droit dans PROC_PARAMEXPRESSO (grep droit/habilit/admin : rien),
+# le geste suit la regle de tous les gestes, agent admis (EcrivainEcran.cs, « Le droit » ; refus du chef du 27/11/2026, lot 14).
 
-# 0. L'agent du banc n'a pas le droit de modifier le greffe (ni Amitel ni administrateur) : l'ecriture partagee refuse
-#    (EcritureReglage.cs ; OPE_EDITER_GREFFE.cs:30-38). Jumeau : bloc 4, le meme geste au nom de banc.admin.l15.
-geste: Enregistrer
-ids: EXPRESSO_RELANCE
-valeur: Paramètre › Valeur = 20
-resultat: refuse
-message: Modification refusee : le compte banc.ecrans n'a pas le droit de modifier le greffe (il faut etre administrateur d'Amitel ou l'un des comptes nommes par la V2 : benier, jouguet, thevenon).
----
 # 1. Un montant illisible : le controle montant de la V2 ne le laisserait pas saisir (OPE_FACTURATION.cs:37-40). Jumeau : bloc 4.
 geste: Enregistrer
 ids: EXPRESSO_RELANCE
@@ -37,7 +30,6 @@ message: La banque du mode L15CH s'enregistre dans « Modes de paiement » : rie
 # 4. Le montant de relance : saisi « 20.5 », ecrit comme la V2 (« 20,50 », decimal du controle en culture francaise), auteur et
 #    date poses par l'ecriture partagee.
 geste: Enregistrer
-agent: banc.admin.l15
 ids: EXPRESSO_RELANCE
 valeur: Paramètre › Valeur = 20.5
 resultat: fait
@@ -50,7 +42,6 @@ controle: SELECT CASE WHEN AuteurModif IS NOT NULL AND DateModif IS NOT NULL THE
 ---
 # 5. La meme valeur, saisie autrement : rien ne change, rien n'est ecrit. Jumeau : bloc 4 (une autre valeur).
 geste: Enregistrer
-agent: banc.admin.l15
 ids: EXPRESSO_RELANCE
 valeur: Paramètre › Valeur = 20,50
 resultat: refuse
@@ -58,7 +49,6 @@ message: Rien à enregistrer : EXPRESSO_RELANCE vaut déjà « 20,50 ».
 ---
 # 6. La valeur d'origine remise (le jeu rend la base comme il l'a trouvee).
 geste: Enregistrer
-agent: banc.admin.l15
 ids: EXPRESSO_RELANCE
 valeur: Paramètre › Valeur = 15
 resultat: fait
@@ -68,7 +58,6 @@ controle: SELECT Valeur FROM soc.Reglage WHERE Code = 'EXPRESSO_RELANCE' => 15,0
 # 7. Un reglage absent de la base : la V3 ne cree pas de reglage (ni INSERT : EcritureReglage.cs, decision du chef). Le mode L15CH
 #    existe : seul le reglage manque. Jumeau : bloc 9 (EXPRESSO_MODE_PAIEMENT_PROFIT, present).
 geste: Enregistrer
-agent: banc.admin.l15
 ids: EXPRESSO_MODE_PAIEMENT_PERTE
 valeur: Paramètre › Valeur = L15CH
 resultat: refuse
@@ -83,7 +72,6 @@ message: EXPRESSO_MODE_PAIEMENT_PROFIT est un mode de paiement du greffe : « ZZ
 ---
 # 9. Le mode de profit : un mode du greffe (OPE_ASSOCIATION_BANQUES.cs:35-38).
 geste: Enregistrer
-agent: banc.admin.l15
 ids: EXPRESSO_MODE_PAIEMENT_PROFIT
 valeur: Paramètre › Valeur = L15CH
 resultat: fait
@@ -92,7 +80,6 @@ controle: SELECT Valeur FROM soc.Reglage WHERE Code = 'EXPRESSO_MODE_PAIEMENT_PR
 ---
 # 10. Une case : « oui » s'ecrit « 1 », comme la V2 (OPE_FACTURATION.cs:102). Jumeau du refus : bloc 11.
 geste: Enregistrer
-agent: banc.admin.l15
 ids: EXPRESSO_EDITIONS_SYNTHETIQUES
 valeur: Paramètre › Valeur = oui
 resultat: fait
@@ -105,3 +92,27 @@ ids: EXPRESSO_EDITIONS_SYNTHETIQUES
 valeur: Paramètre › Valeur = peut-être
 resultat: refuse
 message: EXPRESSO_EDITIONS_SYNTHETIQUES est une case (« 1 » ou « 0 » dans RIG v2) : « peut-être » n'en est pas une. Rien n'est enregistré.
+---
+# 12. Une valeur de 1 001 caracteres, sur un texte (la copie du releve par courriel, OPE_FACTURATION.cs:76-78 : la V2 l'ecrit tel quel) :
+#     l'ecriture partagee la REFUSE, ni coupee ni ecrite, au message de la V2 -- PARAMETRAGE.Verifier (PARAMETRAGE.cs:242, PARAM_VALEUR
+#     varchar(1000)) leve TROPGRAND, « PARAMETRAGE.PARAM_VALEUR est limité à 1000 caractères » (DBObject.cs:993-994). Lot 14, refus du
+#     chef du 27/11/2026 ; avant, le parametre varchar(1000) coupait la valeur et le geste passait. Jumeau : bloc 13.
+geste: Enregistrer
+ids: EXPRESSO_RELEVE_MAIL_COPIE
+valeur: Paramètre › Valeur = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+resultat: refuse
+message: PARAMETRAGE.PARAM_VALEUR est limité à 1000 caractères
+---
+# 13. 1 000 caracteres tout juste : ecrits, et relus ENTIERS.
+geste: Enregistrer
+ids: EXPRESSO_RELEVE_MAIL_COPIE
+valeur: Paramètre › Valeur = aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+resultat: fait
+controle: SELECT LEN(Valeur) FROM soc.Reglage WHERE Code = 'EXPRESSO_RELEVE_MAIL_COPIE' => 1000
+---
+# 14. La valeur d'origine remise (vide, PROC_PARAMEXPRESSO.sql).
+geste: Enregistrer
+ids: EXPRESSO_RELEVE_MAIL_COPIE
+valeur: Paramètre › Valeur =
+resultat: fait
+controle: SELECT LEN(Valeur) FROM soc.Reglage WHERE Code = 'EXPRESSO_RELEVE_MAIL_COPIE' => 0

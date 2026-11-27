@@ -37,7 +37,8 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 //      transaction du geste (Serveur/Numerotation/Compteur/DistributeurNumeros.cs) -- un geste annule ne consomme aucun
 //      numero (plan « RIG v3 100 % fonctionnel », lot 5, 26/11/2026). Aucun EXEC libre. Un ecran RIG v2 qui ecrit SON reglage
 //      (PARAMETRAGE, repris dans soc.Reglage) passe par geste.ModifierReglageAsync : la valeur d'un reglage existant, par l'ecriture
-//      de la route des reglages (Serveur/Socle/Greffes/EcritureReglage.cs), droit de modifier le greffe exige (lot 14, 27/11/2026) ;
+//      de la route des reglages (Serveur/Socle/Greffes/EcritureReglage.cs : reglage existant, 1 000 caracteres au plus), au nom de
+//      l'agent admis, sans le droit de modifier le greffe que seule la route exige (lot 14, 27/11/2026, refus du chef) ;
 //   4. les CONTROLES de RIG v2 passent AVANT toute ecriture, chacun cite (fichier:ligne du code V2 ou fiche
 //      proc_<code>.md), son message AU MOT PRES de la V2. Un controle qui refuse rend IssueGeste.Refuser(message) : le
 //      socle annule la transaction, RIEN n'est ecrit, l'ecran affiche le message. L'objet verrouille par RIG v2
@@ -214,14 +215,16 @@ public sealed partial class GesteEnCours(SqlConnection baseGreffe, SqlTransactio
     /// <summary>
     /// Modifier la VALEUR du reglage <paramref name="code"/> du greffe (soc.Reglage, la reprise de PARAMETRAGE), comme l'ecran RIG v2
     /// qui ecrit SON reglage (ETP_PARAM_IP.DoSauveAfterOperation : IP_CODE_CHEF). La seule porte d'un geste vers soc.* : l'ecriture de
-    /// la route des reglages (<see cref="EcritureReglage.ModifierAsync"/> -- droit de modifier le greffe, reglage existant, auteur =
-    /// le nom de l'agent, date), dans la transaction du geste. Ni creation ni suppression de reglage. Rend <see cref="ReglageEcrit"/> :
-    /// SansLeDroit et Absent sont des refus a rendre ; Modifie porte la ligne du journal (Trace) que l'ecrivain rend a son socle.
+    /// la route des reglages (<see cref="EcritureReglage.ModifierAsync"/> -- reglage existant, 1 000 caracteres au plus, auteur = le nom
+    /// de l'agent, date), dans la transaction du geste. Ni creation ni suppression de reglage. Le droit est celui de tout geste, l'agent
+    /// admis : PROC_PARAM_IP et PROC_PARAMEXPRESSO ne controlent aucun droit dans la V2 (refus du chef, 27/11/2026) ; le droit de
+    /// modifier le greffe reste a la route « Reglages du greffe ». Rend <see cref="ReglageEcrit"/> : Absent et TropLong sont des refus a
+    /// rendre ; Modifie porte la ligne du journal (Trace) que l'ecrivain rend a son socle.
     /// </summary>
     // fix-ok: pas un correctif -- lot 14 (27/11/2026, ordre du chef msg-cab1a60f) : soc.Reglage s'ouvre aux gestes par cette entree
     // typee seule ; ExigerEcritureV2 refuse toujours soc.* (le banc EcransGeneresBaseCheck le verifie).
     public async Task<ReglageEcrit> ModifierReglageAsync(string code, string valeur, CancellationToken ct)
-        => await EcritureReglage.ModifierAsync(Base, Transaction, Agent, await AuteurReglage.DeLAgentAsync(Base, Transaction, Agent, ct), code, valeur, ct);
+        => await EcritureReglage.ModifierAsync(Base, Transaction, await AuteurReglage.DeLAgentAsync(Base, Transaction, Agent, ct), code, valeur, ct);
 
     /// <summary>Leve si <paramref name="sql"/> ecrit ailleurs que dans v2.* ou rec.*, ou change la structure de la base.</summary>
     public static void ExigerEcritureV2(string sql)

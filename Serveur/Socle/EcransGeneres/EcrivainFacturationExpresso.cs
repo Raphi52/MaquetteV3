@@ -18,8 +18,9 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// un mode de paiement le code d'un mode (ComboBoxModePaiement), un texte tel quel. La V3 tient ces controles a l'enregistrement : une
 /// valeur que le controle de la V2 ne laisserait pas saisir est refusee, rien n'est ecrit.
 /// ECRITURE : par GesteEnCours.ModifierReglageAsync, l'ecriture partagee des reglages (EcritureReglage.cs, lot 14 ; decision du chef du
-/// 27/11/2026 : un geste ne change que la valeur d'un reglage existant, par cette seule porte) -- droit de modifier le greffe exige, ni
-/// creation ni suppression, auteur et date poses, ligne du journal rendue au socle.
+/// 27/11/2026 : un geste ne change que la valeur d'un reglage existant, par cette seule porte) -- ni creation ni suppression, 1 000
+/// caracteres au plus (refus au message de la V2, PARAMETRAGE.cs:242), auteur et date poses, ligne du journal rendue au socle. Le droit :
+/// l'agent admis, comme tout geste ; la V2 ne controle aucun droit dans PROC_PARAMEXPRESSO (refus du chef du 27/11/2026, lot 14).
 /// NON REPRIS (nommes) : les colonnes GREFFE_PARAMETRE (GRPAR_*, :49-51, soc.ParametreGreffe en V3 : la decision n'ouvre que soc.Reglage) ;
 /// la creation d'EXPRESSO_TYPE_PIED_PAGE absent a l'ouverture (OPE_PIED_PAGE.cs:22-29 : ni creation de reglage) ; les liens mode / banque
 /// (MetierBanques.SaveAll), que « Modes de paiement » ecrit deja (EcrivainModesPaiement, meme table). La demande « Modification du
@@ -51,7 +52,7 @@ internal sealed class EcrivainFacturationExpresso : IEcrivainEcran
 
         return await geste.ModifierReglageAsync(id, valeur.Ecrite!, ct) switch
         {
-            ReglageEcrit.SansLeDroit s => IssueGeste.Refuser(s.Motif),
+            ReglageEcrit.TropLong t => IssueGeste.Refuser(t.Motif),
             ReglageEcrit.Absent => IssueGeste.Refuser($"Le réglage {id} n'existe pas dans la base du greffe : la V3 ne crée pas de réglage. Rien n'est enregistré."),
             ReglageEcrit.Modifie m when m.Avant.Valeur == m.Apres.Valeur => IssueGeste.Refuser($"Rien à enregistrer : {id} vaut déjà « {m.Apres.Valeur} »."),
             ReglageEcrit.Modifie m => IssueGeste.Ecrit($"Paramètre {id} enregistré : {EnMots(m.Apres.Valeur)} (avant : {EnMots(m.Avant.Valeur)}).", [id], m.Trace),
