@@ -24,8 +24,17 @@
 // pas un jeu de criteres), une ligne par depot (avatar et destinataire, code · abrege ; etat en point colore),
 // les six dates de suivi, le coffre et le type de decision dans la ligne depliee. Aucun montant : pas de carte.
 // Le clic qui montre l'historique, la ligne en alerte et les autres criteres ne changent pas.
+//
+// BRANCHE SUR LA BASE (plan « RIG v3 100 % fonctionnel », lot 20, 27/11/2026) : les depots viennent du pont
+// (Pont/EcranCoffreFortBase.cs). En base, « Deja transmis » est l'HISTORIQUE des depots de RIG v2 (DEMAT_CFEC, requete,
+// colonnes et couleurs d'OPE_RESULTAT_HISTORIQUE : Serveur/Socle/EcransMain/LectureCoffreFort.cs) ; « A transmettre » reste
+// vide et le dit (quatre requetes de RIG v2 non reprises) ; « Date envoi infogreffe » et l'historique des envois sont dans la
+// base EDI du greffe, absente. Le coffre-fort electronique est un service externe, jamais appele : l'ecran n'ecrit rien.
+// Sans serveur, les depots d'exemple ci-dessous, marques ; en panne, le motif et aucun depot.
 
-import { Fragment, useState } from 'react'
+import { Fragment, useEffect, useState } from 'react'
+import { appeler } from '../pont'
+import { ProvenanceEcran, type ModeLecture } from '../provenance'
 import { contientSansCasse, dateCourte, distinctsTries, entierLisible, estBlanc } from '../criteres'
 import {
   CelluleChevron, CelluleIdentite, EnteteListe, LigneDetail, ListeModerne, PiedListe, PointEtat, VuesListe, teinteStatut,
@@ -49,9 +58,26 @@ interface DepotCoffre {
   codeDepot: string
   erreur: string
   historique: string[]
+  /** Lu en base : le nom du document dans le coffre (CFEC_NOM_DOCUMENT_DS_COFFRE). */
+  nomDocument?: string
+  /** Lu en base : faux pour un depot de l'historique (il est parti) ; absent ou null en demonstration. */
+  aTransmettre?: boolean | null
 }
 
-const Depots: DepotCoffre[] = [
+/** Ce que rend le pont (Pont/EcranCoffreFortBase.cs, VueCoffreFort). */
+export interface VueCoffreFort {
+  mode: ModeLecture
+  message: string | null
+  /** Les depots de la base (mode « serveur ») ; vide sinon. */
+  depots: DepotCoffre[]
+  total: number
+}
+
+/** Pourquoi « A transmettre » est vide en base. */
+export const ATransmettreNonLu = "« A transmettre » n'est pas encore lu dans la base : RIG v2 le compose de quatre requêtes " +
+  "(évènements, éditions, décisions numérisées) que la V3 ne reprend pas. « Deja transmis » montre l'historique des dépôts."
+
+const Exemples: DepotCoffre[] = [
   {
     code: 'CF-2026-0412', abrege: 'DUVAL', destinataire: 'Me LEROY', coffre: 'COFFRE_LEROY', typeDecision: 'ACAD', etat: 'Transmis', statut: 'ok',
     envoiInfogreffe: '2026-03-07', arInfogreffe: '2026-03-07', arDestinataire: '2026-03-08', lectureDestinataire: '2026-03-09', traitementRig: '2026-03-07', avisDepotCoffre: '2026-03-08',
@@ -76,15 +102,13 @@ const Depots: DepotCoffre[] = [
 
 const Natures = ['Archive', 'Audience', 'Erreur', 'GED judiciaire', 'Message', 'REDA']
 
-const Coffres = distinctsTries(Depots.map((d) => d.coffre))
-
 const jour = (d: string | null) => (d === null ? '' : dateCourte(d))
 
 /** Colonnes : chevron, Destinataire, Etat, Date envoi infogreffe, Code de depot, Erreur. */
 const NbColonnes = 6
 
-/** Un depot est « a transmettre » s'il n'est jamais parti ou s'il est en erreur (l'onglet de l'ecran). */
-const aTransmettreLe = (d: DepotCoffre) => d.envoiInfogreffe === null || d.erreur !== ''
+/** Un depot est « a transmettre » s'il n'est jamais parti ou s'il est en erreur (l'onglet de l'ecran) ; lu en base, il est parti. */
+const aTransmettreLe = (d: DepotCoffre) => d.aTransmettre ?? (d.envoiInfogreffe === null || d.erreur !== '')
 
 export function EcranCoffreFort() {
   const [recherche, setRecherche] = useState('')
@@ -102,6 +126,21 @@ export function EcranCoffreFort() {
   const [selection, setSelection] = useState<DepotCoffre | null>(null)
   // La ligne depliee par son chevron.
   const [ouverte, setOuverte] = useState<string | null>(null)
+
+  // La vue du pont : null tant qu'il n'a pas repondu (aucun depot). En base, l'ecran s'ouvre sur l'historique.
+  const [vue, setVue] = useState<VueCoffreFort | null>(null)
+  useEffect(() => {
+    let perime = false
+    void appeler<VueCoffreFort>('EcranCoffreFort.Depots').then((v) => {
+      if (perime) return
+      setVue(v)
+      if (v.mode === 'serveur') setATransmettre(false)
+    })
+    return () => { perime = true }
+  }, [])
+  const enBase = vue?.mode === 'serveur'
+  const Depots: DepotCoffre[] = vue === null ? [] : enBase ? vue.depots : vue.mode === 'demo' ? Exemples : []
+  const Coffres = distinctsTries(Depots.map((d) => d.coffre).filter((c) => c !== ''))
 
   function basculerNature(n: string) {
     setNaturesActives((avant) => {
@@ -202,6 +241,8 @@ export function EcranCoffreFort() {
       </aside>
 
       <ListeModerne etiquette="Depots">
+        <ProvenanceEcran mode={vue?.mode} message={vue?.message} quoi="Depots" />
+        {enBase && aTransmettre && <p className="rig-eg-note" role="note">{ATransmettreNonLu}</p>}
         <EnteteListe titre="Depots"
                      synthese={<>{trouves.length}{trouves.length > 1 ? ' depots ' : ' depot '}
                        {aTransmettre ? 'a transmettre' : 'deja transmis'}{' · '}<b>{enErreur}</b>{' en erreur'}</>}
@@ -255,6 +296,7 @@ export function EcranCoffreFort() {
                       { libelle: 'Date avis de depot coffre', valeur: jour(dep.avisDepotCoffre) },
                       { libelle: 'Coffre', valeur: dep.coffre },
                       { libelle: 'Type de decision', valeur: dep.typeDecision },
+                      ...(dep.nomDocument ? [{ libelle: 'Nom du document', valeur: dep.nomDocument }] : []),
                     ]} />
                   )}
                   </Fragment>

@@ -1459,6 +1459,9 @@ Exiger((await EcranDocDemat.PiecesAsync(null, null)) is { Mode: "demo", Pieces.L
 Exiger((await EcranDocDemat.PiecesAsync(client, GreffeAbsent)) is { Mode: "erreur", Pieces.Length: 0, Message: not null },
     "pont Documents dematerialises, greffe absent : le motif, AUCUNE piece");
 
+// ============================================================ 20. LOT 20 : recherche BODACC, Cloture, Archivage, Coffre-fort, Commandes web, Mon accueil (Lot20.cs)
+await new BancLot20((sql, p) => Sql(sql, p), Exiger, greffe.Connexion, client, http, json, Greffe, GreffeAbsent, jour).JouerAsync();
+
 Console.WriteLine();
 if (echecs.Count == 0) { Console.WriteLine("Ecrans faits main branches sur la base : VERT."); return 0; }
 Console.WriteLine(echecs.Count + " echec(s) : " + string.Join(" | ", echecs));

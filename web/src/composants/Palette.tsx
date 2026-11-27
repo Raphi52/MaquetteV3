@@ -14,7 +14,10 @@
 // La RECHERCHE est en C# (Metier/RecherchePalette.cs) et la vue arrive par le
 // plan de travail (Pont/PlanTravailPalette.cs) ; ce composant ne tient que ce
 // qui est affichage : la ligne choisie, le mode « gestes », la frappe en cours.
-// Seules les annonces de l'ecran BODACC, declarees dans son .tsx, se filtrent ici.
+// Seules les annonces BODACC se filtrent ici : celles de la base du greffe, ou l'exemple sans serveur, que rend le pont
+// (ecrans/annoncesBodacc.ts, plan « RIG v3 100 % fonctionnel », lot 20) ; une annonce d'exemple est marquee « exemple ».
+// fix-ok: cause mesuree -- la palette filtrait la constante AnnoncesBodacc (EcranBodacc.tsx:92, l'exemple) meme branchee
+//   au serveur ; elle prend maintenant les annonces du pont (useAnnoncesCherchees), en plusieurs remplacements cibles.
 //
 // « SUR CE DOSSIER » (plan « Vue du dossier = coeur des actions », lot 5,
 // 20/11/2026) : sur une affaire ouverte, les actions de sa barre viennent EN
@@ -23,8 +26,9 @@
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import type { KeyboardEvent as ToucheReact, ReactNode } from 'react'
-import { AnnoncesBodacc } from '../ecrans/EcranBodacc'
 import type { AnnonceBodacc } from '../ecrans/EcranBodacc'
+import { useAnnoncesCherchees } from '../ecrans/annoncesBodacc'
+import { Exemple } from '../ecrans/formes/commun'
 import { jouerAction } from '../plan/ActionsDossier'
 import type {
   ActionPaletteVue, ElementPaletteVue, EcranPaletteVue, GestePlan, HorsGreffePaletteVue, PaletteVue, PiecePaletteVue, TravailPaletteVue,
@@ -119,7 +123,7 @@ type Element =
   | { sorte: 'ecran', e: EcranPaletteVue }
   | { sorte: 'element', el: ElementPaletteVue }
   | { sorte: 'piece', p: PiecePaletteVue }
-  | { sorte: 'annonce', a: AnnonceBodacc }
+  | { sorte: 'annonce', a: AnnonceBodacc, exemple: boolean }
   | { sorte: 'hors', h: HorsGreffePaletteVue }
   | { sorte: 'siren', siren: string }
 
@@ -179,7 +183,8 @@ export function Palette({ vue, plan, ancree = false }: ProprietesPalette) {
   }, [copie])
 
   const texte = vue.texte.trim()
-  const annonces = useMemo(() => AnnoncesBodacc.filter((a) => annonceRepond(a, texte)), [texte])
+  const cherchees = useAnnoncesCherchees(texte)
+  const annonces = useMemo(() => cherchees.annonces.filter((a) => annonceRepond(a, texte)), [cherchees, texte])
 
   const groupes: Groupe[] = []
   // Sur l'affaire ouverte, ce qu'on peut y faire passe devant ce qu'on peut y chercher.
@@ -202,7 +207,7 @@ export function Palette({ vue, plan, ancree = false }: ProprietesPalette) {
     if (avis.length + annonces.length > 0) {
       groupes.push({
         titre: 'Annonces BODACC', compte: avis.length + annonces.length,
-        elements: [...avis.map((p): Element => ({ sorte: 'piece', p })), ...annonces.map((a): Element => ({ sorte: 'annonce', a }))],
+        elements: [...avis.map((p): Element => ({ sorte: 'piece', p })), ...annonces.map((a): Element => ({ sorte: 'annonce', a, exemple: cherchees.exemple }))],
       })
     }
     if (vue.sirenInconnu) groupes.push({ titre: 'Que faire de ce SIREN', elements: [{ sorte: 'siren', siren: vue.sirenInconnu }] })
@@ -560,7 +565,7 @@ function Ligne({ element: e, saisie, choisie, survoler, ouvrir, gestes }: Propri
         <Picto nom="annonce" />
         <span className="rig-palette__texte">
           <span className="rig-palette__t1"><span className="rig-palette__num">{e.a.numAnnonce}</span><Surligne texte={e.a.texte} saisie={saisie} /></span>
-          <span className="rig-palette__t2">{e.a.typeAnnonce} · dossier {e.a.dossier}</span>
+          <span className="rig-palette__t2">{e.exemple && <><Exemple />{' '}</>}{e.a.typeAnnonce} · dossier {e.a.dossier}</span>
         </span>
         <span className={'rig-palette__etat' + (e.a.envoi ? ' rig-palette__etat--ok' : '')}>{e.a.envoi ? 'Envoyee' : 'A envoyer'}</span>
       </>
