@@ -1,0 +1,88 @@
+# « Mesures » (EcrivainSurveillanceMesures) : « Valider » d'OPE_AFFICHAGE_MES.cs (PROC_SURVMES de RIG v2) -- l'evenement echu
+# expire, le survenu de son code d'expiration et le futur de celui-ci sont crees sur la mesure. Lignes du jeu : PROC_SURVMES.sql et
+# .attendu ; mesures et verrou : PROC_MESIN.sql (1500902 tenue par la demande MESIN D2615000941 en cours).
+
+# Refus de RIG v2 : « Aucune ligne cochée » (DoVerifier, :86). Jumeau accepte : bloc 6.
+geste: Agir Valider
+ids:
+resultat: refuse
+message: Aucune ligne cochée
+---
+# Refus de RIG v2 : un code sans code « expire » (:97). Jumeau accepte : bloc 6, BANC9EXP expire en BANC9X.
+geste: Agir Valider
+ids: 1900702
+resultat: refuse
+message: La mesure n°2026M15902 ne contient pas de code événement pro expiré
+---
+# Refus de RIG v2 : un evenement deja survenu n'expire pas (PasserEnExpirerEveProFuturWithParent, EvenementProcedure.cs:2095-2107).
+# Jumeau accepte : bloc 6, 1900711 ni survenu ni expire.
+geste: Agir Valider
+ids: 1900705
+resultat: refuse
+message: Impossible d'expirer l'évènement. On est pas dans un evènement futur
+---
+# Le verrou : la mesure 1500902 est tenue par la demande MESIN en cours (CreateAndLockDemande, Mesure.cs:925-937) -- seule
+# cochee, rien n'est valide. Jumeau accepte : bloc 6, 1500903 n'a qu'une demande MESIN validee.
+geste: Agir Valider
+ids: 1900701
+resultat: refuse
+message: Rien n'est validé : mesure n°2026M15902 : Mesure bloquée (D2615000941), demande "En cours" : MESIN par M. AUTRE MESIN.
+---
+# Un code d'expiration absent de la table des codes : refus, et RIEN n'est ecrit -- l'expiration deja posee de 1900715 est annulee
+# avec la transaction du geste (controle du bloc 6). Jumeau accepte : bloc 6, BANC9X est dans la table.
+geste: Agir Valider
+ids: 1900715
+resultat: refuse
+message: Le code d'expiration « BANC9ABS » du code « BANC9EX4 » n'est pas dans la table des codes d'événement du greffe : rien n'est validé.
+---
+# « Valider » sur deux mesures : 1500902 est verrouillee (avertissement de RIG v2, :111 -- elle n'est pas traitee), 1500903 l'est.
+# 1900711 et 1900712 expirent (1900711 garde son numero source, 1900712 en recoit un) ; pour chacun, un survenu BANC9X du jour
+# (type S, piece numerisee : nature, type et nom du deposant du code) lie a l'expire, puis un futur BANC9F lie au survenu, date
+# maxi a 15 jours (jours avant semaines ; la mini de 1 semaine tombe : maxi avant mini). Rangs : 1, 2 renumerotes, puis 3 a 6.
+geste: Agir Valider
+ids: 1900701,1900711,1900712
+resultat: fait
+message: 2 événements expirés sur 1 mesure ; 2 événements survenus créés, 2 événements futurs. Les éditions ne sont pas générées. Non traitée : mesure n°2026M15902 : Mesure bloquée (D2615000941), demande "En cours" : MESIN par M. AUTRE MESIN.
+lignes:
+Mesure 2026M15904 | BANC9EX2 Échéance deux du banc 9 · échéance {J-3} | Mesures à traiter | AFaire | []
+Mesure 2026M15904 | BANC9EX3 Échéance trois du banc 9 · échéance {J-3} | Mesures à traiter | AFaire | []
+Mesure 2026M15904 | BANC9EX4 Échéance quatre du banc 9 · échéance {J-4} | Mesures à traiter | AFaire | []
+Mesure 2026M15902 | BANC9EXP Échéance du banc 9 · échéance {J-1} | Mesures à traiter | AFaire | []
+Mesure 2026M15902 | BANC9OBS Observation du banc 9 · échéance {J-2} · sans code d'expiration | Sans code d'expiration | Rejetee | []
+Mesure 2026M15902 | BANC9EXP Échéance du banc 9 · échéance {J+0} | Mesures à traiter | AFaire | []
+controle: SELECT CAST(EVNPR_DELAI_EXPIRE AS varchar(1)) + '/' + EVNPR_NUMERO_SOURCE FROM v2.EVENEMENT_PROCEDURE WHERE EVNPR_ID_EVNPR = 1900711 => 1/SRC-1900711
+controle: SELECT CAST(EVNPR_DELAI_EXPIRE AS varchar(1)) + '/' + CAST(LEN(EVNPR_NUMERO_SOURCE) AS varchar(3)) FROM v2.EVENEMENT_PROCEDURE WHERE EVNPR_ID_EVNPR = 1900712 => 1/36
+controle: SELECT s.EVNPR_CODE_EVE_PRO + '/' + s.EVNPR_TYPE_EVE_PRO + '/' + CAST(s.EVNPR_SURVENU AS varchar(1)) + '/' + CAST(s.EVNPR_DELAI_EXPIRE AS varchar(1)) + '/' + CAST(DATEDIFF(day, CAST(GETDATE() AS date), s.EVNPR_DATE) AS varchar(3)) + '/' + CAST(s.EVNPR_AVEC_PIECE_NUMERISE AS varchar(1)) + '/' + s.EVNPR_NATURE_DOC_GED + '/' + s.EVNPR_TYPE_DEPOSANT_GED + '/' + s.EVNPR_NOM_DEPOSANT_GED + '/' + CAST(s.EVNPR_NUM_ORDRE AS varchar(3)) FROM v2.EVENEMENT_PROCEDURE AS s WHERE s.EVNPR_NUMERO_SOURCE_EP_LIE = 'SRC-1900711' => BANC9X/S/1/0/0/1/NAT9/TD9/Déposant du banc 9/3
+controle: SELECT f.EVNPR_CODE_EVE_PRO + '/' + f.EVNPR_TYPE_EVE_PRO + '/' + CAST(f.EVNPR_SURVENU AS varchar(1)) + '/' + CAST(f.EVNPR_DELAI_EXPIRE AS varchar(1)) + '/' + CAST(DATEDIFF(day, CAST(GETDATE() AS date), f.EVNPR_DATE_MAXI) AS varchar(3)) + '/' + CASE WHEN f.EVNPR_DATE IS NULL AND f.EVNPR_DATE_MINI IS NULL AND f.EVNPR_DATE_FIXE IS NULL THEN 'maxi seule' ELSE 'autres dates' END + '/' + CAST(f.EVNPR_AVEC_PIECE_NUMERISE AS varchar(1)) + '/' + CAST(f.EVNPR_NUM_ORDRE AS varchar(3)) FROM v2.EVENEMENT_PROCEDURE AS s JOIN v2.EVENEMENT_PROCEDURE AS f ON f.EVNPR_NUMERO_SOURCE_EP_LIE = s.EVNPR_NUMERO_SOURCE WHERE s.EVNPR_NUMERO_SOURCE_EP_LIE = 'SRC-1900711' => BANC9F/F/0/0/15/maxi seule/0/4
+controle: SELECT CAST(COUNT(*) AS varchar(3)) + '/' + CAST(MAX(EVNPR_NUM_ORDRE) AS varchar(3)) + '/' + CAST(SUM(CASE WHEN EVNPR_SURVENU = 1 THEN 1 ELSE 0 END) AS varchar(3)) FROM v2.EVENEMENT_PROCEDURE WHERE EVNPR_ID_MSINS = 1500903 => 6/6/2
+controle: SELECT CAST(ISNULL(EVNPR_DELAI_EXPIRE, 0) AS varchar(1)) FROM v2.EVENEMENT_PROCEDURE WHERE EVNPR_ID_EVNPR = 1900701 => 0
+controle: SELECT CAST(ISNULL(EVNPR_DELAI_EXPIRE, 0) AS varchar(1)) + '/' + CAST((SELECT COUNT(*) FROM v2.EVENEMENT_PROCEDURE WHERE EVNPR_CODE_EVE_PRO = 'BANC9ABS') AS varchar(3)) FROM v2.EVENEMENT_PROCEDURE WHERE EVNPR_ID_EVNPR = 1900715 => 0/0
+---
+# « Valider » sur la mesure 1500904 (ses trois evenements 1900713 a 1900715) : 1900713 expire en BANC9Y, dont le
+# futur BANC9G prend la date FIXE a 2 mois (fixe avant maxi, IEntiteJudiciaire.cs:185-187) et une piece numerisee SANS nom de
+# deposant (GererPiecesNum : survenu seulement) ; 1900714 expire en BANC9Z, dont le futur n'a aucun delai : pas de futur
+# (:182-184). Rangs : 1 a 3 renumerotes, puis 4 (survenu BANC9Y), 5 (futur BANC9G), 6 (survenu BANC9Z).
+geste: Agir Valider
+ids: 1900713,1900714
+resultat: fait
+message: 2 événements expirés sur 1 mesure ; 2 événements survenus créés, 1 événement futur. Les éditions ne sont pas générées.
+lignes:
+Mesure 2026M15904 | BANC9EX4 Échéance quatre du banc 9 · échéance {J-4} | Mesures à traiter | AFaire | []
+Mesure 2026M15902 | BANC9EXP Échéance du banc 9 · échéance {J-1} | Mesures à traiter | AFaire | []
+Mesure 2026M15902 | BANC9OBS Observation du banc 9 · échéance {J-2} · sans code d'expiration | Sans code d'expiration | Rejetee | []
+Mesure 2026M15902 | BANC9EXP Échéance du banc 9 · échéance {J+0} | Mesures à traiter | AFaire | []
+controle: SELECT f.EVNPR_CODE_EVE_PRO + '/' + CASE WHEN f.EVNPR_DATE_FIXE = DATEADD(month, 2, CAST(CAST(GETDATE() AS date) AS datetime)) THEN 'fixe a 2 mois' ELSE 'autre fixe' END + '/' + CASE WHEN f.EVNPR_DATE_MAXI IS NULL AND f.EVNPR_DATE_MINI IS NULL THEN 'seule' ELSE 'autres dates' END + '/' + CAST(f.EVNPR_AVEC_PIECE_NUMERISE AS varchar(1)) + '/' + f.EVNPR_NATURE_DOC_GED + '/' + f.EVNPR_TYPE_DEPOSANT_GED + '/' + ISNULL(f.EVNPR_NOM_DEPOSANT_GED, 'sans nom') + '/' + CAST(f.EVNPR_NUM_ORDRE AS varchar(3)) FROM v2.EVENEMENT_PROCEDURE AS x JOIN v2.EVENEMENT_PROCEDURE AS s ON s.EVNPR_NUMERO_SOURCE_EP_LIE = x.EVNPR_NUMERO_SOURCE JOIN v2.EVENEMENT_PROCEDURE AS f ON f.EVNPR_NUMERO_SOURCE_EP_LIE = s.EVNPR_NUMERO_SOURCE WHERE x.EVNPR_ID_EVNPR = 1900713 => BANC9G/fixe a 2 mois/seule/1/NAT9G/TD9G/sans nom/5
+controle: SELECT s.EVNPR_CODE_EVE_PRO + '/' + CAST(s.EVNPR_NUM_ORDRE AS varchar(3)) + '/' + CAST((SELECT COUNT(*) FROM v2.EVENEMENT_PROCEDURE AS f WHERE f.EVNPR_NUMERO_SOURCE_EP_LIE = s.EVNPR_NUMERO_SOURCE) AS varchar(3)) FROM v2.EVENEMENT_PROCEDURE AS x JOIN v2.EVENEMENT_PROCEDURE AS s ON s.EVNPR_NUMERO_SOURCE_EP_LIE = x.EVNPR_NUMERO_SOURCE WHERE x.EVNPR_ID_EVNPR = 1900714 => BANC9Z/6/0
+controle: SELECT CAST(COUNT(*) AS varchar(3)) + '/' + CAST(MAX(EVNPR_NUM_ORDRE) AS varchar(3)) + '/' + CAST(SUM(CASE WHEN EVNPR_NUM_ORDRE BETWEEN 1 AND 6 THEN 1 ELSE 0 END) AS varchar(3)) FROM v2.EVENEMENT_PROCEDURE WHERE EVNPR_ID_MSINS = 1500904 => 6/6/6
+---
+# « Editer les lignes cochées » et « Editer tout » ouvrent un apercu Word a l'ecran (EditerLigne, OPE_AFFICHAGE_MES.cs:157) : la V3
+# n'a pas d'edition Word -- refuses, sans jumeau accepte (aucune edition Word n'est produite par la V3).
+geste: Agir Editer les lignes cochées
+ids: 1900703
+resultat: refuse
+message: « Editer les lignes cochées » ouvre un aperçu Word de RIG v2 (EditerLigne, OPE_AFFICHAGE_MES.cs:157) : la V3 n'a pas d'édition Word, rien n'est édité.
+---
+geste: Agir Editer tout
+ids: 1900703
+resultat: refuse
+message: « Editer tout » ouvre un aperçu Word de RIG v2 (EditerLigne, OPE_AFFICHAGE_MES.cs:157) : la V3 n'a pas d'édition Word, rien n'est édité.

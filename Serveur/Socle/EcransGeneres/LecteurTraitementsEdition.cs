@@ -30,8 +30,8 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///
 /// CE QUE LA V3 NE REPREND PAS (nomme) : la plage de dates (aujourd'hui 7 h -> maintenant, OPE_RECHERCHE.cs:128-143), la file
 /// choisie et le numero de groupe -- la forme File ne transmet aucun critere : RIG v2 dates effacees (plage ouverte, MinValue /
-/// MaxValue, :22-56), toutes files. Les gestes : EcrivainTraitementsEdition.cs (« Tout réimprimer » ecrit, les deux autres
-/// refuses avec leur raison).
+/// MaxValue, :22-56), toutes files. Les gestes : EcrivainTraitementsEdition.cs (« Tout réimprimer » et « Cloturer le groupe »
+/// ecrivent, « Relancer via editrcs » est refuse : un programme externe).
 /// </summary>
 internal sealed class LecteurTraitementsEdition : ILecteurEcran
 {

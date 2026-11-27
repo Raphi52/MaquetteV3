@@ -38,8 +38,10 @@ using RigV3Desktop.Pont.EcransGeneres;
 //     de dossier, d'entreprise et d'action : a partir de 100000 x le rang du lot, pour ne pas croiser un autre jeu ;
 //   - <PROCEDURE>.attendu : les lignes que le lecteur doit rendre, DANS L'ORDRE, une par ligne, au format
 //     « Nom | Precisions | Groupe | Etat | [faites] » (celui des ECHEC de ce banc). Une date relative au jour du banc
-//     s'ecrit {J-5}, {M-16} ou {A+1} (jours, mois, annees) ; les lignes vides et celles qui commencent par # sont
-//     ignorees : y dire pourquoi chaque refus est refuse. Chaque refus a son jumeau accepte (meme borne, autre cote).
+//     s'ecrit {J-5}, {M-16} ou {A+1} (jours, mois, annees), le premier ou le dernier jour d'un mois {D-1}, {F-1} ; les
+//     lignes vides et celles qui commencent par # sont ignorees : y dire pourquoi chaque refus est refuse. Chaque refus a
+//     son jumeau accepte (meme borne, autre cote). Les CELLULES d'une ligne (LigneLue.Valeurs, Referentiel et Etat) se
+//     controlent en ajoutant « | valeurs: a ; b ; c » a la ligne attendue ; sans ce champ, elles ne sont pas comparees.
 // Puis la section 4 controle tout lecteur contre son descripteur.
 //
 // LE SOCLE FONCTIONNEL (plan « RIG v3 100 % fonctionnel », lot 2, 26/11/2026) : la recherche, la fiche et les GESTES. Le
@@ -191,15 +193,29 @@ string Texte(LigneLue l) => $"{l.Nom} | {l.Precisions} | {l.Groupe} | {l.Etat} |
 // bloc.Lignes)), sans le remplacement {J-n} que seuls les .attendu recevaient : une ligne datee ne pouvait pas y etre ecrite.
 // fix-ok: mesure le 26/11/2026 (lot 8, PROC_IPSUIVI.recherches) -- meme defaut pour les lignes d'un .recherches (bloc et route) :
 // une IP trouvee par son numero porte les dates de ses actes ; elles recoivent maintenant le meme remplacement.
-string Dates(string ligne) => System.Text.RegularExpressions.Regex.Replace(ligne, @"\{([JMA])([+-]\d+)\}", m =>
+// {D-1} / {F-1} : le premier / le dernier jour du mois M-1 (lot 9 : la periode par defaut de RIG v2, « le mois precedent
+// complet », PROC_STATCA OPE_RECHERCHE.cs:37-58, ne s'ecrivait pas en jours relatifs, qui changent avec le jour du mois).
+string Dates(string ligne) => System.Text.RegularExpressions.Regex.Replace(ligne, @"\{([JMADF])([+-]\d+)\}", m =>
 {
     var n = int.Parse(m.Groups[2].Value, System.Globalization.CultureInfo.InvariantCulture);
-    return D(m.Groups[1].Value switch { "J" => jour.AddDays(n), "M" => jour.AddMonths(n), _ => jour.AddYears(n) });
+    var mois = new DateTime(jour.Year, jour.Month, 1).AddMonths(n);
+    return D(m.Groups[1].Value switch
+    {
+        "J" => jour.AddDays(n), "M" => jour.AddMonths(n), "D" => mois, "F" => mois.AddMonths(1).AddDays(-1), _ => jour.AddYears(n),
+    });
 });
 
+// Une ligne attendue qui finit par « | valeurs: a ; b » compare AUSSI les cellules de la ligne lue (LigneLue.Valeurs) :
+// lot 9 -- les chiffres d'un Etat (PROC_STATCA) sont dans ses cellules, que Texte ne montre pas ; sans ce champ, rien ne change.
+// fix-ok: mesure le 27/11/2026 (lot 9) -- Texte (plus haut) ne porte pas les cellules : aucun jeu ne pouvait voir un chiffre faux
+// d'un Etat. Le stock de PROC_STATCA fausse expres (B + C - D) sort ROUGE au bloc 1 de PROC_STATCA.recherches, qui compare ses
+// « valeurs: », puis vert une fois le calcul remis. Trois
+// retouches de ce fichier pour une seule cause : l'en-tete (format), Dates ({D-1}/{F-1}), et la route des recherches (sans « valeurs: »).
+const string ChampValeurs = " | valeurs: ";
 void Comparer(IReadOnlyList<LigneLue> lues, string[] attendues, string quoi)
 {
-    var obtenues = lues.Select(Texte).ToArray();
+    var obtenues = lues.Select((l, k) => k < attendues.Length && attendues[k].Contains(ChampValeurs)
+        ? Texte(l) + ChampValeurs + string.Join(" ; ", l.Valeurs) : Texte(l)).ToArray();
     var ok = obtenues.SequenceEqual(attendues);
     Exiger(ok, quoi);
     if (!ok)
@@ -546,7 +562,9 @@ foreach (var fichier in Directory.GetFiles(dossierJeux, "*.recherches").Order(St
     var premier = Blocs.Lire(File.ReadAllLines(fichier)).First();
     var parRouteCherchee = await http.GetFromJsonAsync<LignesEcran>(RoutesEcransGeneres.Pour(Greffe, code, new RechercheEcran(premier.Texte, premier.Criteres)), json);
     var parRouteSans = await http.GetFromJsonAsync<LignesEcran>(RoutesEcransGeneres.Pour(Greffe, code), json);
-    Exiger(parRouteCherchee is { Cherchee: true, Chercheur: true } && parRouteCherchee.Lignes.Select(Texte).SequenceEqual((premier.Lignes ?? []).Select(Dates))
+    // Par la route, les lignes seules (sans le champ « valeurs: », que Comparer controle au bloc 1 ci-dessus).
+    Exiger(parRouteCherchee is { Cherchee: true, Chercheur: true } && parRouteCherchee.Lignes.Select(Texte).SequenceEqual((premier.Lignes ?? [])
+               .Select(a => Dates(a.Contains(ChampValeurs) ? a[..a.IndexOf(ChampValeurs, StringComparison.Ordinal)] : a)))
            && parRouteSans is { Cherchee: false, Chercheur: true },
         $"{code} : la recherche passe par la route (texte et criteres en parametres d'adresse), Cherchee ; sans recherche, la liste de travail");
 }

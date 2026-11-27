@@ -2,27 +2,27 @@
 # OPE_EDITGRP.cs). « Tout réimprimer » n'est actif que sur un groupe clos (:205). Lignes du jeu : PROC_RELANCEFILE.sql et .attendu.
 
 # Refus : un groupe ouvert (1900911) coche avec un groupe clos (1900917) -- rien n'est ecrit, pas meme pour 1900917.
-# Jumeau accepte : bloc 7, 1900917 seul.
+# Jumeau accepte : bloc 9, 1900917 seul.
 geste: Agir Tout réimprimer
 ids: 1900917,1900911
 resultat: refuse
 message: Le groupe 1900911 de la file BANC9 RCS est ouvert : RIG v2 ne réimprime qu'un groupe clôturé.
 ---
 # Refus : TRTED_CLOTURE pose sans date de cloture n'est pas clos pour RIG v2 (IsCloture, TraitementEdition.cs:487-490).
-# Jumeau accepte : bloc 7, 1900917 a sa date de cloture.
+# Jumeau accepte : bloc 9, 1900917 a sa date de cloture.
 geste: Agir Tout réimprimer
 ids: 1900913
 resultat: refuse
 message: Le groupe 1900913 de la file BANC9 RCS est ouvert : RIG v2 ne réimprime qu'un groupe clôturé.
 ---
-# Refus : un groupe de la file Amitel, que l'agent du greffe ne voit pas (ETP_LISTVIEW_\OPE_RECHERCHELOT.cs:38). Jumeau : bloc 7.
+# Refus : un groupe de la file Amitel, que l'agent du greffe ne voit pas (ETP_LISTVIEW_\OPE_RECHERCHELOT.cs:38). Jumeau : bloc 9.
 geste: Agir Tout réimprimer
 ids: 1900914
 resultat: refuse
 message: Groupe d'édition introuvable dans la base du greffe (1900914).
 ---
 # Refus : un groupe clos dont aucune edition n'est imprimee par RIG v2 (LGEDT_IMPRIMER = 0, OPE_EDITGRP.cs:295-297) : rien a remettre.
-# Jumeau accepte : bloc 7, 1900917 a une edition que RIG v2 imprime.
+# Jumeau accepte : bloc 9, 1900917 a une edition que RIG v2 imprime.
 geste: Agir Tout réimprimer
 ids: 1900918
 resultat: refuse
@@ -35,11 +35,26 @@ ids: 1900911
 resultat: refuse
 message: « Relancer via editrcs » lance le programme editrcs de RIG v2 : la V3 ne lance aucun programme externe, rien n'est relancé.
 ---
-# Refus : « Cloturer le groupe » (TraitementEdition.Cloturer) n'est pas encore repris : dit, sans rien ecrire ; sans jumeau accepte.
+# Refus de RIG v2 : « Ce groupe est déjà clôturé. » (_cloturer, OPE_EDITGRP.cs:418-421) -- 1900917 coche avec 1900920 : rien
+# n'est ecrit, pas meme pour 1900920. Jumeau accepte : bloc 10, 1900920 seul.
+geste: Agir Cloturer le groupe
+ids: 1900920,1900917
+resultat: refuse
+message: Ce groupe est déjà clôturé.
+---
+# Refus de RIG v2 : un groupe sans imprimante (:422-425 ; la liste de RIG v2 est liee a TRTED_IMPRIMANTE1, :120). Jumeau accepte :
+# bloc 10, 1900920 a son imprimante.
+geste: Agir Cloturer le groupe
+ids: 1900915
+resultat: refuse
+message: Il faut choisir une imprimante avant de clôturer le groupe.
+---
+# Refus : un groupe sans destinataire, que TraitementEdition.Cloturer laisse ouvert sans rien dire (:225-226) -- la V3 le dit.
+# Jumeau accepte : bloc 10, 1900920 a deux destinataires.
 geste: Agir Cloturer le groupe
 ids: 1900911
 resultat: refuse
-message: « Cloturer le groupe » n'est pas encore repris par la V3 : rien n'est écrit.
+message: Le groupe 1900911 de la file BANC9 RCS n'a aucun destinataire : RIG v2 ne le clôture pas, rien n'est écrit.
 ---
 # « Tout réimprimer » (_basculerEtatP(true), :290-322) : l'edition 1900971, que RIG v2 imprime, redevient « non imprimee »
 # (SetEstNonImprime), n'est plus differee et part sur l'imprimante du groupe ; 1900972 (LGEDT_IMPRIMER = 0) ne bouge pas.
@@ -52,7 +67,49 @@ File BANC9 RCS · groupe 1900917 | 2 éditions · 1 non imprimée · ouvert le {
 File BANC9 RCS · groupe 1900911 | 0 édition · ouvert le {J-1} · Imprimante 1er étage | Groupes ouverts | AFaire | []
 File BANC9 RCS · groupe 1900913 | 0 édition · ouvert le {J-2} · Imprimante 1er étage | Groupes ouverts | AFaire | []
 File BANC9 RCS · groupe 1900918 | 1 édition · ouvert le {J-2} · clôturé le {J-2} · en transmission · Imprimante 1er étage | Groupes clôturés | EnCours | []
+File BANC9 RCS · groupe 1900920 | 2 éditions · 2 non imprimées · ouvert le {J-1} · Imprimante 1er étage | Groupes ouverts | AFaire | []
 File Courriers du banc 9 · groupe 1900916 | 0 édition · ouvert le {J-4} | Groupes ouverts | AFaire | []
 File Courriers du banc 9 · groupe 1900915 | 0 édition · ouvert le {J-1} | Groupes ouverts | AFaire | []
+File BANC9 LETTRES · groupe 1900921 | 1 édition · ouvert le {J-1} · Imprimante RDC | Groupes ouverts | AFaire | []
 controle: SELECT LGEDT_ETAT_EDT + '/' + LGEDT_ETAT + '/' + CASE WHEN LGEDT_DATE_EDT IS NULL THEN 'sans date' ELSE 'date' END + '/' + CAST(LGEDT_DIFFERE AS varchar(1)) + '/' + LGEDT_DESTINATION_PHYSIQUE FROM v2.LIGNE_EDITION WHERE LGEDT_ID_LGEDT = 1900971 => I/0/sans date/0/Imprimante 1er étage
 controle: SELECT LGEDT_ETAT_EDT + '/' + LGEDT_ETAT + '/' + CASE WHEN LGEDT_DATE_EDT IS NULL THEN 'sans date' ELSE 'date' END + '/' + CAST(LGEDT_DIFFERE AS varchar(1)) + '/' + LGEDT_DESTINATION_PHYSIQUE FROM v2.LIGNE_EDITION WHERE LGEDT_ID_LGEDT = 1900972 => E/1/date/1/Différée
+---
+# « Cloturer le groupe » (TraitementEdition.Cloturer, :227-244) : 1900920 est clos ce jour, sur son imprimante ; un destinataire
+# attend sa transmission (INFDS_LOT_TRANSMIS = 0) : « en transmission ». La file garde un groupe ouvert (1900911) : aucun groupe
+# neuf (jumeau : bloc 11).
+geste: Agir Cloturer le groupe
+ids: 1900920
+resultat: fait
+message: Groupe 1900920 clôturé. Rien n'est imprimé ni envoyé : rien ne sort du poste.
+lignes:
+File BANC9 RCS · groupe 1900917 | 2 éditions · 1 non imprimée · ouvert le {J-3} · clôturé le {J-3} · transmission finie · Imprimante 1er étage | Groupes clôturés | EnCours | []
+File BANC9 RCS · groupe 1900911 | 0 édition · ouvert le {J-1} · Imprimante 1er étage | Groupes ouverts | AFaire | []
+File BANC9 RCS · groupe 1900913 | 0 édition · ouvert le {J-2} · Imprimante 1er étage | Groupes ouverts | AFaire | []
+File BANC9 RCS · groupe 1900918 | 1 édition · ouvert le {J-2} · clôturé le {J-2} · en transmission · Imprimante 1er étage | Groupes clôturés | EnCours | []
+File BANC9 RCS · groupe 1900920 | 2 éditions · 2 non imprimées · ouvert le {J-1} · clôturé le {J+0} · en transmission · Imprimante 1er étage | Groupes clôturés | EnCours | []
+File Courriers du banc 9 · groupe 1900916 | 0 édition · ouvert le {J-4} | Groupes ouverts | AFaire | []
+File Courriers du banc 9 · groupe 1900915 | 0 édition · ouvert le {J-1} | Groupes ouverts | AFaire | []
+File BANC9 LETTRES · groupe 1900921 | 1 édition · ouvert le {J-1} · Imprimante RDC | Groupes ouverts | AFaire | []
+controle: SELECT CAST(TRTED_CLOTURE AS varchar(1)) + '/' + CAST(TRTED_FIN_TRANSMISSION AS varchar(1)) FROM v2.TRAITEMENT_EDITION WHERE TRTED_ID_TRTED = 1900920 => 1/0
+controle: SELECT COUNT(*) FROM v2.TRAITEMENT_EDITION WHERE TRTED_ID_FLEDT = 1900901 => 6
+---
+# « Cloturer le groupe » sur le SEUL groupe ouvert de la file BANC9 LETTRES : 1900921 est clos, transmission finie (son unique
+# destinataire est transmis, :227-228), et RIG v2 ouvre le groupe suivant aux reglages de la FILE (_CreateEditionOuverte,
+# :196-222) : 1900922, ouvert maintenant, impression automatique demain a 06:30, « Imprimante RDC » ; la file le designe.
+geste: Agir Cloturer le groupe
+ids: 1900921
+resultat: fait
+message: Groupe 1900921 clôturé ; groupe 1900922 ouvert dans la file BANC9 LETTRES. Rien n'est imprimé ni envoyé : rien ne sort du poste.
+lignes:
+File BANC9 RCS · groupe 1900917 | 2 éditions · 1 non imprimée · ouvert le {J-3} · clôturé le {J-3} · transmission finie · Imprimante 1er étage | Groupes clôturés | EnCours | []
+File BANC9 RCS · groupe 1900911 | 0 édition · ouvert le {J-1} · Imprimante 1er étage | Groupes ouverts | AFaire | []
+File BANC9 RCS · groupe 1900913 | 0 édition · ouvert le {J-2} · Imprimante 1er étage | Groupes ouverts | AFaire | []
+File BANC9 RCS · groupe 1900918 | 1 édition · ouvert le {J-2} · clôturé le {J-2} · en transmission · Imprimante 1er étage | Groupes clôturés | EnCours | []
+File BANC9 RCS · groupe 1900920 | 2 éditions · 2 non imprimées · ouvert le {J-1} · clôturé le {J+0} · en transmission · Imprimante 1er étage | Groupes clôturés | EnCours | []
+File Courriers du banc 9 · groupe 1900916 | 0 édition · ouvert le {J-4} | Groupes ouverts | AFaire | []
+File Courriers du banc 9 · groupe 1900915 | 0 édition · ouvert le {J-1} | Groupes ouverts | AFaire | []
+File BANC9 LETTRES · groupe 1900921 | 1 édition · ouvert le {J-1} · clôturé le {J+0} · transmission finie · Imprimante RDC | Groupes clôturés | EnCours | []
+File BANC9 LETTRES · groupe 1900922 | 0 édition · ouvert le {J+0} · Imprimante RDC | Groupes ouverts | AFaire | []
+controle: SELECT CAST(TRTED_CLOTURE AS varchar(1)) + '/' + CAST(TRTED_FIN_TRANSMISSION AS varchar(1)) FROM v2.TRAITEMENT_EDITION WHERE TRTED_ID_TRTED = 1900921 => 1/1
+controle: SELECT CAST(TRTED_CLOTURE AS varchar(1)) + '/' + CAST(TRTED_EN_COURS AS varchar(1)) + '/' + CAST(TRTED_IMPRESSION AS varchar(1)) + '/' + CAST(TRTED_IMPRESSION_AUTO AS varchar(1)) + '/' + CONVERT(varchar(5), TRTED_DATE_IMPRESSION_AUTO, 108) + '/' + CAST(DATEDIFF(day, TRTED_DATE_OUVERTURE, TRTED_DATE_IMPRESSION_AUTO) AS varchar(2)) FROM v2.TRAITEMENT_EDITION WHERE TRTED_ID_TRTED = 1900922 => 0/0/0/1/06:30/1
+controle: SELECT FLEDT_ID_TRTED FROM v2.FILE_EDITION WHERE FLEDT_ID_FLEDT = 1900904 => 1900922

@@ -15,13 +15,20 @@
 //     famille, avec ses propres dates et le champ « Nombre de PC ».
 //
 // Les valeurs sont des donnees de demonstration : en v2 elles viennent de
-// la base du greffe, la maquette ne s'y connecte pas.
+// la base du greffe, la maquette ne s'y connecte pas. Lot 9 du plan « RIG v3
+// 100 % fonctionnel » (27/11/2026) : l'ecran le DIT (mention « exemple »), meme
+// branche au serveur -- il affichait ses chiffres comme ceux du greffe. Les
+// calculer demande les requetes de RIG v2
+// (Outils\DLLEdition\RigRapport\Jud\Stats\Internes\MetierStats.cs : 1 730
+// lignes, environ 150 requetes, qui remplissent un classeur Excel), pas encore
+// reprises.
 //
 // Porte depuis Components/Ecrans/EcranStatistiques.razor (lot 4) : meme
 // balisage, memes classes CSS. L'ecran ne lisait rien dans Metier/ : ses
 // periodes partent de la date du POSTE (DateTime.Today), comme avant.
 
 import { useState } from 'react'
+import { Exemple } from './formes/commun'
 
 type VoletStat = 'Internes' | 'Web' | 'RepartitionsJcOp' | 'ActivitesCa' | 'ActivitesSalaries' | 'Semestrielles'
 
@@ -170,6 +177,9 @@ export function EcranStatistiques() {
           <div className="rig-kicker">{titre}</div>
           <span className="rig-resultats-proc__compte">{lignes.length} ligne(s)</span>
         </div>
+        <p className="rig-eg-note" role="note">
+          <Exemple /> Chiffres de démonstration : les statistiques de RIG v2 (classeur Excel de MetierStats.cs) ne sont pas encore calculées dans la base du greffe.
+        </p>
 
         <div className="rig-table-cadre">
           <table className="rig-table">

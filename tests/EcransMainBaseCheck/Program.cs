@@ -1000,6 +1000,60 @@ await GesteRequi(null, null, "Rechercher");
 Exiger(rq is { ModeResultats: "demo", Trouvees.Length: > 0 }, "pont Requisitions sans serveur : la demonstration");
 EcranRequisitions.Fermer(rq.Session);
 
+// ============================================================ 10. DOSSIERS VERROUILLES (LectureVerrous.cs, lot 9)
+// « Dossiers verrouillés » (PROC_VERROUS), branche au lot 9 du plan : les demandes qui verrouillent leurs objets, la regle de
+// RIG v2 (Demande.GetOldLock, Demande.cs:1290-1316 : en cours, ou etat W, I, N, ET un objet lie par DOSSIER_DEMANDE). La demande
+// 1530203 du jeu des depots (en cours, liee) en fait partie : les controles portent sur les demandes 19095xx. Identifiants du
+// lot 9 : 1 900 000 a 1 999 999.
+await Sql("ALTER TABLE v2.DEMANDE ADD DMND_NOM_UTILISATEUR varchar(255) NULL;");
+// 1909501 en cours, liee ; 1909502 interrompue (I), liee ; 1909503 en reclamation (N), liee, tenue par « banc.moi » ; 1909506 en
+// attente (W, sans libelle dans ETAT_DEMANDE), liee, « Agent.Tiers ». Jumeaux refuses : 1909504 en cours SANS objet lie (de
+// 1909501), 1909505 validee, liee (de 1909502).
+await Sql("""
+    INSERT INTO v2.DEMANDE (DMND_ID_DMND, DMND_NUM_DEMANDE, DMND_NOM, DMND_NUM_INDICATIF, DMND_ETAT_DEMANDE, DMND_EN_COURS, DMND_CODE_PROSS,
+        DMND_DATE_CREATION, DMND_NOM_UTILISATEUR) VALUES
+        (1909501, 'D1909501', 'Instance - VERROU ALPHA', 'B9V01', 'Q', 1, 'MJUD', '20261101', 'agent.tiers'),
+        (1909502, 'D1909502', 'Instance - VERROU BETA', 'B9V02', 'I', 0, 'MPC', '20261102', 'agent.tiers'),
+        (1909503, 'D1909503', 'Instance - VERROU GAMMA', 'B9V03', 'N', 0, 'MJUD', '20261103', 'banc.moi'),
+        (1909504, 'D1909504', 'Instance - VERROU SANS OBJET', 'B9V04', 'Q', 1, 'MJUD', '20261101', 'agent.tiers'),
+        (1909505, 'D1909505', 'Instance - VERROU VALIDE', 'B9V05', 'V', 0, 'MJUD', '20261101', 'agent.tiers'),
+        (1909506, 'D1909506', 'Instance - VERROU DELTA', NULL, 'W', 0, 'MJUD', '20261104', 'Agent.Tiers');
+    INSERT INTO v2.DOSSIER_DEMANDE VALUES (1909551, 1909501, '2J', '1909601'), (1909552, 1909502, '2J', '1909602'),
+        (1909553, 1909503, '2J', '1909603'), (1909555, 1909505, '2J', '1909605'), (1909556, 1909506, '2J', '1909606');
+    """);
+await using (var cn = new SqlConnection(greffe.Connexion))
+{
+    await cn.OpenAsync();
+    var verrous = await LectureVerrous.LireAsync(cn, CancellationToken.None);
+    var miens = verrous.Lignes.Where(v => v.Demande.StartsWith("D19095", StringComparison.Ordinal)).ToArray();
+    Exiger(miens.Select(v => v.Demande).SequenceEqual(["D1909501", "D1909502", "D1909503", "D1909506"]) && verrous.Total == verrous.Lignes.Length,
+        $"verrous : en cours ou W/I/N ET un objet lie, du plus ancien au plus recent ; 1909504 (sans objet) et 1909505 (validee) ecartees ({string.Join(",", miens.Select(v => v.Demande))})");
+    Exiger(miens[0] is { Dossier: "B9V01", Etat: "En cours", Utilisateur: "agent.tiers", Traitement: "MJUD" } && miens[0].Creation == new DateTime(2026, 11, 1)
+           && miens[1].Etat == "Interrompue" && miens[2].Etat == "Réclamation" && miens[3] is { Etat: "W", Dossier: "" },
+        "verrous : « En cours » si DMND_EN_COURS, sinon le libelle de ETAT_DEMANDE (le code s'il n'en a pas) ; qui la tient : DMND_NOM_UTILISATEUR");
+    var un = await LectureVerrous.LireAsync(cn, CancellationToken.None, plafond: 1);
+    Exiger(un.Lignes.Length == 1 && un.Total == verrous.Total, $"verrous : plafond 1 -> une ligne, total {verrous.Total} ({un.Total})");
+}
+var verrousRoute = await http.GetFromJsonAsync<VerrousLus>(RoutesEcransMain.Pour(RoutesVerrous.Verrous, Greffe), json);
+Exiger(verrousRoute is { Total: > 0 } && verrousRoute.Lignes.Any(v => v.Demande == "D1909503"), "route des verrous : les lignes de la lecture");
+Exiger((await http.GetAsync(RoutesEcransMain.Pour(RoutesVerrous.Verrous, GreffeAbsent))).StatusCode == HttpStatusCode.NotFound,
+    "route des verrous : greffe absent -> 404, sans repli");
+var jourVerrous = new DateTime(2026, 11, 27);
+var autres = await EcranVerrous.VerrouillesAsync(client, Greffe, "agent.tiers", false, jourVerrous);
+var miensPont = autres.Lignes.Where(l => l.Nom.Contains("VERROU", StringComparison.Ordinal)).ToArray();
+Exiger(autres.Mode == "serveur" && miensPont.Length == 1 && miensPont[0] is { Dossier: "B9V03", Utilisateur: "banc.moi", Statut: "alerte", Age: 24, Etat: "Réclamation · MJUD (D1909503)" }
+       && !autres.Lignes.Any(l => EcranVerrous.Exemple("R. VILAIN", true).Lignes.Any(e => e.Dossier == l.Dossier)),
+    $"pont Verrous branche : les demandes d'un AUTRE agent (« agent.tiers » ecarte, « Agent.Tiers » aussi : sans casse), aucune de la demonstration ({string.Join(",", miensPont.Select(l => l.Dossier))})");
+var tous = await EcranVerrous.VerrouillesAsync(client, Greffe, "agent.tiers", true, jourVerrous);
+var tousMiens = tous.Lignes.Where(l => l.Nom.Contains("VERROU", StringComparison.Ordinal)).ToArray();
+Exiger(tousMiens.Select(l => l.Dossier).SequenceEqual(["B9V01", "B9V02", "B9V03", "D1909506"]) && tousMiens[0] is { Statut: "attente", Age: 26 }
+       && tous.Detenteurs.Any(d => d is { Utilisateur: "agent.tiers", Nombre: 2 }),
+    "pont Verrous, mes dossiers compris : les quatre ; sans numero de dossier, le numero de demande ; detenteurs par nom");
+Exiger((await EcranVerrous.VerrouillesAsync(null, null, "R. VILAIN", false, jourVerrous)) is { Mode: "demo", Lignes.Length: > 0 },
+    "pont Verrous sans serveur : la demonstration, mode « demo »");
+Exiger((await EcranVerrous.VerrouillesAsync(client, GreffeAbsent, "R. VILAIN", false, jourVerrous)) is { Mode: "erreur", Lignes.Length: 0, Message: not null },
+    "pont Verrous, greffe absent : le motif, AUCUNE ligne");
+
 Console.WriteLine();
 if (echecs.Count == 0) { Console.WriteLine("Ecrans faits main branches sur la base : VERT."); return 0; }
 Console.WriteLine(echecs.Count + " echec(s) : " + string.Join(" | ", echecs));
