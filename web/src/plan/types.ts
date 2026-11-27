@@ -204,6 +204,8 @@ export interface DescripteurEcranVue {
   objetUnique?: boolean
   /** Le RESULTAT d'une operation sur un objet unique : montre apres le geste, et des l'ouverture d'un objet deja traite. */
   resultat?: MarcheEcranVue[]
+  /** Le titre de la section dessinee en EXTRAIT KBIS (composants/ApercuKbis.tsx) au lieu de ses champs ; PROC_XEX seul. */
+  apercuKbis?: string | null
 }
 /** Les formes d'ecran, aux noms de FormeEcran (C#). */
 export type FormeEcranVue = 'File' | 'Consultation' | 'Fiche' | 'Saisie' | 'Referentiel' | 'Etat' | 'Audience' | 'Document' | 'Operation'

@@ -87,6 +87,10 @@ internal sealed class ModuleEcransMain : IModuleServeur
         routes.MapPost(RoutesStatistiques.Statistiques, (string greffe, RechercheStatistiques recherche, CatalogueGreffes c, CancellationToken ct)
             => SurLaBase(c, greffe, ct, async cn => Results.Ok(await LectureStatistiques.LireAsync(cn, recherche, ct))))
             .RequireAuthorization(PolitiquesSocle.AgentAdmis);
+        // Lot 13 : « Comptabilisation » (LectureComptabilisation.cs), les journées à comptabiliser, règles de RIG v2.
+        routes.MapGet(RoutesComptabilisation.Journees, (string greffe, CatalogueGreffes c, CancellationToken ct)
+            => SurLaBase(c, greffe, ct, async cn => Results.Ok(await LectureComptabilisation.LireAsync(cn, ct))))
+            .RequireAuthorization(PolitiquesSocle.AgentAdmis);
         // Lot 6 : « Réquisitions », la recherche des entreprises (LectureEntreprisesRequi.cs).
         routes.MapPost(RoutesRequisitions.Entreprises, (string greffe, RechercheEntreprises recherche, CatalogueGreffes c, CancellationToken ct)
             => SurLaBase(c, greffe, ct, async cn => Results.Ok(await LectureEntreprisesRequi.LireAsync(cn, recherche, ct))))

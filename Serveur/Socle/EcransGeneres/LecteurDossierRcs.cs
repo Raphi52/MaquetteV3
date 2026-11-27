@@ -177,7 +177,8 @@ internal sealed class LecteurDossierRcs : IRechercheEcran, IFicheEcran
 
     // ------------------------------------------------------------------ LA FICHE
 
-    private const string Adresse = "LTRIM(RTRIM(CONCAT(a.NumeroVoie, ' ', a.TypeVoie, ' ', a.NomVoie, ' ', a.CodePostal, ' ', a.Localite)))";
+    // Partagee avec l'extrait Kbis de PROC_XEX (LecteurKbisInterne) : une adresse de rec.Adresse « a » sur une ligne.
+    internal const string Adresse = "LTRIM(RTRIM(CONCAT(a.NumeroVoie, ' ', a.TypeVoie, ' ', a.NomVoie, ' ', a.CodePostal, ' ', a.Localite)))";
 
     private const string FicheDossier = $"""
         SELECT s.Id, s.NumeroGestion AS Numero, s.Siren, {NomEntreprise} AS Nom, s.DateImmatriculation, s.DateRadiation,

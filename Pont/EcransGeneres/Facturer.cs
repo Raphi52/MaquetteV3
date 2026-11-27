@@ -651,7 +651,14 @@ public sealed class DomaineFacturer : IDomaineEcrans
                     "Numéro de gestion", "Désignation"),
                 Marche("Demande", "Renseignée à partir du dossier choisi : désignation, numéro de gestion, identifiant interne. Pas de saisie ; la date est toujours celle du jour.", false,
                     "Désignation", "Numéro de gestion", "Identifiant interne"),
+                // Ce que l'extrait imprime, lu dans la base (LecteurKbisInterne.cs) ; l'écran le dessine en extrait Kbis (ApercuKbis).
+                Marche("Extrait Kbis", "L'extrait du dossier choisi, mise en page nationale : identité, capital, siège, premier dirigeant, première activité. Lu dans la base, sans saisie.", false,
+                    "SIREN", "Code greffe", Champ.Date("Date d'immatriculation"), "Dénomination", "Forme juridique", Champ.Montant("Capital"),
+                    Champ.Case("Capital variable"), "Monnaie", "Adresse du siège", Champ.Date("Date de début"), "Origine du fonds",
+                    "Mode d'exploitation", "Qualité du dirigeant", Champ.Date("Entrée en fonction"), "SIREN du dirigeant",
+                    Champ.Zone("Activité"), Champ.Date("Début d'activité"), "Code NAF"),
             ],
+            ApercuKbis = "Extrait Kbis",
             // Le nom d'une ligne est le numéro de gestion : c'est lui qu'on saisit (opération sur UN objet).
             Lignes =
             [
