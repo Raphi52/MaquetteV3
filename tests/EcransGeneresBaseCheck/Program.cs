@@ -763,10 +763,12 @@ foreach (var (code, lecteur) in lecteurs.ParProcedure.OrderBy(p => p.Key, String
 }
 
 // Tout ECRIVAIN : un descripteur d'une procedure, un jeu .gestes, et des gestes de sa forme (en-tete, 7).
+// Un Referentiel joue aussi Agir : les gestes de ligne que sa fiche nomme, au menu de la ligne (« Dupliquer » un document
+// ocerise, FormeReferentiel.tsx, lot 11).
 var GestesDeLaForme = new Dictionary<FormeEcran, TypeGeste[]>
 {
     [FormeEcran.Fiche] = [TypeGeste.Enregistrer], [FormeEcran.Saisie] = [TypeGeste.Creer],
-    [FormeEcran.Referentiel] = [TypeGeste.Ajouter, TypeGeste.Modifier, TypeGeste.Supprimer], [FormeEcran.File] = [TypeGeste.Agir],
+    [FormeEcran.Referentiel] = [TypeGeste.Ajouter, TypeGeste.Modifier, TypeGeste.Supprimer, TypeGeste.Agir], [FormeEcran.File] = [TypeGeste.Agir],
     [FormeEcran.Consultation] = [TypeGeste.Agir], [FormeEcran.Etat] = [TypeGeste.Agir], [FormeEcran.Document] = [TypeGeste.Agir],
     [FormeEcran.Operation] = [TypeGeste.Confirmer], [FormeEcran.Audience] = [TypeGeste.Decider],
 };

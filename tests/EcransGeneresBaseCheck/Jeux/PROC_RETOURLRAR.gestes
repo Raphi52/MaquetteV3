@@ -52,6 +52,7 @@ Pli 1A1200010 | modalité « INCONNU » de l'ancien RIG · le {J-6} | NPAI, refu
 Pli 1A170600015 | Reçu le 09/07/2001 | Reçus | Validee | []
 Pli 1A170600013 | NPAI reçu le 09/07/2001 | NPAI, refusés ou incomplets | Validee | []
 Pli 1A2110101 | Reçu le 25/03/2001 | Reçus | Validee | []
+Pli 1A2110122 | Reçu le 22/03/2001 | Reçus | Validee | []
 fiche: 1A2110101
 Retour › Modalité de retour = Réception
 Retour › Date de réception = 2001-03-25
@@ -87,3 +88,66 @@ valeur: Retour › Date de réception = 2001-03-27
 resultat: fait
 message: Pli 1A2110102 : date réception mise à jour (Reçu le 27/03/2001). Courriel de changement à la hotline judiciaire : non envoyé (simulé, RIG v3 n'envoie rien hors du poste).
 controle: SELECT LRARI_TYPE_DATE + ' / ' + CONVERT(varchar(10), LRARI_DATE_RECEPTION, 103) FROM v2.LRAR_INFOS WHERE LRARI_NUM_LRAR = '1A2110102' => RECEPTION / 27/03/2001
+---
+# L'EVENEMENT FUTUR LIE (lot 11, reprise ; en tete d'EcrivainRetoursLrar). Refus : 1A2110123 est le seul pli de l'evenement de
+# l'instance 2110702, dont le futur lie IAROIP passerait en survenu, mais une demande MJUD en cours verrouille l'instance
+# (lockInstance, OPE_RETOURLRAR_RECEPTION.cs:775-783) : rien n'est ecrit, ni le retour ni le futur. Jumeau accepte : bloc 13,
+# l'instance 2110701 libre.
+geste: Confirmer Enregistrer le retour
+ids: 1A2110123
+valeur: Retour › Modalité de retour = Réception
+valeur: Retour › Date de réception = 2001-03-25
+resultat: refuse
+message: Impossible de mettre à jour le recommandé sur l'instance ¤1967RA00702¤ car il y a une demande en cours. Instance bloquée (01021107310), demande "En cours" : MJUD par M. AUTRE BANC 11
+---
+# 1A2110122 (deja recu) recu de nouveau, quand l'autre pli de l'evenement, 1A2110121, n'est pas encore revenu : le retour s'ecrit, le
+# futur lie reste, sans message (OPE_RETOURLRAR_TREEVIEW.cs:192). Jumeau : bloc 13, tous les plis recus.
+geste: Confirmer Enregistrer le retour
+ids: 1A2110122
+valeur: Retour › Modalité de retour = Réception
+valeur: Retour › Date de réception = 2001-03-23
+resultat: fait
+message: Pli 1A2110122 : date réception mise à jour (Reçu le 23/03/2001).
+controle: SELECT CAST(EVNPR_SURVENU AS varchar(1)) FROM v2.EVENEMENT_PROCEDURE WHERE EVNPR_ID_EVNPR = 2110712 => 0
+---
+# 1A2110121 revenu NPAI : seule une RECEPTION touche le futur lie (CreerNoeudEP, :171). Jumeau : bloc 13, Reception.
+geste: Confirmer Enregistrer le retour
+ids: 1A2110121
+valeur: Retour › Modalité de retour = NPAI
+valeur: Retour › Date de réception = 2001-03-24
+resultat: fait
+message: Pli 1A2110121 : NPAI reçu le 24/03/2001.
+controle: SELECT CAST(EVNPR_SURVENU AS varchar(1)) FROM v2.EVENEMENT_PROCEDURE WHERE EVNPR_ID_EVNPR = 2110712 => 0
+---
+# 1A2110122 recu de nouveau quand 1A2110121 est revenu NPAI : le retour s'ecrit, le futur reste, et la V2 le dit (:189). Jumeau :
+# bloc 13, 1A2110121 recu.
+geste: Confirmer Enregistrer le retour
+ids: 1A2110122
+valeur: Retour › Modalité de retour = Réception
+valeur: Retour › Date de réception = 2001-03-23
+resultat: fait
+message: Pli 1A2110122 : date réception mise à jour (Reçu le 23/03/2001). Impossible de mettre à jour l'évènement procédure futur lié IAROIP de l'instance 1967RA00701. Les recommandés liés à cette instance n'ont pas tous été réceptionnés.
+controle: SELECT CAST(EVNPR_SURVENU AS varchar(1)) FROM v2.EVENEMENT_PROCEDURE WHERE EVNPR_ID_EVNPR = 2110712 => 0
+---
+# 1A2110121 recu le 25/03/2001 : l'autre pli de l'evenement est recu, le futur IAROIP passe en survenu a cette date, ses dates
+# s'effacent (PasserEnSurvenuEveProFutur, EvenementProcedure.cs:1968-1984), et son propre futur ICONSOIP se cree, 15 jours maxi
+# plus tard, lie a son numero source (creationEvenementFutur) ; aucune consignation n'etait la (:1007-1012).
+geste: Confirmer Enregistrer le retour
+ids: 1A2110121
+valeur: Retour › Modalité de retour = Réception
+valeur: Retour › Date de réception = 2001-03-25
+resultat: fait
+message: Pli 1A2110121 : date réception mise à jour (Reçu le 25/03/2001). Mise à jour de l'instance 1967RA00701. L'évènement procédure futur lié IAROIP est passé en survenu.
+controle: SELECT CAST(EVNPR_SURVENU AS varchar(1)) + CAST(EVNPR_DELAI_EXPIRE AS varchar(1)) + '|' + CONVERT(varchar(10), EVNPR_DATE, 103) + '|' + COALESCE(CONVERT(varchar(10), EVNPR_DATE_MAXI, 103), 'sans date maxi') FROM v2.EVENEMENT_PROCEDURE WHERE EVNPR_ID_EVNPR = 2110712 => 10|25/03/2001|sans date maxi
+controle: SELECT CAST(EVNPR_NUM_ORDRE AS varchar(5)) + '|' + CAST(EVNPR_SURVENU AS varchar(1)) + '|' + CONVERT(varchar(10), EVNPR_DATE_MAXI, 103) + '|' + EVNPR_TYPE_EVE_PRO FROM v2.EVENEMENT_PROCEDURE WHERE EVNPR_ID_INSTN = 2110701 AND EVNPR_CODE_EVE_PRO = 'ICONSOIP' AND EVNPR_NUMERO_SOURCE_EP_LIE = 'B11-LRAR-FUT-1' => 3|0|09/04/2001|I
+---
+# 1A2110124, seul pli de l'evenement de 2110703, recu : son futur IAROIP passe en survenu, mais un futur de consignation ICONSOIP est
+# deja la sur l'instance (OPE_RETOURLRAR_RECEPTION.cs:1007-1012) : il est relie au futur qui passe, et aucun autre n'est cree.
+geste: Confirmer Enregistrer le retour
+ids: 1A2110124
+valeur: Retour › Modalité de retour = Réception
+valeur: Retour › Date de réception = 2001-03-26
+resultat: fait
+message: Pli 1A2110124 : Reçu le 26/03/2001. Mise à jour de l'instance 1967RA00703. L'évènement procédure futur lié IAROIP est passé en survenu.
+controle: SELECT CAST(EVNPR_SURVENU AS varchar(1)) + '|' + CONVERT(varchar(10), EVNPR_DATE, 103) FROM v2.EVENEMENT_PROCEDURE WHERE EVNPR_ID_EVNPR = 2110716 => 1|26/03/2001
+controle: SELECT CAST(COUNT(*) AS varchar(5)) + '|' + MAX(EVNPR_NUMERO_SOURCE_EP_LIE) FROM v2.EVENEMENT_PROCEDURE WHERE EVNPR_ID_INSTN = 2110703 AND EVNPR_CODE_EVE_PRO = 'ICONSOIP' => 1|B11-LRAR-FUT-3

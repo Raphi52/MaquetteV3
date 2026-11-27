@@ -39,9 +39,10 @@ EXEC sp_executesql N'
 INSERT INTO v2.EVENEMENT_PROCEDURE (EVNPR_ID_EVNPR, EVNPR_CODE_EVE_PRO, EVNPR_DATE, EVNPR_ID_PRCLL, EVNPR_ID_PREVE) VALUES
     (2110301, ''BANC11JAL'', DATEADD(DAY, -20, @aujourdhui), 1400103, NULL),
     (2110302, ''BANC11JAL'', DATEADD(DAY, -15, @aujourdhui), NULL, 1400201);
--- Deux bordereaux : B11J01 genere, pas encore transmis (annulable) ; B11J02 transmis par EDI (etat XML 3, plus annulable).
+-- Deux bordereaux : B11J01 genere, pas encore transmis (annulable) ; B11J02 transmis par EDI (etat XML 3, plus annulable), a une
+-- date fixe : « Supprimer le bordereau » la cite dans son refus (PROC_ENV_JAL.gestes).
 INSERT INTO v2.BORDEREAU_JAL (BRDRJ_ID_BRDRJ, BRDRJ_NUM_BORDEREAU, BRDRJ_DATE_CREA_XML, BRDRJ_ETAT_XML) VALUES
-    (2110341, ''B11J01'', DATEADD(DAY, -4, @aujourdhui), ''2''), (2110342, ''B11J02'', DATEADD(DAY, -4, @aujourdhui), ''3'');
+    (2110341, ''B11J01'', DATEADD(DAY, -4, @aujourdhui), ''2''), (2110342, ''B11J02'', ''20010315 10:30:00'', ''3'');
 INSERT INTO v2.PUBLICITE (PBLCT_ID_PBLCT, PBLCT_ID_EVNPR, PBLCT_DATE_ENVOI, PBLCT_DATE_ENVOI_ELECTRONIQUE, PBLCT_NUM_BORDEREAU,
     PBLCT_DESTINATAIRE, PBLCT_ID_PREC_JAL) VALUES
     -- a envoyer (pas de date d envoi electronique), dans la periode par defaut [J-10 ; aujourd hui]

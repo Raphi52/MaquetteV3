@@ -69,3 +69,26 @@ geste: Supprimer
 ids: 2110303
 resultat: refuse
 message: Document introuvable parmi les documents océrisés : relisez la liste.
+---
+# « Dupliquer » (PROC_NUM_PROC.Dupliquer, :388-423), au menu de la ligne (type Agir). Refus : 2110304 n'a pas de fichier
+# (DOCOC_FICHIER vide), GetFichierRaw n'en rend aucun (:406, message de :417). Jumeau accepte : bloc 10, 2110302 et son fichier.
+geste: Agir Dupliquer
+ids: 2110304
+resultat: refuse
+message: Impossible de dupliquer le document
+---
+# Copie de 2110302 (CreateCopie, :369-386) : une nouvelle ligne, ses champs et son fichier, creee aujourd'hui, ni processus ni
+# utilisateur en cours (elle est donc disponible, l'original reste en cours) ; le nom que la V2 propose, « -copie » avant
+# l'extension et les espaces en « _ » (:410, Sauve :404-408) ; son tag OCR_DIFFERE a « 0 » (2110302 n'est pas en traitement OCR).
+# 2110302, son tag et sa ligne VIDIGED_INDEX_TMP_OCR restent.
+geste: Agir Dupliquer
+ids: 2110302
+resultat: fait
+message: Document « scan du banc 11.tif » dupliqué en « scan_du_banc_11-copie.tif », le nom que RIG v2 propose (il se change par Modifier).
+lignes:
+scan_du_banc_11-copie.tif | TIF · 1 page · 1 Ko · créé le {J+0} | TIF | AFaire | []
+scan du banc 11.tif | TIF · 1 page · 1 Ko · créé le 03/05/2001 · en cours · processus NUM · depuis le 04/05/2001 | TIF | EnCours | []
+en cours de numérisation | PDF · créé le 01/05/2001 | PDF | AFaire | []
+ancien du banc 11.TIFF | TIF | TIF | AFaire | []
+controle: SELECT CASE WHEN c.DOCOC_FICHIER = o.DOCOC_FICHIER THEN 'meme fichier' ELSE 'autre fichier' END + '|' + CAST(c.DOCOC_NB_PAGES AS varchar(9)) + '|' + CAST(c.DOCOC_TAILLE AS varchar(9)) + '|' + COALESCE(c.DOCOC_CODE_PROC_EN_COURS, 'libre') + '|' + (SELECT DOCOT_TYPE + '=' + CONVERT(varchar(10), DOCOT_DONNEES_OCERISEES) + '/' + CAST(DOCOT_NUM_PAGE AS varchar(9)) FROM v2.DOCUMENT_OCERISE_TAGS WHERE DOCOT_ID_DOCOC = c.DOCOC_ID_DOCOC) FROM v2.DOCUMENT_OCERISE AS c CROSS JOIN v2.DOCUMENT_OCERISE AS o WHERE c.DOCOC_NOM_FICHIER = 'scan_du_banc_11-copie.tif' AND o.DOCOC_ID_DOCOC = 2110302 => meme fichier|1|500|libre|OCR_DIFFERE=0/0
+controle: SELECT CAST((SELECT COUNT(*) FROM v2.DOCUMENT_OCERISE_TAGS WHERE DOCOT_ID_DOCOC = 2110302) AS varchar(9)) + ' / ' + COALESCE((SELECT DOCOC_CODE_PROC_EN_COURS FROM v2.DOCUMENT_OCERISE WHERE DOCOC_ID_DOCOC = 2110302), 'libre') => 1 / NUM

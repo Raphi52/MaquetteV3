@@ -6,6 +6,11 @@
 // n'a pas de liste : voir OperationSurUnObjet.
 // Confirmer va a l'ecrivain de la procedure (type Confirmer, les objets choisis, les champs remplis) ; fait, la liste est
 // relue (plan « RIG v3 100 % fonctionnel », lot 2). Sans ecrivain, la confirmation ne change rien et le dit.
+// PLUSIEURS GESTES (lot 11) : une fiche RIG v2 qui offre plusieurs boutons sur les memes objets (« Générer » ou « Supprimer
+// le bordereau » d'un envoi JAL, OPE_A_ENVOYER / OPE_DEJA_ENVOYER ; valider ou editer un certificat BODACC) les nomme dans
+// descripteur.gestes : CONFIRMER montre un bouton par geste (gestesDe), chacun envoye a l'ecrivain sous son nom. Sans gestes
+// nommes, le bouton valider seul, comme avant. fix-ok: mesure par le controle final du lot 11 (27/11/2026) -- confirmer
+// n'envoyait que p.valider, si bien qu'un second geste V2 de la meme liste n'atteignait jamais son ecrivain.
 // LA BASE (lot 2) : quand le lecteur sait chercher, le texte et les criteres cherchent dans la base (useRecherche) -- un
 // objet sur UN numero aussi, qui n'est donc pas limite aux lignes deja lues ; un objet se deplie (ou s'ouvre, sur UN
 // objet) sur SA fiche lue, en lecture (FicheLue, useFiche). fix-ok: mesure par le controle final du lot 2 (26/11/2026) --
@@ -17,7 +22,7 @@ import { EnteteListe, ListeModerne, normaliser, PiedListe } from '../../composan
 import type { DescripteurEcranVue } from '../../plan/types'
 import {
   Annonce, ChampSaisie, DEMONSTRATION, Exemple, FicheLue, NoteRecherche, PanneauCriteres, Provenance, Sections,
-  TableLignes, cleChamp, etatDe, figee, manquantes, parcoursDe, refus, useAnnonce, useFiche, useGeste, useLignes,
+  TableLignes, cleChamp, etatDe, figee, gestesDe, manquantes, parcoursDe, refus, useAnnonce, useFiche, useGeste, useLignes,
   useRecherche, type Saisies,
 } from './commun'
 
@@ -48,7 +53,8 @@ function OperationSurLaListe({ d }: { d: DescripteurEcranVue }) {
     if (!apres.delete(i)) apres.add(i)
     return apres
   })
-  const confirmer = () => {
+  const gestes = gestesDe(p)
+  const confirmer = (geste: string) => {
     const manque = manquantes(p.sections, saisies)
     if (manque.length > 0) {
       poserTemps(1)
@@ -56,8 +62,8 @@ function OperationSurLaListe({ d }: { d: DescripteurEcranVue }) {
       return
     }
     const remplies = Object.fromEntries(Object.entries(saisies).filter(([, v]) => v.trim() !== ''))
-    void jouer({ type: 'Confirmer', nom: p.valider, groupe: choisies[0]?.groupe ?? p.titre, ids: choisies.map((l) => l.id), valeurs: remplies },
-      refus(p.valider, `sur ${choisies.length} objet${choisies.length > 1 ? 's' : ''} : rien n’est modifié dans la base`),
+    void jouer({ type: 'Confirmer', nom: geste, groupe: choisies[0]?.groupe ?? p.titre, ids: choisies.map((l) => l.id), valeurs: remplies },
+      refus(geste, `sur ${choisies.length} objet${choisies.length > 1 ? 's' : ''} : rien n’est modifié dans la base`),
       () => { poserCochees(new Set()); poserSaisies({}); poserTemps(0); relire() })
   }
   const remplis = p.sections.flatMap((s) => s.champs.map((c) => ({ c, v: saisies[cleChamp(s.titre, c.libelle)] ?? '' })))
@@ -99,7 +105,7 @@ function OperationSurLaListe({ d }: { d: DescripteurEcranVue }) {
         )}
         {temps === 2 && (
           <div className="rig-eg-recap">
-            <p><b>{p.valider}</b> sur :</p>
+            <p><b>{gestes.join(' ou ')}</b> sur :</p>
             <ul>{choisies.map((l) => <li key={l.i}><b>{l.nom}</b> — {l.precisions}</li>)}</ul>
             {remplis.length > 0 && (
               <dl className="rig-eg-lecture">
@@ -114,9 +120,9 @@ function OperationSurLaListe({ d }: { d: DescripteurEcranVue }) {
           {temps < 2 ? (
             <button type="button" className="rig-lm-outil rig-lm-outil--fort" disabled={choisies.length === 0}
                     onClick={() => poserTemps(temps + 1)}>Suivant</button>
-          ) : (
-            <button type="button" className="rig-lm-outil rig-lm-outil--fort" onClick={confirmer}>{p.valider}</button>
-          )}
+          ) : gestes.map((g, k) => (
+            <button key={g} type="button" className={`rig-lm-outil${k === 0 ? ' rig-lm-outil--fort' : ''}`} onClick={() => confirmer(g)}>{g}</button>
+          ))}
         </PiedListe>
       </ListeModerne>
     </div>

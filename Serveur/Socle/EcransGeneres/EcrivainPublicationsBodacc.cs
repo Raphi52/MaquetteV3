@@ -20,9 +20,17 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///     rien ne s'ecrit : une annonce de cette liste est refusee.
 /// CONTROLES : au moins une annonce cochee ; chaque annonce relue DANS la transaction, dans sa liste (la requete du lecteur).
 /// LA PARTIE EXTERNE : aucune -- l'envoi au BODACC est le geste de « Envoi JAL / BODACC », qui reprend les annonces a l'etat 3.
-/// NON REPRIS (nomme) : les EDITIONS (le certificat par destinataire CERTIF_BOD / CERTIF_BODPR, OPE_LST_CERTIF_BOD.cs:61-89 ; la liste
-/// des rejets, OPE_LST_LISTE_REJ.cs:63-106 ; la liste des controles) : la case « editer » de la V2, une deuxieme case par ligne que
-/// l'Operation ne porte pas.
+/// NON REPRIS (nomme) : les EDITIONS. La forme les offrirait (une Operation porte maintenant un bouton par geste nomme, lot 11), mais
+/// ce qu'elles ecrivent manque a RIG v3 :
+///   - le certificat par destinataire CERTIF_BOD / CERTIF_BODPR (OPE_LST_CERTIF_BOD.cs:61-89) : une demande d'edition par destinataire
+///     de la PC ou de la prevention retenu par le reglage CERTIF_BOD_DEST (« MDJ » dans RIG_DEV, lu le 27/11/2026 : le mandataire
+///     judiciaire), avec sa fiche destinataire (nom, adresse multi-lignes, coffre, courriel : RecupDestEditLot2FROMProcedureCollective,
+///     JUDICIAIRE\DestinatairesEditionsLot2.cs:1526-1700) et l'envoi au coffre du mandataire (:79-87). EditionsEvenementV2 ne calcule que
+///     les destinataires institutionnels d'une instance (son en-tete) : celui d'une PC ou d'une prevention n'existe pas en V3 ;
+///   - la liste des rejets LISTE_REJETS_BODACC (OPE_LST_LISTE_REJ.cs:63-120) et celle des controles : des etats Crystal (FUSION_CRYSTAL
+///     dans PARAMETRE_EDITION de RIG_DEV) dont tout le contenu est le XML de generation -- la requete, le titre et le nom du greffe
+///     (SetParametre SQL / TitreEtat / GreffeNom, :115-117) ; RIG v3 n'ecrit pas ce XML pour un etat Crystal (EditionsV2, en-tete ;
+///     meme reserve que les registres du lot 6, EcrivainRegistresJudiciaires) : la demande sortirait vide.
 /// </summary>
 internal sealed class EcrivainPublicationsBodacc : IEcrivainEcran
 {

@@ -401,8 +401,10 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
             // LecteurDocumentsOcerises.cs (lot 11). Forme Référentiel, pas Document (lot 11, reprise) : la liste de RIG v2 est une
             // grille dont le nom se saisit dans la ligne puis s'enregistre (TreeViewPiecesNum.NodeNom_ChangesApplied, :346-365 ;
             // OPE_PIECENUM_1.Modifier, :341-377), et dont une ligne se supprime (menu Suppression, :269-283) : les deux gestes qui
-            // écrivent la table, EcrivainDocumentsOcerises.cs. Ajouter (scanner ou importer un fichier), Dupliquer et les traitements
-            // de fichier (export sur disque, PDF_WRITER, pages blanches, fusion Aspose) ne sont pas repris (proc_num.md, Détail OPE).
+            // écrivent la table, EcrivainDocumentsOcerises.cs ; et « Dupliquer le document sélectionné » (FORM_NUM.cs:99-100,
+            // PROC_NUM_PROC.Dupliquer :388-423), une copie en base, au menu de la ligne (Gestes, lot 11). Ajouter (scanner ou importer
+            // un fichier) et les traitements de fichier (export sur disque, PDF_WRITER, pages blanches, fusion Aspose) ne sont pas
+            // repris (proc_num.md, Détail OPE).
             Forme = FormeEcran.Referentiel,
             // Le nom sans extension (OPE_PIECENUM_10.cs:105), le format de l'édition (PROC_NUM_PROC._Editer), pages, taille, date,
             // affaire : ce que la ligne V2 montre (OPE_PIECENUM_1.cs:121-136).
@@ -410,6 +412,7 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
             Recherche = "Rechercher un document, un titre, une date…",
             Criteres = ["Format (PDF ou TIF)", "Titre", "Nombre de pages"],
             Valider = "Enregistrer les noms de fichiers",
+            Gestes = ["Dupliquer"],
             Rang = 2,
             // En cours : le document qu'un processus tient (DOCOC_ID_UTLST_EN_COURS) ; la V2 n'a pas d'état « enregistré ».
             Etats = EtatsEcran.Trois("Disponible", "En cours", "Enregistré"),
@@ -418,7 +421,7 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
             [
                 Marche("Document", "Le document de la liste ; seul son nom se saisit, sans extension : RIG v2 remet celle du document.", true,
                     "Nom", "Format", Champ.Nombre("Pages"), "Taille", Champ.Date("Créé le"), "Affaire"),
-                Marche("Traitements du fichier", "Ouvrir, modifier dans l'éditeur PDF ou TIF, supprimer les pages blanches, fusionner, dupliquer, enregistrer sous : des traitements du fichier lui-même, faits sur le poste par RIG v2.", false),
+                Marche("Traitements du fichier", "Ouvrir, modifier dans l'éditeur PDF ou TIF, supprimer les pages blanches, fusionner, enregistrer sous : des traitements du fichier lui-même, faits sur le poste par RIG v2. Dupliquer, au menu de la ligne, crée la copie « <nom>-copie » dans la liste.", false),
             ],
             Lignes =
             [
@@ -552,12 +555,14 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
             // (PROC_ENV_JAL.cs:52-69). Lecteur : LecteurEnvoiJal.cs (lot 11), à envoyer puis déjà envoyées. « Générer le bordereau » :
             // EcrivainEnvoiJal.cs, le mode EDI de la V2 (JAL_ENVOIE_EDI = 1 dans RIG_DEV) en un geste -- Générer puis Envoyer
             // (OPE_A_ENVOYER.cs:189-334, :1071-1170) : bordereau RBOE, publicités envoyées ; le fichier XML n'est pas produit (simulé,
-            // dit à l'écran). Le document Word hors EDI (:493-597) n'est pas repris. « Supprimer le bordereau »
-            // (OPE_DEJA_ENVOYER.cs:297-376) est un second geste, qu'une Opération (un seul geste) ne porte pas.
+            // dit à l'écran). Le document Word hors EDI (:493-597) n'est pas repris. « Supprimer le bordereau », le bouton des
+            // annonces déjà envoyées (OPE_DEJA_ENVOYER.cs:69-84, AnnulerBordereaux_JAL :305-376) : le second geste, offert au temps
+            // Confirmer (Gestes, lot 11) -- les annonces du bordereau redeviennent à envoyer, le bordereau est supprimé.
             Forme = FormeEcran.Operation,
             Recherche = "Numéro de bordereau…",
             Criteres = ["Date de début", "Date de fin", "Destinataire (JAL)", "Numéro de PC ou PRV", "Numéro de bordereau"],
             Valider = "Générer le bordereau",
+            Gestes = ["Générer le bordereau", "Supprimer le bordereau"],
             Rang = 2,
             Etats = EtatsEcran.Trois("À envoyer", "Bordereau généré", "Envoyée"),
             Groupes = ["Procédures collectives", "Préventions"],
@@ -599,7 +604,8 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
             // Les boutons radio GestionBodacc (OPE_BASE_BOD.cs:12, :44-47) et les deux dates « du » / « au » de la V2.
             Criteres = ["Critère de date", "Date du", "Date au", "Numéro de parution"],
             // VALIDER de RIG v2, dans la liste de chaque annonce : un rejet passe à renvoyer (état 3, OPE_LST_LISTE_REJ.DoSauver,
-            // :51-57), un certificat est vérifié (état 6, OPE_LST_CERTIF_BOD, :57-59). Les éditions ne sont pas reprises.
+            // :51-57), un certificat est vérifié (état 6, OPE_LST_CERTIF_BOD, :57-59). Les éditions ne sont pas reprises : le
+            // destinataire d'une PC (mandataire, CERTIF_BOD_DEST) et le XML d'un état Crystal manquent à RIG v3 (EcrivainPublicationsBodacc.cs).
             Valider = "Valider",
             Rang = 2,
             Etats = [.. EtatsEcran.Trois("À traiter", "Vérifiée", "Certifiée"), new EtatEcran("EnAttente", "À renvoyer", "en-attente")],
@@ -608,7 +614,7 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
             [
                 Marche("Renvoi des rejets", "Un rejet coché passe à renvoyer (état 3) : le prochain envoi BODACC le reprend.", false),
                 Marche("Vérification des parutions", "Un certificat de parution coché passe à l'état vérifié (6). Un contrôle non conforme ne s'enregistre pas : RIG v2 n'en édite que la liste. Une validation sans ligne cochée est refusée.", false),
-                Marche("Éditions", "Certificat par destinataire, liste des rejets, liste des contrôles : éditions de RIG v2, non reprises.", false),
+                Marche("Éditions", "Certificat par destinataire, liste des rejets, liste des contrôles : éditions de RIG v2, non reprises — le certificat part vers le mandataire de la procédure, dont RIG v3 ne calcule pas encore la fiche destinataire, et les deux listes sont des états dont RIG v3 n'écrit pas la requête.", false),
             ],
             Lignes =
             [
