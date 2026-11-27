@@ -331,6 +331,9 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             // une section par table, six exemples.
             // fix-ok: mesure par le controle final du lot 14 (27/11/2026, reprise) -- la grille n'offrait ni « Ajouter une zone » ni
             // « Dupliquer » (une ligne neuve n'envoyait que ses colonnes) : Duplication, SectionsAjout, et l'historique d'une zone a part.
+            // fix-ok: controle final du lot 14 (27/11/2026, 2e reprise) -- la fiche d'une zone montrait les sections des deux autres
+            // tables « Non lu », Modifier d'une zone ne prenait que libelle et case, et un type AJMJ offrait Supprimer / Dupliquer :
+            // SectionsParGroupe (le formulaire de chaque table) et GroupesModificationSeule (OPE_AFFICHE_REF_CFEC_AJMJ_TYPE_DEPOT.cs:31-33).
             Colonnes = ["Code", "Libellé", "Table", Champ.Case("Utilisable en saisie")],
             Recherche = "Rechercher un code, un libellé, une table…",
             Criteres = ["Table", "Code", "Libellé"],
@@ -343,25 +346,42 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             // dans son onglet, ses champs obligatoires (OPE_AFFICHE_SQLBASE_PC_ETAT_ZONE.Designer.cs:78-96).
             Duplication = true,
             SectionsAjout = new Dictionary<string, string[]> { ["Zones à afficher selon l’état de la procédure collective"] = ["Champs d'une zone"] },
+            // Le formulaire de chaque table sous sa ligne ouverte (« Enregistrement » est dans les colonnes) : ses champs modifiables
+            // dans RIG v2 s'y saisissent (une zone : tous, _PC_ETAT_ZONE.cs:75-95 ; un type AJMJ : l'evenement de procedure, :46).
+            SectionsParGroupe = new Dictionary<string, string[]>
+            {
+                ["État de la procédure collective"] = ["Champs d'un état de PC"],
+                ["Zones à afficher selon l’état de la procédure collective"] = ["Champs d'une zone", "Historique d'une zone"],
+                ["Types des dépôts envoyés par les AJMJ"] = ["Champs d'un type de dépôt"],
+            },
+            // RIG v2 cache NOUVEAU, SUPPRIMER et DUPLIQUER pour un type de depot AJMJ (OPE_AFFICHE_REF_CFEC_AJMJ_TYPE_DEPOT.cs:31-33).
+            GroupesModificationSeule = ["Types des dépôts envoyés par les AJMJ"],
             Sections =
             [
-                new MarcheEcran("Enregistrement", "Le code ne se renomme pas (en saisir un autre ouvre son enregistrement dans RIG v2) ; le libellé et « Utilisable en saisie » se modifient. Un état de procédure collective se crée ici, une zone dans son onglet avec ses champs ; « Dupliquer » copie un état ou une zone sous un autre code ; un code cité ailleurs ne se supprime pas.", true,
+                new MarcheEcran("Enregistrement", "Le code ne se renomme pas (en saisir un autre ouvre son enregistrement dans RIG v2) ; le libellé et « Utilisable en saisie » se modifient (le libellé d'un type de dépôt AJMJ, par l'équipe Amitel seule). Un état de procédure collective se crée ici, une zone dans son onglet avec ses champs ; « Dupliquer » copie un état ou une zone sous un autre code ; un code cité ailleurs ne se supprime pas. Un type de dépôt AJMJ ne se crée, ne se copie ni ne se supprime : RIG v2 ne fait que le modifier.", true,
                     ["Table", "Code", "Libellé", Champ.Case("Utilisable en saisie")]),
                 // Les autres champs du formulaire de chaque table, en lecture (la fiche d'un code ne montre que la section de sa table).
-                new MarcheEcran("Champs d'un état de PC", "Le formulaire d'un état de procédure collective (OPE_AFFICHE_SQLBASE_PC_ETAT.cs:64-82), en lecture : ses cases s'excluent et ses collections (états suivants, décisions, saisie) se règlent dans RIG v2.", false,
+                // En lecture : changer une modalite AJ ou PA y recalcule les decisions et la saisie rattachees (Modalite_Changed,
+                // OPE_AFFICHE_SQLBASE_PC_ETAT.cs:111-114 -> _PC_ETAT_DJ_EP.cs:393-401, _PC_ETAT_SAISIE.cs:706-714), enregistrees avec
+                // l'etat (SQLBase_Handler_PC_Etat) ; les cases s'excluent et se montrent l'une par l'autre (:89-119, :135-161) ; le
+                // regime des statistiques est reserve a Amitel (:52-55). La grille V3 ne porte ni ces listes ni ces dependances.
+                new MarcheEcran("Champs d'un état de PC", "Le formulaire d'un état de procédure collective (OPE_AFFICHE_SQLBASE_PC_ETAT.cs:64-82), en lecture : changer une modalité y recalcule les décisions et la saisie rattachées à l'état, que cet écran ne règle pas ; les cases ouverture, clôture, conversion et extension s'excluent. Ces champs se règlent dans RIG v2.", false,
                     ["Régime", "Modalité PA", "Modalité AJ", "Ouverture", "Clôture", "Conversion LJ", "Extension", "Résolution du plan", "Code clôture",
                      "Mise à jour de la PC", "À sauver", "Audience future", "Régime PC (statistiques)", "Code procédure"]),
                 // Saisis a la creation et a la copie d'une zone (SectionsAjout), lus ensuite : synonyme, ISO, simplifie et developpe,
                 // table, attribut, type et etat sont obligatoires ; le type et l'etat, les listes de RIG v2 (_ChargerComboTypes,
                 // OPE_AFFICHE_SQLBASE_PC_ETAT_ZONE.cs:48-55 ; _ChargerComboEtats, SousOPE_HISTORIQUE.cs:39-47).
-                new MarcheEcran("Champs d'une zone", "Le formulaire d'une zone (OPE_AFFICHE_SQLBASE_PC_ETAT_ZONE.cs:75-95) : saisi quand la zone se crée ou se copie (synonyme, ISO, textes simplifié et développé, table, attribut, type et état obligatoires ; une table et un attribut déjà portés par une autre zone sont refusés), lu ensuite.", false,
+                new MarcheEcran("Champs d'une zone", "Le formulaire d'une zone (OPE_AFFICHE_SQLBASE_PC_ETAT_ZONE.cs:75-95) : saisi quand la zone se crée, se copie ou se modifie (synonyme, ISO, textes simplifié et développé, table, attribut, type et état obligatoires ; une table et un attribut déjà portés par une autre zone sont refusés).", false,
                     ["Synonyme", "ISO", "Abrégé pour édition", "Simplifié pour édition", Champ.Zone("Développé pour édition"), Champ.Zone("Exhaustif pour édition"),
                      "Table de la zone", "Attribut", Champ.Liste("Type", "DATE", "DATETIME", "HEURE", "INT", "TEXT", "MULTILIGNE", "MONTANT"),
                      Champ.Liste("État", "En test", "En vigueur pour tout", "En vigueur si maj après création", "Applicable si maj avant archivage", "Inactif"),
                      Champ.Date("Date de désactivation")]),
                 new MarcheEcran("Historique d'une zone", "La création et la dernière modification d'une zone (SousOPE_HISTORIQUE), posées par RIG.", false,
                     ["Création", "Modification"]),
-                new MarcheEcran("Champs d'un type de dépôt", "Le formulaire d'un type de dépôt AJMJ (OPE_AFFICHE_SQLBASE_DEMAT_CFEC_AJMJ_TYPE_DEPOT.cs:44-52), en lecture.", false,
+                // L'evenement de procedure se modifie (lie l. 46), facultatif (MetierObligatoire force a faux, l. 27-28), parmi les codes
+                // avec depot PC (MetierDepotPcObligatoire, .Designer.cs:98 -> ULT_COMBO_CODE_EVE_PRO.cs:79) ; creation et modification
+                // se lisent.
+                new MarcheEcran("Champs d'un type de dépôt", "Le formulaire d'un type de dépôt AJMJ (OPE_AFFICHE_SQLBASE_DEMAT_CFEC_AJMJ_TYPE_DEPOT.cs:44-52) : l'évènement de procédure se modifie (facultatif, un code avec dépôt PC) ; la création et la modification se lisent.", false,
                     ["Évènement de procédure", "Création", "Modification"]),
             ],
             Lignes =

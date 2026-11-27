@@ -250,6 +250,20 @@ public sealed record DescripteurEcran
     /// SousOPE_EDITION.Designer.cs:83-92). Vide : une ligne neuve n'a que ses colonnes.</summary>
     public IReadOnlyDictionary<string, string[]> SectionsAjout { get; init; } = new Dictionary<string, string[]>();
 
+    /// <summary>Un <see cref="FormeEcran.Referentiel"/> dont les lignes n'ont pas toutes le meme formulaire RIG v2 : par groupe,
+    /// les titres des <see cref="Sections"/> d'une ligne de ce groupe. Sous une ligne ouverte en modification, la grille ne montre
+    /// QUE celles-la, et y fait saisir les champs que la fiche lue dit modifiables (hors colonnes, que la ligne porte deja) ;
+    /// Enregistrer envoie ceux qui changent sous la cle « Section › Libelle ». PROC_GTABREF : un etat de PC, une zone et un type
+    /// de depot ont chacun leur formulaire (OPE_AFFICHE_SQLBASE_PC_ETAT.cs:64-82, _PC_ETAT_ZONE.cs:75-95,
+    /// _DEMAT_CFEC_AJMJ_TYPE_DEPOT.cs:44-52) ; la fiche d'une zone montrait les deux autres « Non lu » (controle final du lot 14,
+    /// 27/11/2026). Groupe absent : toutes les sections, en lecture, comme avant.</summary>
+    public IReadOnlyDictionary<string, string[]> SectionsParGroupe { get; init; } = new Dictionary<string, string[]>();
+
+    /// <summary>Un <see cref="FormeEcran.Referentiel"/> : les groupes dont la fiche RIG v2 ne fait que MODIFIER une ligne -- ni
+    /// « Ajouter » dans leur onglet, ni « Supprimer » ni « Dupliquer » au menu de leurs lignes. PROC_GTABREF : le type de depot
+    /// AJMJ, dont la V2 cache les boutons NOUVEAU, SUPPRIMER et DUPLIQUER (OPE_AFFICHE_REF_CFEC_AJMJ_TYPE_DEPOT.cs:31-33).</summary>
+    public string[] GroupesModificationSeule { get; init; } = [];
+
     /// <summary>Le RESULTAT d'une operation sur un objet unique : les sections que le geste produit, montrees APRES lui
     /// (2e temps), et des l'ouverture d'un objet deja traite. PROC_IA : lancement puis restitution (proc_ia.md:151-156) ;
     /// une liasse deja analysee affiche son resultat sans relancer (PROC_IA.cs:60-64). Vide pour toute autre forme.</summary>

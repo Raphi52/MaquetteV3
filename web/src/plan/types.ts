@@ -212,6 +212,11 @@ export interface DescripteurEcranVue {
   /** Un Referentiel : par groupe, les titres des sections dont les champs se saisissent sous une ligne neuve de ce groupe
    * (Ajouter dans son onglet, Dupliquer une de ses lignes), envoyes en « Section › Libelle ». Absent : les colonnes seules. */
   sectionsAjout?: Record<string, string[]>
+  /** Un Referentiel dont les lignes ont chacune le formulaire de leur groupe : par groupe, les sections montrees sous une ligne
+   * ouverte en modification (les champs que la fiche dit modifiables, hors colonnes, s'y saisissent). Groupe absent : toutes. */
+  sectionsParGroupe?: Record<string, string[]>
+  /** Un Referentiel : les groupes ou RIG v2 ne fait que modifier -- ni Ajouter dans leur onglet, ni Supprimer ni Dupliquer. */
+  groupesModificationSeule?: string[]
   /** Le RESULTAT d'une operation sur un objet unique : montre apres le geste, et des l'ouverture d'un objet deja traite. */
   resultat?: MarcheEcranVue[]
   /** Le titre de la section dessinee en EXTRAIT KBIS (composants/ApercuKbis.tsx) au lieu de ses champs ; PROC_XEX seul. */

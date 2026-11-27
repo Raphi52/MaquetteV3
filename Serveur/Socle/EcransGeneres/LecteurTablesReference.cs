@@ -21,7 +21,10 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///   - L'ETAT : libelle vide -> AFaire « Libellé à saisir » (le libelle est NOT NULL mais peut etre vide) ; non saisissable -> EnCours ;
 ///     sinon Validee « Utilisable en saisie ».
 ///   - LA FICHE : les champs du formulaire de la table (OPE_AFFICHE_SQLBASE_PC_ETAT.cs:64-82, OPE_AFFICHE_SQLBASE_PC_ETAT_ZONE.cs:75-95,
-///     OPE_AFFICHE_SQLBASE_DEMAT_CFEC_AJMJ_TYPE_DEPOT.cs:44-52) ; le libelle et « Utilisable en saisie » se modifient, le reste se lit.
+///     OPE_AFFICHE_SQLBASE_DEMAT_CFEC_AJMJ_TYPE_DEPOT.cs:44-52). Se modifient : le libelle (sauf d'un type AJMJ, en lecture seule
+///     dans RIG v2 hors equipe Amitel : .Designer.cs:88, l. 54) et « Utilisable en saisie » ; tous les champs d'une zone (l. 75-95) ;
+///     l'evenement de procedure d'un type AJMJ (l. 46). Le reste se lit : l'historique (SousOPE_HISTORIQUE.Designer.cs:80-108,
+///     MetierReadOnly) et les champs d'un etat de PC (Configurer.cs dit pourquoi).
 /// L'id d'une ligne est « &lt;TABLE&gt;|&lt;code&gt; » : les trois tables ont chacune leurs codes.
 /// VALEURS : dans l'ordre des Colonnes (Code, Libellé, Table, Utilisable en saisie).
 /// </summary>
@@ -29,6 +32,8 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 // fautifs : Champs de la table > Régime… ») -- la fiche rendait une section « Champs de la table » dont les champs varient par table,
 // et le descripteur n'en declarait aucun : une section par table, ses champs declares (Configurer.cs), « Table de la zone » distinct
 // de la colonne « Table ».
+// fix-ok: controle final du lot 14 (27/11/2026, 2e reprise) -- la fiche d'une zone ne marquait modifiables que libelle et case,
+// et le libelle d'un type AJMJ l'etait alors que RIG v2 le montre en lecture seule (.Designer.cs:88) : banc PROC_GTABREF.gestes.
 internal sealed class LecteurTablesReference : IRechercheEcran, IFicheEcran
 {
     public string Procedure => "PROC_GTABREF";
@@ -59,6 +64,15 @@ internal sealed class LecteurTablesReference : IRechercheEcran, IFicheEcran
     internal static TableRef? Table(string saisie) => Tables.FirstOrDefault(t =>
         string.Equals(t.Nom, saisie, StringComparison.OrdinalIgnoreCase) || string.Equals(t.Liste, saisie, StringComparison.OrdinalIgnoreCase)
         || string.Equals(t.Groupe, saisie, StringComparison.OrdinalIgnoreCase));
+
+    /// <summary>Le libelle d'un type de depot AJMJ ne se modifie que par l'equipe Amitel : MetierReadOnly
+    /// (OPE_AFFICHE_SQLBASE_DEMAT_CFEC_AJMJ_TYPE_DEPOT.Designer.cs:88), leve pour un utilisateur Amitel quand le type le liste
+    /// (l. 54 ; DematCfecAjmjTypeDepot.IGtabRef.cs:14-15, « Libelle »).</summary>
+    internal static bool LibelleAmitel(TableRef t) => t.Nom == "DEMAT_CFEC_AJMJ_TYPE_DEPOT";
+
+    /// <summary>Une table ou RIG v2 ne fait que modifier : le type de depot AJMJ, dont la V2 cache NOUVEAU, SUPPRIMER et DUPLIQUER
+    /// (OPE_AFFICHE_REF_CFEC_AJMJ_TYPE_DEPOT.cs:31-33). La grille le sait par Configurer.cs (GroupesModificationSeule).</summary>
+    internal static bool ModificationSeule(TableRef t) => t.Nom == "DEMAT_CFEC_AJMJ_TYPE_DEPOT";
 
     /// <summary>« PC_ETAT|01 » -> (PC_ETAT, « 01 ») ; null si l'id n'est pas lisible.</summary>
     internal static (TableRef Table, string Code)? Id(string id)
@@ -140,7 +154,10 @@ internal sealed class LecteurTablesReference : IRechercheEcran, IFicheEcran
         static ChampFiche M(string libelle, string valeur) => new(libelle, valeur) { Modifiable = true };
         static ChampFiche L(string libelle, string valeur) => new(libelle, valeur);
         var libelle = V(t.Libelle);
-        var commun = new SectionFiche("Enregistrement", [L(ColTable, t.Liste), L(ColCode, code), M(ColLibelle, libelle), M(ColSaisie, V(t.Saisie))]);
+        // Le libelle d'un type AJMJ : lecture seule dans RIG v2 (.Designer.cs:88), sauf pour l'equipe Amitel (l. 54) -- la fiche ne
+        // connait pas l'agent : elle le montre en lecture, l'ecrivain accepte le changement d'un agent Amitel.
+        var commun = new SectionFiche("Enregistrement",
+            [L(ColTable, t.Liste), L(ColCode, code), LibelleAmitel(t) ? L(ColLibelle, libelle) : M(ColLibelle, libelle), M(ColSaisie, V(t.Saisie))]);
         SectionFiche propre = t.Nom switch
         {
             // OPE_AFFICHE_SQLBASE_PC_ETAT.cs:64-82 : regime, cases exclusives (ouverture / cloture / conversion / extension), resolution du
@@ -153,21 +170,21 @@ internal sealed class LecteurTablesReference : IRechercheEcran, IFicheEcran
                 L("Mise à jour de la PC", V("R_PCETAT_MAJ_PC")), L("À sauver", V("R_PCETAT_ASAUVER")), L("Audience future", V("R_PCETAT_AUD_FUTURE")),
                 L("Régime PC (statistiques)", V("R_PCETAT_REGIME_PC_STATS")), L("Code procédure", V("R_PCETAT_CODE_PROC")),
             ]),
-            // OPE_AFFICHE_SQLBASE_PC_ETAT_ZONE.cs:75-95 : enregistrement, edition, table / attribut / type ; l'etat par son libelle
-            // de la liste V2 (eTableRefEtat, SousOPE_HISTORIQUE.cs:39-47), la date de desactivation au format d'un champ date :
-            // « Dupliquer » une zone reprend ces valeurs dans ses champs (FormeReferentiel.tsx).
+            // OPE_AFFICHE_SQLBASE_PC_ETAT_ZONE.cs:75-95 : enregistrement, edition, table / attribut / type, tous modifiables ; l'etat
+            // par son libelle de la liste V2 (eTableRefEtat, SousOPE_HISTORIQUE.cs:39-47), la date de desactivation au format d'un
+            // champ date : « Dupliquer » une zone reprend ces valeurs dans ses champs, la modifier les y saisit (FormeReferentiel.tsx).
             "PC_ETAT_ZONE" => new("Champs d'une zone",
             [
-                L("Synonyme", V("R_PCETATZONE_SYNONYME")), L("ISO", V("R_PCETATZONE_ISO")), L("Abrégé pour édition", V("R_PCETATZONE_ABREGE_EDIT")),
-                L("Simplifié pour édition", V("R_PCETATZONE_SIMPLIFIE_EDIT")), L("Développé pour édition", V("R_PCETATZONE_DEVELOPPE_EDIT")),
-                L("Exhaustif pour édition", V("R_PCETATZONE_EXHAUSTIF_EDIT")), L("Table de la zone", V("R_PCETATZONE_TABLE")), L("Attribut", V("R_PCETATZONE_ATTRIBUT")),
-                L("Type", V("R_PCETATZONE_TYPE")), L("État", EtatZone(V("R_PCETATZONE_ETAT"))),
-                L("Date de désactivation", r["R_PCETATZONE_DATE_DESACTIVATION"] is DateTime fin ? fin.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : ""),
+                M("Synonyme", V("R_PCETATZONE_SYNONYME")), M("ISO", V("R_PCETATZONE_ISO")), M("Abrégé pour édition", V("R_PCETATZONE_ABREGE_EDIT")),
+                M("Simplifié pour édition", V("R_PCETATZONE_SIMPLIFIE_EDIT")), M("Développé pour édition", V("R_PCETATZONE_DEVELOPPE_EDIT")),
+                M("Exhaustif pour édition", V("R_PCETATZONE_EXHAUSTIF_EDIT")), M("Table de la zone", V("R_PCETATZONE_TABLE")), M("Attribut", V("R_PCETATZONE_ATTRIBUT")),
+                M("Type", V("R_PCETATZONE_TYPE")), M("État", EtatZone(V("R_PCETATZONE_ETAT"))),
+                M("Date de désactivation", r["R_PCETATZONE_DATE_DESACTIVATION"] is DateTime fin ? fin.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) : ""),
             ]),
-            // OPE_AFFICHE_SQLBASE_DEMAT_CFEC_AJMJ_TYPE_DEPOT.cs:44-52 : evenement de procedure, historique.
+            // OPE_AFFICHE_SQLBASE_DEMAT_CFEC_AJMJ_TYPE_DEPOT.cs:44-52 : evenement de procedure (modifiable, l. 46), historique.
             _ => new("Champs d'un type de dépôt",
             [
-                L("Évènement de procédure", V("CFECAJTD_CODE_EVE_PRO")),
+                M("Évènement de procédure", V("CFECAJTD_CODE_EVE_PRO")),
                 L("Création", FormeLigne.Joindre(V("CFECAJTD_DATE_CREATION"), V("CFECAJTD_AUTEUR_CREATION"))),
                 L("Modification", FormeLigne.Joindre(V("CFECAJTD_DATE_MODIFICATION"), V("CFECAJTD_AUTEUR_MODIFICATION"))),
             ]),

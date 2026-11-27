@@ -1,8 +1,9 @@
 -- Jeu de LecteurTablesReference / EcrivainTablesReference (« Tables de référence », PROC_GTABREF), lot 14 du plan-676a4b19.
 -- Codes « G14... ». Les tables aux types de RIG_DEV (RigBaseGreffe\GREFFE\PC_ETAT.cs, PC_ETAT_ZONE.cs, DEMAT_CFEC_AJMJ_TYPE_DEPOT.cs ;
 -- Source\BaseDeDonnées\RigDatabase\dbo\Tables\PC_ETAT_HISTO.sql, PC_ETAT_SUIVANT.sql, PC_ETAT_SAISIE.sql, PC_ETAT_DJ_EP.sql), sans
--- leurs cles etrangeres (la base V3 ne les a pas recopiees : l'ecrivain controle les citations avant d'ecrire). DEMAT_CFEC_AJMJ reçoit
--- la definition de PROC_TRANSDOC.sql (joue apres), plus la colonne du type de depot (DEMAT_CFEC_AJMJ.sql : varchar(10) NULL).
+-- leurs cles etrangeres (la base V3 ne les a pas recopiees : l'ecrivain controle les citations avant d'ecrire). Les codes d'evenement
+-- G14EV1 / G14EV0 (avec / sans depot PC) servent a l'evenement de procedure d'un type AJMJ ; CODE_EVE_PRO et CATEGORIE_DEPOT aux
+-- colonnes de PROC_DEP.sql (DepotsPcV2.CodeAsync les lit).
 IF OBJECT_ID(N'v2.PC_ETAT') IS NULL
     CREATE TABLE v2.PC_ETAT (R_PCETAT_VALEUR varchar(20) NOT NULL PRIMARY KEY, R_PCETAT_LIBELLE_ECRAN varchar(200) NOT NULL,
         R_PCETAT_OUVERTURE bit NOT NULL DEFAULT 0, R_PCETAT_CLOTURE bit NOT NULL, R_PCETAT_MODALITE_REGIME varchar(1) NULL,
@@ -38,12 +39,16 @@ IF OBJECT_ID(N'v2.PC_ETAT_DJ_EP') IS NULL
         PETDJ_MODALITE_AJ varchar(10) NOT NULL, PETDJ_TYPE_DECISION varchar(50) NULL, PETDJ_CODE_EVE_PRO varchar(50) NULL,
         PETDJ_CODE_EVE_PRO_NI varchar(50) NULL, PETDJ_CODE_EVE_PRO_PM varchar(50) NULL, PETDJ_CODE_EVE_PRO_PP varchar(50) NULL,
         PETDJ_CODE_ACTE_PROCE varchar(3) NULL);
-IF OBJECT_ID(N'v2.DEMAT_CFEC_AJMJ') IS NULL
-    CREATE TABLE v2.DEMAT_CFEC_AJMJ (CFECAJ_ID_CFECAJ int NOT NULL PRIMARY KEY, CFECAJ_DATE_CREATION datetime NOT NULL,
-        CFECAJ_NUMERO_AFF varchar(255) NULL, CFECAJ_NUM_SIREN varchar(255) NULL, CFECAJ_TYPE_DOC varchar(255) NULL,
-        CFECAJ_ID_DMND int NOT NULL);
-IF COL_LENGTH('v2.DEMAT_CFEC_AJMJ', 'CFECAJ_DEMAT_CFEC_AJMJ_TYPE_DEPOT') IS NULL
-    ALTER TABLE v2.DEMAT_CFEC_AJMJ ADD CFECAJ_DEMAT_CFEC_AJMJ_TYPE_DEPOT varchar(10) NULL;
+IF OBJECT_ID(N'v2.CODE_EVE_PRO') IS NULL
+    CREATE TABLE v2.CODE_EVE_PRO (R_CODEEVEPRO_VALEUR varchar(10) NOT NULL PRIMARY KEY, R_CODEEVEPRO_LIBELLE_ECRAN varchar(35) NOT NULL);
+IF COL_LENGTH('v2.CODE_EVE_PRO', 'R_CODEEVEPRO_TYPE_EVE_PRO') IS NULL ALTER TABLE v2.CODE_EVE_PRO ADD R_CODEEVEPRO_TYPE_EVE_PRO varchar(1) NULL;
+IF COL_LENGTH('v2.CODE_EVE_PRO', 'R_CODEEVEPRO_CATEGORIE_DEPOT') IS NULL ALTER TABLE v2.CODE_EVE_PRO ADD R_CODEEVEPRO_CATEGORIE_DEPOT varchar(3) NULL;
+IF COL_LENGTH('v2.CODE_EVE_PRO', 'R_CODEEVEPRO_AVEC_DEPOT_PC') IS NULL ALTER TABLE v2.CODE_EVE_PRO ADD R_CODEEVEPRO_AVEC_DEPOT_PC bit NULL;
+IF COL_LENGTH('v2.CODE_EVE_PRO', 'R_CODEEVEPRO_AVEC_PIECE_NUMERISE_PCPRV') IS NULL ALTER TABLE v2.CODE_EVE_PRO ADD R_CODEEVEPRO_AVEC_PIECE_NUMERISE_PCPRV bit NULL;
+IF COL_LENGTH('v2.CODE_EVE_PRO', 'R_CODEEVEPRO_NATURE_DOC_GED') IS NULL ALTER TABLE v2.CODE_EVE_PRO ADD R_CODEEVEPRO_NATURE_DOC_GED varchar(50) NULL;
+IF COL_LENGTH('v2.CODE_EVE_PRO', 'R_CODEEVEPRO_TYPE_DEPOSANT_GED') IS NULL ALTER TABLE v2.CODE_EVE_PRO ADD R_CODEEVEPRO_TYPE_DEPOSANT_GED varchar(50) NULL;
+IF OBJECT_ID(N'v2.CATEGORIE_DEPOT') IS NULL
+    CREATE TABLE v2.CATEGORIE_DEPOT (R_CATEGORIED_VALEUR varchar(3) NOT NULL PRIMARY KEY, R_CATEGORIED_TYPE_NUM_DEPOT varchar(5) NULL);
 
 EXEC sp_executesql N'
 -- Les etats de PC : G14A (avec ses etats suivants, sa decision et sa saisie, supprimes avec lui), G14B (etat suivant de G14A : supprime
@@ -65,9 +70,11 @@ INSERT INTO v2.PC_ETAT_ZONE (R_PCETATZONE_VALEUR, R_PCETATZONE_LIBELLE_ECRAN, R_
     R_PCETATZONE_TABLE, R_PCETATZONE_ATTRIBUT, R_PCETATZONE_TYPE) VALUES
     (''GZ1'', ''ZONE BANC CITEE'', ''GZ1'', ''GZ1'', ''zone citee'', ''zone citee'', ''20010203'', ''BANC ORIGINE'', ''1'', 1, ''PROCEDURE_COLLECTIVE'', ''PRCLL_DATE'', ''DATE''),
     (''GZ2'', ''ZONE BANC LIBRE'', ''GZ2'', ''GZ2'', ''zone libre'', ''zone libre'', @aujourdhui, NULL, ''1'', 1, ''PROCEDURE_COLLECTIVE'', ''PRCLL_DATE_FIN'', ''DATE'');
--- Les types de depot AJMJ : GT1 (cite par un depot recu : suppression refusee), GT2 (modifie : date et auteur de modification).
+-- Les types de depot AJMJ (RIG v2 ne fait que les modifier : OPE_AFFICHE_REF_CFEC_AJMJ_TYPE_DEPOT.cs:31-33) : GT1, GT2 (son evenement de
+-- procedure modifie : date et auteur de modification).
 INSERT INTO v2.DEMAT_CFEC_AJMJ_TYPE_DEPOT (CFECAJTD_VALEUR, CFECAJTD_LIBELLE_ECRAN, CFECAJTD_UTILISABLE_SAISIE, CFECAJTD_DATE_CREATION, CFECAJTD_AUTEUR_CREATION) VALUES
     (''GT1'', ''TYPE BANC CITE'', 1, @aujourdhui, ''BANC''), (''GT2'', ''TYPE BANC LIBRE'', 1, @aujourdhui, ''BANC'');
--- Le depot qui cite GT1 : sa demande 2400999 n''existe pas, aucun autre ecran (PROC_TRANSDOC part des demandes) ne le voit.
-INSERT INTO v2.DEMAT_CFEC_AJMJ (CFECAJ_ID_CFECAJ, CFECAJ_DATE_CREATION, CFECAJ_ID_DMND, CFECAJ_DEMAT_CFEC_AJMJ_TYPE_DEPOT) VALUES (2400976, @aujourdhui, 2400999, ''GT1'');
+-- L''evenement d''un type AJMJ : un code avec depot PC (G14EV1), un sans (G14EV0 : refuse, ULT_COMBO_CODE_EVE_PRO.cs:79).
+INSERT INTO v2.CODE_EVE_PRO (R_CODEEVEPRO_VALEUR, R_CODEEVEPRO_LIBELLE_ECRAN, R_CODEEVEPRO_TYPE_EVE_PRO, R_CODEEVEPRO_AVEC_DEPOT_PC) VALUES
+    (''G14EV1'', ''Évènement du banc avec dépôt PC'', ''1'', 1), (''G14EV0'', ''Évènement du banc sans dépôt PC'', ''2'', 0);
 ', N'@aujourdhui datetime', @aujourdhui;

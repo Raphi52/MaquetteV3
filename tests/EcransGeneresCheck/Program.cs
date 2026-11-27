@@ -456,6 +456,18 @@ foreach (var d in descripteurs)
         foreach (var t in titres.Where(t => d.Sections.All(s => s.Titre != t)))
             defauts.Add($"section d'ajout « {t} » ({g}) absente des sections de l'ecran");
     }
+    // Les sections d'une ligne par groupe et les groupes en modification seule (lot 14, 2e reprise : Tables de reference) : la
+    // grille d'un Referentiel seule ; chaque groupe et chaque section nommes existent (sinon la ligne ouverte n'en montre aucune).
+    if ((d.SectionsParGroupe.Count > 0 || d.GroupesModificationSeule.Length > 0) && d.Forme != FormeEcran.Referentiel)
+        defauts.Add($"sections par groupe ou groupes en modification seule sur une forme {d.Forme} : seule la grille d'un Referentiel les offre");
+    foreach (var (g, titres) in d.SectionsParGroupe)
+    {
+        if (!d.Groupes.Contains(g)) defauts.Add($"sections du groupe « {g} », absent des groupes de l'ecran");
+        foreach (var t in titres.Where(t => d.Sections.All(s => s.Titre != t)))
+            defauts.Add($"section « {t} » du groupe « {g} » absente des sections de l'ecran");
+    }
+    foreach (var g in d.GroupesModificationSeule.Where(g => !d.Groupes.Contains(g)))
+        defauts.Add($"groupe en modification seule « {g} », absent des groupes de l'ecran");
     if (!reuni)
     {
         switch (d.Forme)
