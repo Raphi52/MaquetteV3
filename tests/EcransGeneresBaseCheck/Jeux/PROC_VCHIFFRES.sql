@@ -40,7 +40,7 @@ INSERT INTO v2.EXERCICE (EXRCC_ID_EXRCC, EXRCC_DATE_CLOTURE, EXRCC_ID_DSRCS, EXR
     (1600912, ''20231231'', 1600901, 1600922),
     -- 2022, sans chiffres seuils : la ligne « - » de la V2, AFaire
     (1600913, ''20221231'', 1600901, NULL),
-    -- ECARTE a l''ouverture : un dossier sans aucun exercice chiffre -- jumeau retenu 1600901 ; retrouve par sa recherche
+    -- un dossier sans aucun exercice chiffre : retrouve par sa recherche (PROC_VCHIFFRES.recherches)
     (1600914, ''20241231'', 1600902, NULL);
 INSERT INTO v2.DEPOT_RCS (DPTRC_ID_DPTRC, DPTRC_ID_EXRCC, DPTRC_NUM_DEPOT, DPTRC_DATE) VALUES (1600931, 1600912, ''L6D0931'', ''20240615'');
 INSERT INTO v2.ACTE_DEPOSE (ACTDP_ID_ACDPS, ACTDP_ID_DPTRC, ACTDP_ABREGE_PIECE, ACTDP_NUM_ORDRE, ACTDP_SAISIE_BILAN_CodeRejet,

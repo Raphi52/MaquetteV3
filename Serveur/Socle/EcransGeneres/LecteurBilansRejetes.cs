@@ -23,6 +23,18 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///     26/11/2026, serveur 5096) : PARAMETRAGE est repris dans soc.Reglage (Serveur/Socle/Greffes/RepriseReglages.cs:57).
 ///   La designation est celle de la fiche rec.Entreprise du dossier (la V2 la lit dans INSCRIT_PM / INSCRIT_PP) ; DOSSIER_RCS est
 ///   rec.DossierRcs et ACTION_RCS rec.ActionRegistre (Serveur/Recopie/FichesV3.cs).
+/// LA LISTE A L'OUVERTURE : celle de la V2, qui charge la grille des que l'ecran s'ouvre (RigAutomate Operation.moteur.cs:74-75 :
+/// InitProcessus appelle DoChargerDonnees), aux codes par defaut et a la date de debut du greffe.
+///
+/// RECHERCHE (IRechercheEcran) : le numero metier de OPE_SEARCH (OPE_REJETS_BILANS.cs:140-158), saisi dans le champ de recherche
+/// -- la forme File n'a pas de panneau de criteres (FormeFile.tsx:22), elle n'envoie que ce texte. La V2 choisit la colonne par le
+/// format du numero (SIREN -> DSSRC_SIREN, numero de gestion -> DSSRC_NUM_GESTION, sinon numero de depot -> DPTRC_NUM_DEPOT) et
+/// compare a EGALITE : ici, l'egalite sur l'une des trois colonnes (blancs retires), un numero n'ayant qu'un format. Les filtres de
+/// la liste (codes de rejet, date de debut) restent. fix-ok: controle final du lot 6 (27/11/2026) -- ce lecteur ne cherchait pas :
+/// le texte ne filtrait que les 200 lignes chargees. Non cherches (nommes) : les codes motifs choisis (une liste a choix multiples,
+/// que les ecrans V3 n'ont pas, Descripteur.cs) et les dates de cloture (OPE_DATE_CLOTURE) -- la forme File n'envoie aucun critere.
+/// Pas de fiche (IFicheEcran) : la V2 n'en a pas, elle montre l'apercu PDF du bilan (ultApercuBilan) -- le meme manque que
+/// « Voir un PDF » (LecteurPiecesGed.cs : un service qui rend le fichier et une visionneuse).
 ///
 /// GROUPES (ChiffresSeuils.IsRenvoiToInfogreffeAllowed, ChiffresSeuils.cs:226-237) : « Renvoi possible » -- les motifs 3, 7, A7,
 /// B7, C7, D7, E7, que la V2 laisse renvoyer a Infogreffe apres correction -- ; « Rejet de fond » -- les autres.
@@ -31,7 +43,7 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///   « En correction » ; sinon AFaire « Rejeté ». Un bilan corrige puis renvoye perd son code de rejet (la V2 le vide,
 ///   proc_rejets_bilans.md:449) : il sort de la liste, « Corrigé » n'a donc pas de ligne.
 /// </summary>
-internal sealed class LecteurBilansRejetes : ILecteurEcran
+internal sealed class LecteurBilansRejetes : IRechercheEcran
 {
     public string Procedure => "PROC_REJETS_BILANS";
 
@@ -39,6 +51,9 @@ internal sealed class LecteurBilansRejetes : ILecteurEcran
 
     /// <summary>Les codes qui permettent le renvoi a Infogreffe (IsRenvoiToInfogreffeAllowed).</summary>
     internal static readonly string[] CodesRenvoi = ["3", "7", "A7", "B7", "C7", "D7", "E7"];
+
+    /// <summary>Aucun critere : la forme File n'envoie que le texte, le numero metier (en tete du fichier).</summary>
+    public IReadOnlyCollection<string> Criteres { get; } = [];
 
     private const string Requete = """
         SELECT TOP (@plafond) s.NumeroGestion, s.Siren,
@@ -55,7 +70,7 @@ internal sealed class LecteurBilansRejetes : ILecteurEcran
         JOIN v2.ACTE_DEPOSE AS ad ON ad.ACTDP_ID_DPTRC = p.DPTRC_ID_DPTRC
         JOIN v2.EXERCICE AS x ON x.EXRCC_ID_EXRCC = p.DPTRC_ID_EXRCC
         WHERE ad.ACTDP_SAISIE_BILAN_CodeRejet IN ('3', '7', '10', '16', '17', 'C7', 'D7', 'E7')
-          AND (@debutSaisie IS NULL OR CONVERT(date, ad.ACTDP_SAISIE_BILAN_DateSaisieTerminee) >= @debutSaisie)
+          AND (@debutSaisie IS NULL OR CONVERT(date, ad.ACTDP_SAISIE_BILAN_DateSaisieTerminee) >= @debutSaisie) /*filtres*/
         ORDER BY p.DPTRC_DATE DESC, s.NumeroGestion DESC, ad.ACTDP_ID_ACDPS
         """;
 
@@ -64,11 +79,25 @@ internal sealed class LecteurBilansRejetes : ILecteurEcran
     /// illisible comme date : aucune borne (la V2 compare a AmiString.dateTimeNull).</summary>
     internal static readonly LectureReglage DateDebut = new("VDCAREJ_DATE_DEBUT", "", "OPE_REJETS_BILANS.cs:121-124");
 
-    public async Task<LignesLues> LireAsync(SqlConnection baseGreffe, DateTime aujourdhui, int plafond, CancellationToken ct)
+    public Task<LignesLues> LireAsync(SqlConnection baseGreffe, DateTime aujourdhui, int plafond, CancellationToken ct)
+        => Lire(baseGreffe, new FiltresRecherche(), plafond, ct);
+
+    public Task<LignesLues> ChercherAsync(SqlConnection baseGreffe, RechercheEcran recherche, DateTime aujourdhui, int plafond, CancellationToken ct)
+    {
+        var f = new FiltresRecherche();
+        // Le numero metier, a egalite (en tete du fichier).
+        if (!string.IsNullOrWhiteSpace(recherche.Texte))
+            f.Ajouter("s.Siren = @numero OR s.NumeroGestion = @numero OR p.DPTRC_NUM_DEPOT = @numero",
+                ("@numero", CriteresConsultation.Numero(recherche.Texte)));
+        return Lire(baseGreffe, f, plafond, ct);
+    }
+
+    private static async Task<LignesLues> Lire(SqlConnection baseGreffe, FiltresRecherche f, int plafond, CancellationToken ct)
     {
         var debut = CriteresConsultation.Date(await DateDebut.LireTexteAsync(baseGreffe, ct));
-        return await LectureEcran.LireAsync(baseGreffe, Requete, Ligne, ct, new SqlParameter("@plafond", plafond),
-            new SqlParameter("@debutSaisie", System.Data.SqlDbType.Date) { Value = (object?)debut ?? DBNull.Value });
+        return await LectureEcran.LireAsync(baseGreffe, Requete.Replace("/*filtres*/", f.EnSuite, StringComparison.Ordinal), Ligne, ct,
+            f.Parametres(new SqlParameter("@plafond", plafond),
+                new SqlParameter("@debutSaisie", System.Data.SqlDbType.Date) { Value = (object?)debut ?? DBNull.Value }));
     }
 
     private static LigneLue Ligne(SqlDataReader r)

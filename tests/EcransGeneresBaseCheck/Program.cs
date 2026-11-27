@@ -42,7 +42,8 @@ using RigV3Desktop.Pont.EcransGeneres;
 //     lignes vides et celles qui commencent par # sont ignorees : y dire pourquoi chaque refus est refuse. Chaque refus a
 //     son jumeau accepte (meme borne, autre cote). Les CELLULES d'une ligne (LigneLue.Valeurs, Referentiel et Etat) se
 //     controlent en ajoutant « | valeurs: a ; b ; c » a la ligne attendue ; sans ce champ, elles ne sont pas comparees.
-// Puis la section 4 controle tout lecteur contre son descripteur.
+//     Un ecran que RIG v2 ouvre sur sa recherche, sans liste, a un .attendu sans ligne (le refus) et un .recherches (le jumeau).
+// Puis la section 4 controle tout lecteur contre son descripteur (sur les lignes de ses recherches s'il s'ouvre vide).
 //
 // LE SOCLE FONCTIONNEL (plan « RIG v3 100 % fonctionnel », lot 2, 26/11/2026) : la recherche, la fiche et les GESTES. Le
 // banc trouve aussi les ECRIVAINS (EcrivainEcran.cs) et les joue par la route POST, au nom de l'agent du banc :
@@ -800,6 +801,22 @@ foreach (var (code, lecteur) in lecteurs.ParProcedure.OrderBy(p => p.Key, String
     {
         Exiger(false, $"{code} : le lecteur echoue sur le banc ({e.Message}) -- ajouter son jeu tests/EcransGeneresBaseCheck/Jeux/{code}.sql");
         continue;
+    }
+    // Un ecran que RIG v2 ouvre sur sa recherche, sans liste (son .attendu n'a aucune ligne : PROC_VDOSSIER, PROC_VJUD,
+    // PROC_VCHIFFRES), s'essaie sur les lignes de ses recherches (<PROCEDURE>.recherches). fix-ok: controle final du lot 6
+    // (27/11/2026) -- exiger une ligne a l'ouverture avait fait inventer a trois lecteurs une liste de depart sans source V2.
+    var fichierRecherches = Path.Combine(dossierJeux, code + ".recherches");
+    if (lues.Lignes.Count == 0 && lecteur is IRechercheEcran ouvreSurRecherche && File.Exists(fichierRecherches))
+    {
+        var trouvees = new List<LigneLue>();
+        foreach (var bloc in Blocs.Lire(File.ReadAllLines(fichierRecherches)))
+        {
+            await using var cnRecherche = new SqlConnection(greffe.Connexion);
+            await cnRecherche.OpenAsync();
+            trouvees.AddRange((await ouvreSurRecherche.ChercherAsync(cnRecherche, new RechercheEcran(bloc.Texte, bloc.Criteres), jour, 200,
+                CancellationToken.None)).Lignes);
+        }
+        lues = new LignesLues([.. trouvees.DistinctBy(Texte)], trouvees.DistinctBy(Texte).Count());
     }
     Exiger(lues.Lignes.Count > 0, $"{code} : au moins une ligne sur le banc ({lues.Lignes.Count}) -- sinon le lecteur n'est pas essaye");
     var etats = d.Etats.Select(e => e.Code).ToHashSet();
