@@ -627,6 +627,8 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
             // Reste en EXEMPLE (lot 11) : la file vit dans la table PAPERCUT de la base commune COMMUN_RIG
             // ([COMMUN_RIG].[dbo].[PAPERCUT], proc_papercut.md, Détail OPE : vue globale et vidage), absente de la base V3 du greffe
             // (et de RIG_DEV : aucune table PAPERCUT, lu le 27/11/2026) ; « Imprimer » appelle le service WCF d'impression PaperCut.
+            // L'écran le DIT : chaque ligne d'exemple nomme la table absente (le descripteur n'a pas d'autre texte affiché au-dessus
+            // de la liste, et la mention « exemple » seule ne disait pas pourquoi).
             Forme = FormeEcran.File,
             Recherche = "Rechercher une imprimante…",
             Criteres = ["Imprimante", "Utilisateur", "Nombre de feuilles"],
@@ -645,13 +647,13 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
             ],
             Lignes =
             [
-                Ligne("Imprimante Greffe 1", "3 travaux · 14 feuilles · utilisateur 1", "Greffe", "AFaire"),
-                Ligne("Imprimante Greffe 2", "1 travail · 2 feuilles · utilisateur 1", "Greffe", "EnCours", 0),
-                Ligne("Imprimante Greffe 3", "5 travaux · 30 feuilles · en impression", "Greffe", "EnCours", 0, 1),
-                Ligne("Imprimante Accueil", "2 travaux · 6 feuilles · imprimée", "Accueil", "Validee", 0, 1),
-                Ligne("Imprimante Salle A", "4 travaux · 22 feuilles · utilisateur 2", "Accueil", "AFaire"),
-                Ligne("Imprimante Salle B", "1 travail · 1 feuille · imprimée", "Accueil", "Validee", 0, 1),
-                Ligne("Imprimante Salle C", "8 travaux · 40 feuilles · à vider", "Accueil", "EnCours", 0),
+                Ligne("Imprimante Greffe 1", "3 travaux · 14 feuilles · utilisateur 1 · exemple : table PAPERCUT de COMMUN_RIG, absente de la base du greffe", "Greffe", "AFaire"),
+                Ligne("Imprimante Greffe 2", "1 travail · 2 feuilles · utilisateur 1 · exemple : table PAPERCUT de COMMUN_RIG, absente de la base du greffe", "Greffe", "EnCours", 0),
+                Ligne("Imprimante Greffe 3", "5 travaux · 30 feuilles · en impression · exemple : table PAPERCUT de COMMUN_RIG, absente de la base du greffe", "Greffe", "EnCours", 0, 1),
+                Ligne("Imprimante Accueil", "2 travaux · 6 feuilles · imprimée · exemple : table PAPERCUT de COMMUN_RIG, absente de la base du greffe", "Accueil", "Validee", 0, 1),
+                Ligne("Imprimante Salle A", "4 travaux · 22 feuilles · utilisateur 2 · exemple : table PAPERCUT de COMMUN_RIG, absente de la base du greffe", "Accueil", "AFaire"),
+                Ligne("Imprimante Salle B", "1 travail · 1 feuille · imprimée · exemple : table PAPERCUT de COMMUN_RIG, absente de la base du greffe", "Accueil", "Validee", 0, 1),
+                Ligne("Imprimante Salle C", "8 travaux · 40 feuilles · à vider · exemple : table PAPERCUT de COMMUN_RIG, absente de la base du greffe", "Accueil", "EnCours", 0),
             ],
         },
 

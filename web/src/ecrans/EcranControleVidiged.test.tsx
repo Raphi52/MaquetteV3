@@ -132,4 +132,12 @@ describe('EcranControleVidiged en liste moderne', () => {
     fireEvent.click(puce('Comptes sans CD'))
     expect(guids(container)).toEqual(['b77c-2026-0103'])
   })
+
+  // Lot 11 : l'ecran reste en exemple et dit pourquoi (tables de COMMUN_RIG et bases Vidiged, absentes de la base V3).
+  it('dit que ses archives sont un exemple, et la base qui manque', () => {
+    render(<EcranControleVidiged />)
+    const note = screen.getByRole('note')
+    expect(note.textContent).toContain('exemple')
+    expect(note.textContent).toContain('CONTROLE_VIDIGED de COMMUN_RIG')
+  })
 })
