@@ -60,6 +60,9 @@ using RigV3Desktop.Pont.EcransGeneres;
 //          fiche: <id>                              facultatif : puis des « Section › Libelle = valeur » que la fiche relue porte ;
 //                                                   la ligne n d'une sous-liste (Tableau) : « Section › Libelle › n = cellule | cellule »
 //          controle: <SELECT d'une valeur> => <attendu>   facultatif : ce que RIG v2 ecrit en plus (dates, etats...)
+//          agent: <compte Windows>                  facultatif : le bloc est joue au nom de ce compte (cree par le .sql du jeu,
+//                                                   admis dans le greffe) au lieu de l'agent du banc -- un geste qui exige un
+//                                                   droit que l'agent du banc n'a pas (PROC_PARAM_IP : modifier le greffe, lot 14)
 //        Un refus est verifie SANS ECRITURE : lignes relues identiques, journal des gestes inchange. Un geste fait ajoute au
 //        moins une ligne au journal des gestes. Chaque refus a son jumeau accepte, dit en commentaire ;
 //      - <PROCEDURE>.recherches (pour un lecteur qui cherche, IRechercheEcran) : des blocs « texte: », « critere: <Libelle> =
@@ -617,31 +620,26 @@ Exiger(reponseSansDroit.StatusCode == HttpStatusCode.UnprocessableEntity && sans
     $"PROC_RELCLI, Valider les soldes SANS le droit EXPCOMPTA : refus de RIG v2, aucun solde ni trace ({(int)reponseSansDroit.StatusCode} « {sansDroit?.Message} »)");
 await Sql("INSERT INTO soc.RoleFonction (Role, Fonction) VALUES ('BANC', 'EXPCOMPTA')");
 
-// « Facturation Expresso » (PROC_PARAMEXPRESSO, lot 15) SANS le droit de modifier le greffe : l'ecriture partagee d'un reglage
-// (EcritureReglage.cs, lot 14 ; Parametrage.UpdateValeurParametrage de RIG v2 sous le droit d'OPE_EDITER_GREFFE.cs:30-38) refuse
-// l'agent du banc, ni Amitel ni administrateur : son motif, rien d'ecrit. Le jumeau accepte : PROC_PARAMEXPRESSO.gestes, joue
-// ci-dessous avec ce droit, donne a l'agent le temps de ce seul jeu (CompteAdministrateurPour).
-string[] CompteAdministrateurPour = ["PROC_PARAMEXPRESSO"];
-var reglageAvantDroit = await Valeur("SELECT Valeur FROM soc.Reglage WHERE Code = 'EXPRESSO_RELANCE'");
-var journalAvantReglage = await Valeur("SELECT COUNT(*) FROM soc.Journal");
-var reponseReglage = await http.PostAsJsonAsync(RoutesEcransGeneres.GestesPour(Greffe, "PROC_PARAMEXPRESSO"),
-    new GesteEcran(TypeGeste.Enregistrer, ["EXPRESSO_RELANCE"], new Dictionary<string, string> { ["Paramètre › Valeur"] = "20" }), json);
-var reglageSansDroit = await reponseReglage.Content.ReadFromJsonAsync<ResultatGeste>(json);
-Exiger(reponseReglage.StatusCode == HttpStatusCode.UnprocessableEntity && reglageSansDroit is { Fait: false }
-       && reglageSansDroit.Message == $"Modification refusee : le compte {Agent} n'a pas le droit de modifier le greffe (il faut etre administrateur d'Amitel ou l'un des comptes nommes par la V2 : benier, jouguet, thevenon)."
-       && await Valeur("SELECT Valeur FROM soc.Reglage WHERE Code = 'EXPRESSO_RELANCE'") == reglageAvantDroit
-       && await Valeur("SELECT COUNT(*) FROM soc.Journal") == journalAvantReglage,
-    $"PROC_PARAMEXPRESSO, Enregistrer SANS le droit de modifier le greffe : refus, reglage et journal inchanges ({(int)reponseReglage.StatusCode} « {reglageSansDroit?.Message} »)");
-
-// Les GESTES (<PROCEDURE>.gestes), joues par la route POST, dans l'ordre.
+// Les GESTES (<PROCEDURE>.gestes), joues par la route POST, dans l'ordre ; un bloc « agent: » au nom de son compte (en-tete, 6).
+// fix-ok: pas un correctif -- lot 14 (27/11/2026) : l'agent du banc est cree sans EstAmitel ni EstAdministrateur (section 0, defauts 0 de
+// SOC-001_comptes.sql:33-34), donc un geste qui exige le droit de modifier le greffe (EcritureReglage) n'aurait ici que des refus.
+var clientsParAgent = new Dictionary<string, HttpClient>(StringComparer.OrdinalIgnoreCase);
+HttpClient ClientDe(string? agent)
+{
+    if (agent is null) return http;
+    if (!clientsParAgent.TryGetValue(agent, out var client))
+    {
+        client = app.GetTestClient();
+        client.DefaultRequestHeaders.Add(RoutesIdentite.EnTeteCompte, agent);
+        clientsParAgent[agent] = client;
+    }
+    return client;
+}
 foreach (var fichier in Directory.GetFiles(dossierJeux, "*.gestes").Order(StringComparer.Ordinal))
 {
     var code = Path.GetFileNameWithoutExtension(fichier);
     if (!ecrivains.ParProcedure.ContainsKey(code)) { Exiger(false, $"jeu {code}.gestes : aucun ecrivain pour cette procedure"); continue; }
     var rang = 0;
-    // Le droit de modifier le greffe, le temps du seul jeu qui ecrit un reglage (voir le refus SANS ce droit, juste au-dessus).
-    var droitReglage = CompteAdministrateurPour.Contains(code);
-    if (droitReglage) await Sql("UPDATE soc.Compte SET EstAmitel = 1, EstAdministrateur = 1 WHERE CompteWindows = @a", ("@a", Agent));
     foreach (var bloc in Blocs.Lire(File.ReadAllLines(fichier)))
     {
         rang++;
@@ -649,7 +647,7 @@ foreach (var fichier in Directory.GetFiles(dossierJeux, "*.gestes").Order(String
         if (bloc.Geste is null || bloc.Resultat is null) { Exiger(false, $"{quoi} : « geste: » et « resultat: » sont obligatoires"); continue; }
         var avant = (await Lire(code)).Lignes.Select(Texte).ToArray();
         var journalAvant = await Valeur("SELECT COUNT(*) FROM soc.Journal");
-        var reponse = await http.PostAsJsonAsync(RoutesEcransGeneres.GestesPour(Greffe, code), bloc.Geste, json);
+        var reponse = await ClientDe(bloc.Agent).PostAsJsonAsync(RoutesEcransGeneres.GestesPour(Greffe, code), bloc.Geste, json);
         var r = await reponse.Content.ReadFromJsonAsync<ResultatGeste>(json);
         var obtenu = r is null ? "illisible" : r.SansEcrivain ? "sans-ecrivain" : r.Fait ? "fait" : "refuse";
         var statut = obtenu == "refuse" ? HttpStatusCode.UnprocessableEntity : HttpStatusCode.OK;
@@ -685,7 +683,6 @@ foreach (var fichier in Directory.GetFiles(dossierJeux, "*.gestes").Order(String
             Exiger(lue == attendue, $"{quoi} : controle « {sql} » = {attendue} (lu : {lue})");
         }
     }
-    if (droitReglage) await Sql("UPDATE soc.Compte SET EstAmitel = 0, EstAdministrateur = 0 WHERE CompteWindows = @a", ("@a", Agent));
 }
 
 // « Registres judiciaires » SANS le reglage d'edition REP_GENERAL (EcrivainRegistresJudiciaires.cs, en tete) : la V2 ne cree alors
@@ -952,6 +949,7 @@ sealed class Bloc
     public string? Fiche { get; set; }
     public List<(string Cle, string Valeur)> ValeursFiche { get; } = [];
     public List<(string Sql, string Attendu)> Controles { get; } = [];
+    public string? Agent { get; set; }
     public string? Texte { get; set; }
     public Dictionary<string, string> Criteres { get; } = new(StringComparer.Ordinal);
 }
@@ -959,7 +957,7 @@ sealed class Bloc
 /// <summary>La lecture des jeux .gestes et .recherches : des blocs separes par « --- », des lignes « cle: valeur ».</summary>
 static class Blocs
 {
-    private static readonly string[] Cles = ["geste:", "ids:", "valeur:", "resultat:", "message:", "lignes:", "fiche:", "controle:", "texte:", "critere:"];
+    private static readonly string[] Cles = ["geste:", "ids:", "valeur:", "resultat:", "message:", "lignes:", "fiche:", "controle:", "agent:", "texte:", "critere:"];
 
     /// <summary>« cle = valeur » (le premier « = » precede d'un blanc ; une valeur vide est permise).</summary>
     private static (string, string) Paire(string texte)
@@ -1015,6 +1013,7 @@ static class Blocs
                     var i = v.LastIndexOf(" => ", StringComparison.Ordinal);
                     b.Controles.Add((v[..i].Trim(), v[(i + 4)..].Trim()));
                     break;
+                case "agent:": b.Agent = v; break;
                 case "texte:": b.Texte = v; break;
                 case "critere:": var (c, y) = Paire(v); b.Criteres[c] = y; break;
             }

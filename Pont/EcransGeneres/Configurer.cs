@@ -497,11 +497,13 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         {
             Code = "PROC_PARAM_IP", Titre = "Codes chefs IP", Sujet = "codes chefs",
             Forme = FormeEcran.Referentiel,
-            // Colonnes de la liste V2 (OPE_PARAM_IP.cs:11-18) et le rang du code (RigListViewUpDown). Lignes : LecteurCodesChefsIp.cs
-            // (le reglage IP_CODE_CHEF de PARAMETRAGE, repris dans soc.Reglage : ReprisesPhase1.cs:86). AUCUN ecrivain : les gestes
-            // des ecrans generes n'ecrivent que v2.* et rec.* (EcrivainEcran.cs, point 3), et soc.Reglage n'en est pas ; Ajouter,
-            // Modifier et Supprimer disent donc « Demonstration ». La raison est en tete de LecteurCodesChefsIp.cs.
+            // Colonnes de la liste V2 (OPE_PARAM_IP.cs:27-34) et le rang du code (RigListViewUpDown). Lignes : LecteurCodesChefsIp.cs
+            // (le reglage IP_CODE_CHEF de PARAMETRAGE, repris dans soc.Reglage : ReprisesPhase1.cs:86). Gestes : EcrivainCodesChefsIp.cs --
+            // Ajouter (en fin de liste), Supprimer (le retrait de la liste) et, au menu de la ligne, Monter / Descendre d'un rang
+            // (RigListViewUpDown._MoveItem) ; chacun reecrit le reglage par l'ecriture des reglages du greffe (EcritureReglage.cs).
+            // « Modifier » n'existe pas en V2 : il reste « Demonstration ».
             Colonnes = ["Code chef", "Libellé", Champ.Nombre("Ordre")],
+            Gestes = ["Monter", "Descendre"],
             Recherche = "Rechercher un code chef…",
             Criteres = ["Code chef", "Libellé"],
             // Bouton final cite par la fiche v2 : DoSauveAfterOperation (proc_param_ip.md, Detail OPE)
@@ -513,7 +515,7 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             [
                 new MarcheEcran("Ajout", "Seuls les codes chefs commençant par IP sont proposés. Un code déjà dans la liste est refusé ; un code qui ne se résout pas n'est pas ajouté. Il va en fin de liste.", true,
                     ["Code chef", "Libellé"]),
-                new MarcheEcran("Ordre", "L'ordre choisi par l'utilisateur est conservé tel quel dans la liste : modifiez le rang d'un code pour le déplacer.", false,
+                new MarcheEcran("Ordre", "L'ordre choisi par l'utilisateur est conservé tel quel dans la liste : « Monter » et « Descendre », au menu de la ligne, déplacent un code d'un rang.", false,
                     ["Ordre", "Liste enregistrée"]),
                 new MarcheEcran("Enregistrement", "La liste est réécrite en entier. Une liste vide est refusée. Un code introuvable au rechargement disparaît à la prochaine sauvegarde.", true,
                     ["Enregistrer"]),

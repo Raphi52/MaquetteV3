@@ -1,0 +1,165 @@
+# « Codes chefs IP » (EcrivainCodesChefsIp) : la liste ordonnee du reglage IP_CODE_CHEF (soc.Reglage). Gestes : Ajouter (en fin de liste),
+# Supprimer (retirer), Agir Monter / Descendre (un rang). Chaque geste reecrit la liste ENTIERE, codes resolus joints par « ; » sans « ; »
+# final (ETP_PARAM_IP.cs:52-68), par l'ecriture des reglages (EcritureReglage.cs), qui exige le droit de modifier le greffe.
+# Depart (PROC_PARAM_IP.sql) : « RFL14;IPL14A;IPL14Z;IPL14C » ; IPL14Z, absent de CODE_CHEF, n'est pas montre (ETP_PARAM_IP.cs:34) et
+# disparait a la premiere ecriture (bloc 6). Arrivee : la liste montree au depart, remise (derniers blocs).
+# Agent : banc.admin.l14, administrateur (PROC_PARAM_IP.sql), sauf le bloc 1.
+
+# Refus : l'agent du banc n'a pas le droit de modifier le greffe (ServiceDroits.PeutModifierLeGreffe, OPE_EDITER_GREFFE.cs:30-38 ;
+# EcritureReglage). Jumeau accepte : bloc 6, le meme geste par un administrateur.
+geste: Ajouter
+valeur: Code chef = IPL14B
+resultat: refuse
+message: Modification refusee : le compte banc.ecrans n'a pas le droit de modifier le greffe (il faut etre administrateur d'Amitel ou l'un des comptes nommes par la V2 : benier, jouguet, thevenon).
+---
+# Refus : rien de choisi (la liste deroulante de la V2 n'a pas de valeur vide ; message sans source V2). Jumeau accepte : bloc 6.
+agent: banc.admin.l14
+geste: Ajouter
+valeur: Code chef =
+resultat: refuse
+message: Choisissez le code chef à ajouter.
+---
+# Refus : IPL14Z commence par IP mais CODE_CHEF ne le trouve pas (GetCODE_CHEF, OPE_PARAM_IP.cs:50-52 ; la V2 ne l'ajoute pas, sans
+# message). Jumeau accepte : bloc 6, IPL14B, dans CODE_CHEF.
+agent: banc.admin.l14
+geste: Ajouter
+valeur: Code chef = IPL14Z
+resultat: refuse
+message: Le code chef « IPL14Z » n'est pas proposé : RIG v2 ne propose que les codes chefs commençant par IP.
+---
+# Refus : RFL14 est dans CODE_CHEF mais ne commence pas par IP (la liste deroulante : « like 'IP%' », OPE_PARAM_IP.cs:43). Jumeau
+# accepte : bloc 6, IPL14B.
+agent: banc.admin.l14
+geste: Ajouter
+valeur: Code chef = RFL14
+resultat: refuse
+message: Le code chef « RFL14 » n'est pas proposé : RIG v2 ne propose que les codes chefs commençant par IP.
+---
+# Refus : IPL14A est deja dans la liste (GetItem, OPE_PARAM_IP.cs:49 ; la V2 ne fait rien, sans message). Jumeau accepte : bloc 6,
+# IPL14B, absent de la liste.
+agent: banc.admin.l14
+geste: Ajouter
+valeur: Code chef = IPL14A
+resultat: refuse
+message: Le code chef « IPL14A » est déjà dans la liste.
+---
+# AJOUTER IPL14B : en fin de liste (AddItem, OPE_PARAM_IP.cs:56) ; le libelle vient de CODE_CHEF. Le reglage est reecrit sans IPL14Z,
+# sans « ; » final ; son auteur est le NOM de l'agent (soc.Compte.Nom, comme la route : AuteurReglage) ; une seule ligne au journal.
+agent: banc.admin.l14
+geste: Ajouter
+valeur: Code chef = IPL14B
+resultat: fait
+message: Code chef IPL14B ajouté en fin de liste (rang 4).
+lignes:
+RFL14 | REFERE BANC · rang 1 | Autres codes | Validee | []
+IPL14A | INJONCTION BANC A · rang 2 | Codes IP proposables | Validee | []
+IPL14C | INJONCTION BANC C · rang 3 | Codes IP proposables | Validee | []
+IPL14B | INJONCTION BANC B · rang 4 | Codes IP proposables | Validee | [] | valeurs: IPL14B ; INJONCTION BANC B ; 4
+controle: SELECT Valeur FROM soc.Reglage WHERE Code = 'IP_CODE_CHEF' => RFL14;IPL14A;IPL14C;IPL14B
+controle: SELECT AuteurModif FROM soc.Reglage WHERE Code = 'IP_CODE_CHEF' => ADMINL14
+controle: SELECT COUNT(*) FROM soc.Journal WHERE Ecran = 'Codes chefs IP' AND Famille = 'reglage' AND Objet = 'le reglage IP_CODE_CHEF' AND Verbe = 'a modifie' => 1
+---
+# MONTER IPL14B d'un rang (RigListViewUpDown._MoveItem, Direction.Up : index - 1).
+agent: banc.admin.l14
+geste: Agir Monter
+ids: IPL14B
+resultat: fait
+message: Code chef IPL14B monté au rang 3.
+lignes:
+RFL14 | REFERE BANC · rang 1 | Autres codes | Validee | []
+IPL14A | INJONCTION BANC A · rang 2 | Codes IP proposables | Validee | []
+IPL14B | INJONCTION BANC B · rang 3 | Codes IP proposables | Validee | [] | valeurs: IPL14B ; INJONCTION BANC B ; 3
+IPL14C | INJONCTION BANC C · rang 4 | Codes IP proposables | Validee | []
+controle: SELECT Valeur FROM soc.Reglage WHERE Code = 'IP_CODE_CHEF' => RFL14;IPL14A;IPL14B;IPL14C
+controle: SELECT COUNT(*) FROM soc.Journal WHERE Ecran = 'Codes chefs IP' AND Famille = 'reglage' AND Objet = 'le reglage IP_CODE_CHEF' => 2
+---
+# Refus : le premier code ne monte pas (_MoveItem, l. 135 : hors des bornes, rien ne bouge ; message sans source V2). Jumeau accepte :
+# bloc 7, IPL14B au rang 4.
+agent: banc.admin.l14
+geste: Agir Monter
+ids: RFL14
+resultat: refuse
+message: Le code chef « RFL14 » est déjà en tête de liste.
+---
+# Refus : le dernier code ne descend pas (_MoveItem, l. 135). Jumeau accepte : bloc 10, IPL14B au rang 3.
+agent: banc.admin.l14
+geste: Agir Descendre
+ids: IPL14C
+resultat: refuse
+message: Le code chef « IPL14C » est déjà en fin de liste.
+---
+# DESCENDRE IPL14B d'un rang (Direction.Down : index + 1).
+agent: banc.admin.l14
+geste: Agir Descendre
+ids: IPL14B
+resultat: fait
+message: Code chef IPL14B descendu au rang 4.
+lignes:
+RFL14 | REFERE BANC · rang 1 | Autres codes | Validee | []
+IPL14A | INJONCTION BANC A · rang 2 | Codes IP proposables | Validee | []
+IPL14C | INJONCTION BANC C · rang 3 | Codes IP proposables | Validee | []
+IPL14B | INJONCTION BANC B · rang 4 | Codes IP proposables | Validee | []
+controle: SELECT Valeur FROM soc.Reglage WHERE Code = 'IP_CODE_CHEF' => RFL14;IPL14A;IPL14C;IPL14B
+---
+# Refus : retirer un code qui n'est pas dans la liste (IPL14Z, introuvable, n'y est pas montre). Jumeau accepte : bloc 12.
+agent: banc.admin.l14
+geste: Supprimer
+ids: IPL14Z
+resultat: refuse
+message: Le code chef « IPL14Z » n'est pas dans la liste.
+---
+# RETIRER IPL14B (le bouton de retrait, RigListViewUpDown.RemoveItem) : la liste montree au depart.
+agent: banc.admin.l14
+geste: Supprimer
+ids: IPL14B
+resultat: fait
+message: Code chef IPL14B retiré de la liste.
+lignes:
+RFL14 | REFERE BANC · rang 1 | Autres codes | Validee | []
+IPL14A | INJONCTION BANC A · rang 2 | Codes IP proposables | Validee | []
+IPL14C | INJONCTION BANC C · rang 3 | Codes IP proposables | Validee | []
+controle: SELECT Valeur FROM soc.Reglage WHERE Code = 'IP_CODE_CHEF' => RFL14;IPL14A;IPL14C
+---
+# Vers la liste a UN code : IPL14A puis IPL14C retires (faits).
+agent: banc.admin.l14
+geste: Supprimer
+ids: IPL14A
+resultat: fait
+message: Code chef IPL14A retiré de la liste.
+controle: SELECT Valeur FROM soc.Reglage WHERE Code = 'IP_CODE_CHEF' => RFL14;IPL14C
+---
+agent: banc.admin.l14
+geste: Supprimer
+ids: IPL14C
+resultat: fait
+message: Code chef IPL14C retiré de la liste.
+lignes:
+RFL14 | REFERE BANC · rang 1 | Autres codes | Validee | []
+controle: SELECT Valeur FROM soc.Reglage WHERE Code = 'IP_CODE_CHEF' => RFL14
+---
+# Refus : retirer le DERNIER code laisserait une liste vide (ETP_PARAM_IP.DoVerifier, l. 43-50 : « La liste ne contient aucun code
+# chef »). Le reglage garde RFL14. Jumeaux acceptes : blocs 12 a 14 (il restait au moins un code).
+agent: banc.admin.l14
+geste: Supprimer
+ids: RFL14
+resultat: refuse
+message: La liste ne contient aucun code chef
+---
+# La liste d'origine remise : IPL14A puis IPL14C ajoutes en fin (RFL14, hors IP, ne pourrait pas etre rajoute : il n'est jamais sorti).
+agent: banc.admin.l14
+geste: Ajouter
+valeur: Code chef = IPL14A
+resultat: fait
+message: Code chef IPL14A ajouté en fin de liste (rang 2).
+---
+agent: banc.admin.l14
+geste: Ajouter
+valeur: Code chef = IPL14C
+resultat: fait
+message: Code chef IPL14C ajouté en fin de liste (rang 3).
+lignes:
+RFL14 | REFERE BANC · rang 1 | Autres codes | Validee | [] | valeurs: RFL14 ; REFERE BANC ; 1
+IPL14A | INJONCTION BANC A · rang 2 | Codes IP proposables | Validee | [] | valeurs: IPL14A ; INJONCTION BANC A ; 2
+IPL14C | INJONCTION BANC C · rang 3 | Codes IP proposables | Validee | [] | valeurs: IPL14C ; INJONCTION BANC C ; 3
+controle: SELECT Valeur FROM soc.Reglage WHERE Code = 'IP_CODE_CHEF' => RFL14;IPL14A;IPL14C
+controle: SELECT COUNT(*) FROM soc.Journal WHERE Ecran = 'Codes chefs IP' AND Famille = 'reglage' AND Objet = 'le reglage IP_CODE_CHEF' => 8
