@@ -53,7 +53,7 @@ internal static class EditionsV2
             """, ct, new SqlParameter("@code", code));
         if (!await r.ReadAsync(ct)) return null;
         return new ParametreEdition(FormeLigne.Texte(r, "PRMED_CODE"), FormeLigne.Texte(r, "PRMED_LIBELLE"),
-            EcrivainRelancesComptesAnnuels.TypeGeneration(FormeLigne.Texte(r, "PRMED_TYPE_GENERATION"), FormeLigne.Texte(r, "PRMED_LISTE")),
+            RelancesRsurv.TypeGeneration(FormeLigne.Texte(r, "PRMED_TYPE_GENERATION"), FormeLigne.Texte(r, "PRMED_LISTE")),
             r["PRMED_CODE_CFECP"] is DBNull ? null : r["PRMED_CODE_CFECP"],
             r["PRMED_TRIBUNAL_DIGITAL_NATURE_DOC"] is DBNull ? null : r["PRMED_TRIBUNAL_DIGITAL_NATURE_DOC"]);
     }

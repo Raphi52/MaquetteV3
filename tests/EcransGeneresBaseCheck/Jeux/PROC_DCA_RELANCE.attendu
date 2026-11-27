@@ -8,6 +8,12 @@
 # 1800404 (relance 2 due ; elle existe deja : le geste le refuse). Jumeaux de 403, non dus : 402 (relance 1 echue le
 # {J+20}), 407 (echue le jour meme : « < aujourd'hui »), 1800401 (demande DCA en attente W), 1800402 (radie), 1800403
 # (exercice depose). 401 : etat relance 1 « A faire 1ere relance », qu'aucune requete de relance ne lit -- en cours.
+# Relance 1 (lot 8, identifiants 18005xx) : un DOSSIER dont des exercices sont dans la recherche SDCA / RSURV / 1 de RIG_DEV
+# (Id « dossier:<id> »), apres les relances dues, par dossier croissant : 501 (forme a depot obligatoire), 502 (forme « 3 »
+# dont l'associe ASNC est une personne morale relancable ; 2 exercices), 511 (son exercice 2024 est exclu de SDCA, reste 2023).
+# Ecartes, chacun avec son jumeau retenu (PROC_DCA_RELANCE.sql) : 503 associe ASNC personne physique, 504 forme « 0 », 505 type
+# C1, 506 exercice depose, 507 limite de depot le jour meme, 508 etat DCA « 22 », 509 demande DCA en attente, 510 exercice
+# porte par une diligence en cours deja relancee, 512 dissoute.
 # Groupe : close regularisee (9) -> Depot tardif (408) ; reclamation sur un exercice -> Reclamation (405) ; refus DCA
 # (etat O) depuis la 1re relance -> Refus (406) ; sinon Sans reponse.
 # Etat hors « A relancer » : sans courrier ou reclamation en cours -> EnCours ; courrier envoye -> Validee [0,1,3],
@@ -19,7 +25,15 @@
 # relance, derniere des closes -- jumeau 410 (etat 0, sans relance : en cours).
 RELANCE SIGMA SARL · SIREN 518 004 404 | Exercice clos le 31/12/2024 · Relance 2 due · Relance 2 du {J-1} · limite {J+14} | Sans réponse | AFaire | []
 RELANCE DELTA SAS · SIREN 511 000 404 | 2 exercices, le dernier clos le 31/12/2024 · Relance 3 due · Mise en demeure du {J-20} · limite {J-5} | Sans réponse | AFaire | []
+# Lot 8 (injonctions) : les dossiers a enjoindre de ce jeu (INJ ...) ont aussi leur relance 2 due -- RIG v2 les propose aux deux
+# moteurs ; 1800603 (relance 1 echeant aujourd'hui) n'est ni a relancer ni a enjoindre : sa relance est en cours.
+INJ DELTA SAS · SIREN 518 006 604 | Exercice clos le 31/12/2023 · Relance 2 due · Relance 1 du {J-31} · limite {J-1} | Sans réponse | AFaire | []
+INJ BETA SAS · SIREN 518 006 602 | 2 exercices, le dernier clos le 31/12/2023 · Relance 2 due · Relance 1 du {J-31} · limite {J-1} | Sans réponse | AFaire | []
+INJ ALPHA SAS · SIREN 518 006 601 | Exercice clos le 31/12/2023 · Relance 2 due · Relance 1 du {J-31} · limite {J-1} | Sans réponse | AFaire | []
 RELANCE GAMMA SARL · SIREN 511 000 403 | Exercice clos le 31/12/2024 · Relance 2 due · Relance 1 du {J-40} · limite {J-10} | Sans réponse | AFaire | []
+R1 ALPHA SAS · SIREN 518 005 501 | Exercice clos le 31/12/2024 · Relance 1 due | Sans réponse | AFaire | []
+R1 BETA SNC · SIREN 518 005 502 | 2 exercices, le dernier clos le 31/12/2024 · Relance 1 due | Sans réponse | AFaire | []
+R1 LAMBDA SAS · SIREN 518 005 511 | Exercice clos le 31/12/2023 · Relance 1 due | Sans réponse | AFaire | []
 RELANCE EPSILON SARL · SIREN 511 000 405 | Exercice clos le 31/12/2024 · Relance 1 du {J-30} · limite {J+0} · réclamation reçue | Réclamation | EnCours | [0,1,3,4]
 RELANCE KAPPA SAS · 2018 B 00410 | Exercice clos le 31/12/2024 · aucune relance envoyée | Sans réponse | EnCours | [0,1]
 RELANCE ALPHA SARL · SIREN 511 000 401 | Exercice clos le 31/12/2024 · 1re relance à faire | Sans réponse | EnCours | [0,1]
@@ -27,6 +41,7 @@ RELANCE BETA SAS · SIREN 511 000 402 | Exercice clos le 31/12/2024 · Relance 1
 RELANCE MU SAS · SIREN 511 000 412 | Exercice clos le 31/12/2024 · Relance 2 du {J-15} | Sans réponse | Validee | [0,1,3]
 RELANCE ETA SARL · SIREN 511 000 407 | Exercice clos le 31/12/2024 · Relance 1 du {J-30} · limite {J+0} | Sans réponse | Validee | [0,1,3]
 RELANCE ZETA SAS · SIREN 511 000 406 | Exercice clos le 31/12/2024 · Relance 1 du {J-30} · limite {J+0} · refus du {J-5} | Refus | Validee | [0,1,3,4]
+INJ GAMMA SAS · SIREN 518 006 603 | Exercice clos le 31/12/2023 · Relance 1 du {J-31} · limite {J+0} | Sans réponse | Validee | [0,1,3]
 RELANCE RHO SAS · SIREN 518 004 403 | Exercice clos le 31/12/2024 · Relance 1 du {J-40} · limite {J-10} | Sans réponse | Validee | [0,1,3]
 RELANCE PI SARL · SIREN 518 004 402 | Exercice clos le 31/12/2024 · Relance 1 du {J-40} · limite {J-10} | Sans réponse | Validee | [0,1,3]
 RELANCE OMICRON SAS · SIREN 518 004 401 | Exercice clos le 31/12/2024 · Relance 1 du {J-40} · limite {J-10} | Sans réponse | Validee | [0,1,3]

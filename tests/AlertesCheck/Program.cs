@@ -375,7 +375,7 @@ Exiger(File.Exists(Path.Combine(racine, "web/src/ecrans/EcranTeletransmission.ts
 var cheminTsxVerrous = Path.Combine(racine, "web/src/ecrans/EcranVerrous.tsx");
 Exiger(File.Exists(cheminTsxVerrous), "l'ecran React des dossiers verrouilles existe (web/src/ecrans/EcranVerrous.tsx)");
 var tsxVerrous = File.Exists(cheminTsxVerrous) ? File.ReadAllText(cheminTsxVerrous) : string.Empty;
-var pontVerrous = File.ReadAllText(Path.Combine(racine, "Pont/EcranVerrous.cs"));
+var pontVerrous = File.ReadAllText(Path.Combine(racine, "Pont/EcranVerrous.cs")) + File.ReadAllText(Path.Combine(racine, "Pont/EcranVerrousBase.cs"));   // [JSInvokable] dans EcranVerrousBase depuis le lot 9 (38a433a), la demonstration dans EcranVerrous.Exemple
 Exiger(Regex.IsMatch(aiguillage, @"<EcranVerrous\b"),
     "l'aiguillage du plan de travail monte l'ecran React EcranVerrous");
 Exiger(tsxVerrous.Contains("ouvrirDossier: (numero: string) => void")
@@ -394,7 +394,7 @@ Exiger(pontVerrous.Contains("[JSInvokable(\"EcranVerrous.Verrouilles\")]"),
 Exiger(!Regex.IsMatch(tsxVerrous, @"['""`]\d{6}['""`]"),
     "l'ecran React n'ecrit aucun numero de dossier en dur : il affiche ce que le pont calcule");
 
-var vueVerrous = RigV3Desktop.Pont.EcranVerrous.Verrouilles("R. VILAIN", moiCompris: false);
+var vueVerrous = RigV3Desktop.Pont.EcranVerrous.Exemple("R. VILAIN", moiCompris: false);
 Exiger(vueVerrous.Lignes.Length == attenduVerrous,
     $"l'ecran montre autant de verrous que les demandes en cours d'un autre poste ({vueVerrous.Lignes.Length} / {attenduVerrous})");
 Exiger(verrou is null || verrou.Titre.StartsWith(vueVerrous.Lignes.Length + " "),
@@ -404,7 +404,7 @@ Exiger(vueVerrous.Lignes.All(l => l.Utilisateur != "R. VILAIN"
     "chaque ligne est une demande connue, en cours, portee par un autre login");
 Exiger(vueVerrous.Lignes.Zip(vueVerrous.Lignes.Skip(1)).All(p => p.First.Age >= p.Second.Age),
     "les verrous les plus anciens viennent en tete");
-var avecMoi = RigV3Desktop.Pont.EcranVerrous.Verrouilles("R. VILAIN", moiCompris: true);
+var avecMoi = RigV3Desktop.Pont.EcranVerrous.Exemple("R. VILAIN", moiCompris: true);
 Exiger(avecMoi.Lignes.Length == JeuDemo.Demandes.Count(d => d.EnCours && !string.IsNullOrWhiteSpace(d.Utilisateur)),
     "« Inclure mes propres dossiers » ajoute mes demandes en cours, et elles seules");
 Exiger(avecMoi.Detenteurs.Sum(d => d.Nombre) == avecMoi.Lignes.Length

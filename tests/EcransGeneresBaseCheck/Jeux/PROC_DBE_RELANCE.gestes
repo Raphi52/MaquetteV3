@@ -1,0 +1,68 @@
+# « Relances beneficiaires » (EcrivainRelancesBeneficiaires) : « Générer les courriers de relance » fait la relance 1 des dossiers
+# coches (moteur PROC_RSURV de RIG v2, nature SDBE). Lignes du jeu : PROC_DBE_RELANCE.sql et .attendu.
+
+# Refus : 1100202 est une diligence deja relancee (relance 1 du {J-10}) ; RIG v2 n'a qu'une relance SDBE et ne la propose
+# pas, la V3 refuse sans rien ecrire. Jumeau accepte : le dossier 1800201 (a relancer), bloc 3.
+geste: Agir Générer les courriers de relance
+ids: 1100202
+resultat: refuse
+message: BENEF BETA SAS · SIREN 511 000 202 : aucune relance n'est due (RIG v2 ne relance que les dossiers sans relance des bénéficiaires en cours).
+---
+# Refus : le dossier 1800213 n'est pas a relancer (sa diligence SDBE en cours, etat relance 1, l'ecarte de la recherche de
+# RIG v2, NatureDiligence.parametre.cs:798-806) ; coche avec 1800201, il fait refuser tout le lot : rien n'est ecrit pour
+# 1800201 non plus. Jumeau accepte : 1800214 (diligence d'etat relance 0), bloc 3.
+geste: Agir Générer les courriers de relance
+ids: dossier:1800201,dossier:1800213
+resultat: refuse
+message: RBE TREIZE SAS · SIREN 518 002 213 : aucune relance n'est due (le dossier n'est plus dans la recherche des bénéficiaires à relancer).
+---
+# La relance en lot sur DEUX lignes : 1800201 et 1800214 passent de « A relancer » a « Relancee » (relance 1 du jour,
+# limite a un mois : reglage DelaiRelance « Mois=1 » ; type S sans reglage TypeRelance) ; ils ne sont plus a relancer (leur
+# diligence en cours d'etat relance 2 les ecarte). Les autres lignes ne bougent pas.
+geste: Agir Générer les courriers de relance
+ids: dossier:1800201,dossier:1800214
+resultat: fait
+message: Relance 1 faite pour 2 dossiers : 2 courriers « Relance Greffe DBE SDBE » en file d'édition.
+lignes:
+RBE DEUX SARL · SIREN 518 002 202 | Relance 1 due | DBE non déposée | AFaire | []
+RBE SEPT SAS · SIREN 518 002 207 | Relance 1 due | DBE non déposée | AFaire | []
+RBE NEUF SAS · SIREN 518 002 209 | Relance 1 due | DBE non déposée | AFaire | []
+RBE DOUZE SAS · SIREN 518 002 212 | Relance 1 due | DBE non déposée | AFaire | []
+RBE QUATORZE SAS · SIREN 518 002 214 | aucune relance envoyée | DBE non déposée | EnCours | [0,1]
+RBE TREIZE SAS · SIREN 518 002 213 | 1re relance à faire | DBE non déposée | EnCours | [0,1]
+BENEF GAMMA SARL · SIREN 511 000 203 | aucune relance envoyée | DBE non déposée | EnCours | [0,1]
+BENEF ALPHA SARL · SIREN 511 000 201 | 1re relance à faire | DBE non déposée | EnCours | [0,1]
+RBE QUATORZE SAS · SIREN 518 002 214 | Relance 1 du {J+0} · limite {M+1} | DBE non déposée | Validee | [0,1,2]
+RBE UN SAS · SIREN 518 002 201 | Relance 1 du {J+0} · limite {M+1} | DBE non déposée | Validee | [0,1,2]
+BENEF THETA SAS · SIREN 511 000 208 | Relance 2 du {J-5} | DBE non déposée | Validee | [0,1,2]
+BENEF BETA SAS · SIREN 511 000 202 | Relance 1 du {J-10} · limite {J+20} | DBE non déposée | Validee | [0,1,2]
+BENEF ZETA SAS · SIREN 511 000 206 | Relance 1 du {J-30} · limite {J+0} | DBE non déposée | Validee | [0,1,2]
+ENJOINDRE DEJA OPINJRBE · SIREN 518 000 108 | Relance 1 du {J-31} · limite {J-1} | DBE non déposée | Validee | [0,1,2]
+ENJOINDRE DEMANDE MB1 · SIREN 518 000 107 | Relance 1 du {J-31} · limite {J-1} | DBE non déposée | Validee | [0,1,2]
+ENJOINDRE FORMALITE BEN · SIREN 518 000 106 | Relance 1 du {J-31} · limite {J-1} | DBE non déposée | Validee | [0,1,2]
+ENJOINDRE DEPOT BEN · SIREN 518 000 105 | Relance 1 du {J-31} · limite {J-1} | DBE non déposée | Validee | [0,1,2]
+ENJOINDRE SIEGE UE · SIREN 518 000 104 | Relance 1 du {J-31} · limite {J-1} | DBE non déposée | Validee | [0,1,2]
+ENJOINDRE SANS BEN · SIREN 518 000 103 | Relance 1 du {J-31} · limite {J-1} | DBE non déposée | Validee | [0,1,2]
+ENJOINDRE COTEE SA · SIREN 518 000 102 | Relance 1 du {J-31} · limite {J-1} | DBE non déposée | Validee | [0,1,2]
+BENEF ETA SARL · SIREN 511 000 207 | Relance 1 du {J-31} · limite {J-1} | DBE non déposée | Validee | [0,1,2]
+BENEF KAPPA SAS · SIREN 511 000 210 | 1re relance faite | DBE non déposée | Validee | [0,1,2]
+BENEF DELTA SAS · SIREN 511 000 204 | Relance 1 du {J-40} · limite {J-10} · régularisée le {J-2} | DBE non déposée | Validee | [0,1,2,3]
+BENEF EPSILON SARL · SIREN 511 000 205 | Relance 1 du {J-300} · limite {J-270} · close sans régularisation | DBE non déposée | Validee | [0,1,2,3]
+# Ce que RIG v2 ecrit (PROC_RSURV.cs:159-166, 197-209, 225-226, 320-380) : l'action du dossier (code SDBE, etat info 1, etat 2,
+# arrivee RA1 du jour) ; la diligence (origine G, motif NP, en cours, etat relance 2, sans etat EDI : EnvoiEdi 0) ; la relance 1
+# (auteur 3 greffe, intervenant 1, type S, limite a un mois, non facturee) ; la demande RSURV validee du dossier, son nom, son
+# numero indicatif, son action et ses parametres ; la demande du lot du groupe de la nature et ses deux filles ; le courrier en
+# phase « C » dans la file d'impression du reglage.
+controle: SELECT a.CodeProcessus + '/' + a.EtatInfo + a.EtatAction + '/' + CASE WHEN a.NumeroArrivee IS NOT NULL AND a.DateArrivee = CAST(GETDATE() AS date) THEN 'arrivee du jour' ELSE 'sans arrivee' END FROM rec.ActionRegistre AS a JOIN v2.DILIGENCE_RCS AS g ON g.DLGRC_ID_ACTRC = a.Id WHERE a.IdDossier = 1800201 AND g.DLGRC_NATURE_DILIGENCE = 'SDBE' => SDBE/12/arrivee du jour
+controle: SELECT g.DLGRC_ORIGINE_INFO + '/' + g.DLGRC_MOTIF_DILIGENCE + '/' + g.DLGRC_ETAT_DILIGENCE + g.DLGRC_ETAT_RELANCE + '/' + CASE WHEN g.DLGRC_ETAT_EDI IS NULL THEN 'sans EDI' ELSE g.DLGRC_ETAT_EDI END FROM v2.DILIGENCE_RCS AS g JOIN rec.ActionRegistre AS a ON a.Id = g.DLGRC_ID_ACTRC WHERE a.IdDossier = 1800201 AND g.DLGRC_NATURE_DILIGENCE = 'SDBE' => G/NP/12/sans EDI
+controle: SELECT r.RLCRC_AUTEUR + r.RLCRC_INTERVENANT + '/' + r.RLCRC_TYPE_RELANCE + '/' + CAST(DATEDIFF(MONTH, r.RLCRC_DATE_RELANCE, r.RLCRC_DATE_LIMITE) AS varchar(3)) + '/' + CAST(r.RLCRC_FACTURE AS varchar(1)) FROM v2.RELANCE_RCS AS r JOIN v2.DILIGENCE_RCS AS g ON g.DLGRC_ID_DLGRC = r.RLCRC_ID_DLGRC JOIN rec.ActionRegistre AS a ON a.Id = g.DLGRC_ID_ACTRC WHERE a.IdDossier = 1800214 AND g.DLGRC_ETAT_RELANCE = '2' => 31/S/1/0
+controle: SELECT d.DMND_ETAT_DEMANDE + '/' + d.DMND_NOM + '/' + d.DMND_NUM_INDICATIF FROM v2.DEMANDE AS d WHERE d.DMND_CODE_PROSS = 'RSURV' AND d.DMND_ID_DSRCS = 1800201 => V/Relance 1 SDBE : RBE UN SAS/2026B18201
+controle: SELECT CASE WHEN d.DMND_TEXTE_PARAMETRE = 'NumRelance=1;NatureDiligence=SDBE;IdDiligenceRcs=' + CAST(g.DLGRC_ID_DLGRC AS varchar(10)) AND d.DMND_ID_ACTRC = g.DLGRC_ID_ACTRC THEN 'parametres et action de la diligence' ELSE d.DMND_TEXTE_PARAMETRE END FROM v2.DEMANDE AS d JOIN rec.ActionRegistre AS a ON a.IdDossier = d.DMND_ID_DSRCS JOIN v2.DILIGENCE_RCS AS g ON g.DLGRC_ID_ACTRC = a.Id AND g.DLGRC_ETAT_RELANCE = '2' WHERE d.DMND_CODE_PROSS = 'RSURV' AND d.DMND_ID_DSRCS = 1800214 => parametres et action de la diligence
+controle: SELECT COUNT(*) FROM v2.DEMANDE AS m WHERE m.DMND_CODE_PROSS = 'RSURV' AND m.DMND_ETAT_DEMANDE = 'V' AND m.DMND_NOM = 'Relances du groupe Surveillances Président - 2 occurence(s)' AND (SELECT COUNT(*) FROM v2.DEMANDE AS f WHERE f.DMND_ID_DMND_MERE = m.DMND_ID_DMND) = 2 => 1
+controle: SELECT de.DMNED_LIBELLE_DOCUMENT + '/' + de.DMNED_PHASE_TRAITEMENT + '/' + ISNULL(de.DMNED_LOT, '') FROM v2.DEMANDE_EDITION AS de JOIN v2.DEMANDE AS d ON d.DMND_ID_DMND = de.DMNED_ID_DMND WHERE d.DMND_ID_DSRCS = 1800214 AND d.DMND_CODE_PROSS = 'RSURV' => Relance Greffe DBE SDBE/C/AMIRCSRBE
+---
+# Rejoue la relance de 1800201 : il n'est plus a relancer (sa diligence en cours d'etat relance 2) -- refuse, rien d'ecrit.
+geste: Agir Générer les courriers de relance
+ids: dossier:1800201
+resultat: refuse
+message: RBE UN SAS · SIREN 518 002 201 : aucune relance n'est due (le dossier n'est plus dans la recherche des bénéficiaires à relancer).

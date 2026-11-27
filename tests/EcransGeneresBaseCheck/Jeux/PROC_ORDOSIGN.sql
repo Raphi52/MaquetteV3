@@ -44,9 +44,14 @@ IF COL_LENGTH('v2.NATURE_DILIGENCE_PARAM', 'NADIP_TYPE_PARAM') IS NULL ALTER TAB
 EXEC sp_executesql N'
 INSERT INTO v2.NATURE_DILIGENCE_GROUPE (NDILGRP_ID_NDILGRP, NDILGRP_CODE, NDILGRP_LIBELLE) VALUES (2000002, ''JugeCommis'', ''Surveillances Juge Commis'');
 INSERT INTO v2.NATURE_DILIGENCE (R_NATUREDILI_VALEUR, R_NATUREDILI_LIBELLE_ECRAN, R_NATUREDILI_ID_NDILGRP) VALUES (''SJC20'', ''Surveillance juge commis du banc'', 2000002);
-INSERT INTO v2.NATURE_DILIGENCE_PARAM (NADIP_ID_NADIP, NADIP_NATURE_DILIGENCE, NADIP_TYPE_PARAM, NADIP_CODE_PARAM, NADIP_VALEUR_PARAM) VALUES
-    (2000001, ''SDCA'', ''CritereMetier'', ''CodeAffaire'', ''POP20''), (2000002, ''SDBE'', ''CritereMetier'', ''CodeAffaire'', ''INJRBE20''),
-    (2000003, ''SJC20'', ''CritereMetier'', ''CodeAffaire'', ''JCOM20''), (2000004, ''SDCA'', ''CritereMetier'', ''NatureAffaire'', ''OPIDC'');';
+INSERT INTO v2.NATURE_DILIGENCE_PARAM (NADIP_ID_NADIP, NADIP_NATURE_DILIGENCE, NADIP_TYPE_PARAM, NADIP_CODE_PARAM, NADIP_VALEUR_PARAM)
+SELECT v.i, v.n, ''CritereMetier'', v.c, v.v FROM (VALUES
+    (2000001, ''SDCA'', ''CodeAffaire'', ''POP20''), (2000002, ''SDBE'', ''CodeAffaire'', ''INJRBE20''),
+    (2000003, ''SJC20'', ''CodeAffaire'', ''JCOM20''), (2000004, ''SDCA'', ''NatureAffaire'', ''OPIDC'')) AS v (i, n, c, v)
+-- RIG_DEV n''a qu''un code affaire par nature (SDCA : POP5, SDBE : INJRBE, processus ISURV) : celui que PROC_DBE_INJ.sql (lot 8, joue
+-- avant) pose deja n''est pas double -- les instances ORDO N, O et T prennent plus bas le code reglé, le premier que lit le lecteur.
+WHERE NOT EXISTS (SELECT 1 FROM v2.NATURE_DILIGENCE_PARAM AS x WHERE x.NADIP_NATURE_DILIGENCE = v.n AND x.NADIP_CODE_PARAM = v.c
+                  AND x.NADIP_TYPE_PARAM = ''CritereMetier'' AND x.NADIP_NUM_ORDRE IS NULL);';
 
 -- Les bornes de la recherche (PARAMETRAGE ORDOSIGN_DATE_DEBUT_*, repris dans soc.Reglage) et le code affaire du changement de juge.
 INSERT INTO soc.Reglage (Code, Libelle, Valeur)
@@ -90,7 +95,13 @@ INSERT INTO v2.INSTANCE (INSTN_ID_INSTN, INSTN_NUM_ROLE, INSTN_NOM_COURANT, INST
     (2000117, ''2026OS20117'', ''ORDO Q'', ''RP'', ''OPX20'', ''2025-01-23'', ''2099-01-01'', NULL, NULL),
     (2000118, ''2026OS20118'', ''ORDO R'', ''RP'', ''OPX20'', ''2025-01-24'', ''2020-01-01'', NULL, NULL),
     (2000119, ''2026OS20119'', ''ORDO S'', ''RP'', NULL, ''2025-01-25'', ''2020-01-01'', NULL, NULL),
-    (2000120, ''2026OS20120'', ''ORDO T'', ''RP'', ''INJRBE20'', ''2021-04-30'', ''2020-01-01'', NULL, NULL);';
+    (2000120, ''2026OS20120'', ''ORDO T'', ''RP'', ''INJRBE20'', ''2021-04-30'', ''2020-01-01'', NULL, NULL);
+-- Le code affaire SDCA / SDBE reglé dans la base du banc (le 1er CritereMetier CodeAffaire de la nature, celui que le lecteur lit,
+-- comme NatureDiligence.GetParametre de RIG v2) : POP20 / INJRBE20 seuls, ou ceux de PROC_DBE_INJ.sql s''il passe avant.
+UPDATE v2.INSTANCE SET INSTN_CODE_AFFAIRE = (SELECT TOP (1) p.NADIP_VALEUR_PARAM FROM v2.NATURE_DILIGENCE_PARAM AS p
+        WHERE p.NADIP_NATURE_DILIGENCE = CASE WHEN INSTN_ID_INSTN = 2000114 THEN ''SDCA'' ELSE ''SDBE'' END AND p.NADIP_CODE_PARAM = ''CodeAffaire''
+          AND p.NADIP_TYPE_PARAM = ''CritereMetier'' AND p.NADIP_NUM_ORDRE IS NULL ORDER BY p.NADIP_ID_NADIP)
+WHERE INSTN_ID_INSTN IN (2000114, 2000115, 2000120);';
 
 -- Les decisions, une par instance (prevues dans l'ordre des roles). 2000104 rendue l'an dernier, 2000105 rendue le jour du banc ;
 -- 2000118 porte deja la minute 2501000001 (le 10/01/2025), sans date.

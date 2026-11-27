@@ -1,0 +1,163 @@
+# « Injonctions beneficiaires » (PROC_DBE_INJ) : « Générer les injonctions » (EcrivainInjonctionsBeneficiaires, moteur
+# InjonctionsIsurv.cs = PROC_ISURV, nature SDBE). Les references (cabinet du 15/01/2099 chambre CB18 de juge JGI18 et greffier GRI18,
+# code affaire INJ18, decision OPRBE18 et son edition OP_INJ18, reglages SDBE / ISURV) : PROC_DBE_INJ.sql. Les saisies du geste sont
+# les Parametres du descripteur (etape « Cabinet et decision »), par leur libelle. Lot 8 du plan « RIG v3 100 % fonctionnel ».
+
+# 1. Refus : aucune ligne cochee -- « Aucun élément selectionné » (Verifier, PROC_ISURV.cs:221-223). Jumeau accepte : bloc 7.
+geste: Agir Générer les injonctions
+resultat: refuse
+message: Aucun élément selectionné
+---
+# 2. Refus : la date du cabinet manque (etape « Cabinet et decision » obligatoire). Jumeau accepte : bloc 7 (saisie).
+geste: Agir Générer les injonctions
+ids: 1100101
+valeur: Date prévue = 2099-01-15
+resultat: refuse
+message: « Date du cabinet » est obligatoire.
+---
+# 3. Refus : le cabinet du 15/01/2001 est passe -- RIG v2 ne propose que les cabinets a venir (« Type=FUTUR »). Jumeau accepte :
+#    bloc 7 (15/01/2099).
+geste: Agir Générer les injonctions
+ids: 1100101
+valeur: Date du cabinet = 2001-01-15
+valeur: Cabinet = CB18
+valeur: Date prévue = 2099-01-15
+resultat: refuse
+message: Le cabinet de liquidation d'astreinte doit être à venir : RIG v2 ne propose que les cabinets futurs (15/01/2001).
+---
+# 4. Refus : la date prevue de l'ordonnance est passee, au message de RIG v2 (OPE_DECISION_JUDICIAIRE.cs:36-43). Jumeau accepte :
+#    bloc 7 (15/01/2099).
+geste: Agir Générer les injonctions
+ids: 1100101
+valeur: Date du cabinet = 2099-01-15
+valeur: Cabinet = CB18
+valeur: Date prévue = 2001-01-01
+resultat: refuse
+message: La date de décision doit être supérieur ou égale à la date du jour
+---
+# 5. Refus : 1800101 n'a pas de dirigeant representant legal (son seul dirigeant est commissaire aux comptes) : RIG v2 s'arrete sur
+#    l'intervenant (.First(), PROC_ISURV.cs:327). RIEN n'est enjoint, meme 1100101. Jumeau accepte : bloc 7 (1100101 seul avec 1100102).
+geste: Agir Générer les injonctions
+ids: 1100101,1800101
+valeur: Date du cabinet = 2099-01-15
+valeur: Cabinet = CB18
+valeur: Date prévue = 2099-01-15
+resultat: refuse
+message: ENJOINDRE SANS GERANT SAS · SIREN 518 000 101 : aucun dirigeant représentant légal en fonction ; RIG v2 ne peut pas créer l'intervenant de l'injonction (rien n'est enjoint).
+---
+# 6. Refus : 1100103 porte deja son injonction (relance IDBE avec instance) : rien a enjoindre. Jumeau accepte : bloc 7.
+geste: Agir Générer les injonctions
+ids: 1100103
+valeur: Date du cabinet = 2099-01-15
+valeur: Cabinet = CB18
+valeur: Date prévue = 2099-01-15
+resultat: refuse
+message: ENJOINDRE GAMMA SARL · SIREN 511 000 103 : rien à enjoindre (seule une relance restée sans effet, sans injonction émise, sur un dossier que la recherche d'injonction de RIG v2 retient, s'enjoint).
+---
+# 6b. Refus : 1800102, relance 1 echue comme 1100101, mais societe COTEE -- la recherche ISURV SDBE de RIG v2 l'ecarte
+#     (INSPM_SOCI_COTEE = 0, LecteurInjonctionsBeneficiaires.ExclusionsIsurv) ; 1800103 de meme, forme juridique sans declaration
+#     de beneficiaires (R_FORMEJURID_TYPE_BEN 0). Jumeau accepte : bloc 7 (1100101, non cotee, forme SAI18).
+geste: Agir Générer les injonctions
+ids: 1800102
+valeur: Date du cabinet = 2099-01-15
+valeur: Cabinet = CB18
+valeur: Date prévue = 2099-01-15
+resultat: refuse
+message: ENJOINDRE COTEE SA · SIREN 518 000 102 : rien à enjoindre (seule une relance restée sans effet, sans injonction émise, sur un dossier que la recherche d'injonction de RIG v2 retient, s'enjoint).
+---
+geste: Agir Générer les injonctions
+ids: 1800103
+valeur: Date du cabinet = 2099-01-15
+valeur: Cabinet = CB18
+valeur: Date prévue = 2099-01-15
+resultat: refuse
+message: ENJOINDRE SANS BEN · SIREN 518 000 103 : rien à enjoindre (seule une relance restée sans effet, sans injonction émise, sur un dossier que la recherche d'injonction de RIG v2 retient, s'enjoint).
+---
+# 6c. Refus : les quatre autres exclusions d'ExclusionsIsurv, un dossier par condition (PROC_DBE_INJ.sql, 18001xx) ; chacun a une
+#     relance 1 echue et la forme SAI18 non cotee de 1100101. Jumeau accepte : bloc 7 (1100101, aucune de ces conditions).
+# 6c. 1800104 : siege (etablissement SPM) en Allemagne, pays de l'Union europeenne.
+geste: Agir Générer les injonctions
+ids: 1800104
+valeur: Date du cabinet = 2099-01-15
+valeur: Cabinet = CB18
+valeur: Date prévue = 2099-01-15
+resultat: refuse
+message: ENJOINDRE SIEGE UE · SIREN 518 000 104 : rien à enjoindre (seule une relance restée sans effet, sans injonction émise, sur un dossier que la recherche d'injonction de RIG v2 retient, s'enjoint).
+---
+# 6c. 1800105 : un depot de categorie N avec son acte BEN.
+geste: Agir Générer les injonctions
+ids: 1800105
+valeur: Date du cabinet = 2099-01-15
+valeur: Cabinet = CB18
+valeur: Date prévue = 2099-01-15
+resultat: refuse
+message: ENJOINDRE DEPOT BEN · SIREN 518 000 105 : rien à enjoindre (seule une relance restée sans effet, sans injonction émise, sur un dossier que la recherche d'injonction de RIG v2 retient, s'enjoint).
+---
+# 6c. 1800106 : une formalite d'un evenement BEN (R_CODEEVENEM_ISBENEF 1).
+geste: Agir Générer les injonctions
+ids: 1800106
+valeur: Date du cabinet = 2099-01-15
+valeur: Cabinet = CB18
+valeur: Date prévue = 2099-01-15
+resultat: refuse
+message: ENJOINDRE FORMALITE BEN · SIREN 518 000 106 : rien à enjoindre (seule une relance restée sans effet, sans injonction émise, sur un dossier que la recherche d'injonction de RIG v2 retient, s'enjoint).
+---
+# 6c. 1800107 : une demande MB1 en attente (Q).
+geste: Agir Générer les injonctions
+ids: 1800107
+valeur: Date du cabinet = 2099-01-15
+valeur: Cabinet = CB18
+valeur: Date prévue = 2099-01-15
+resultat: refuse
+message: ENJOINDRE DEMANDE MB1 · SIREN 518 000 107 : rien à enjoindre (seule une relance restée sans effet, sans injonction émise, sur un dossier que la recherche d'injonction de RIG v2 retient, s'enjoint).
+---
+# 6c. 1800108 : partie d'une instance OPINJRBE.
+geste: Agir Générer les injonctions
+ids: 1800108
+valeur: Date du cabinet = 2099-01-15
+valeur: Cabinet = CB18
+valeur: Date prévue = 2099-01-15
+resultat: refuse
+message: ENJOINDRE DEJA OPINJRBE · SIREN 518 000 108 : rien à enjoindre (seule une relance restée sans effet, sans injonction émise, sur un dossier que la recherche d'injonction de RIG v2 retient, s'enjoint).
+---
+# 7. FAIT, en lot sur 2 lignes : 1100101 et 1100102, cabinet du 15/01/2099 chambre CB18 -- juge, greffier et type de classement
+#    (CJ, seul admis) recopies du cabinet --, heure d'appel 09:45, ordonnance prevue le 15/01/2099. Une instance INJ18 par dossier
+#    (role JRO18, repertoire JGAFF), ses trois parties, l'appel, la decision OPRBE18 et ses deux evenements, la relance IDBE n° 2 sur la
+#    diligence (etat relance 4), la demande OPE validee fille de la demande ISURV, l'ordonnance OP_INJ18 en file d'edition. Les deux
+#    lignes passent de « À enjoindre » a « Injonction émise ».
+geste: Agir Générer les injonctions
+ids: 1100101,1100102
+valeur: Date du cabinet = 2099-01-15
+valeur: Cabinet = CB18
+valeur: Heure d'appel = 09:45
+valeur: Date prévue = 2099-01-15
+resultat: fait
+message: Traitements effectués : 2 injonctions pour 2 dossiers, rôles 2026OP00001, 2026OP00002 · Cabinet du 15/01/2099 à 09:30 - JUGEINJ Marc · ordonnance « Ordonnance d injonction DBE » en file d'édition. Non repris par la V3 : la facture, les mots directeurs et le récapitulatif Word des injonctions.
+lignes:
+ENJOINDRE SANS GERANT SAS · SIREN 518 000 101 | Relance du {J-40} · délai expiré le {J-10} | Relance restée sans effet | AFaire | []
+ENJOINDRE BETA SAS · SIREN 511 000 102 | Injonction du {J+0} | Injonction à suivre | Validee | [0,1,2]
+ENJOINDRE ALPHA SARL · SIREN 511 000 101 | Injonction du {J+0} | Injonction à suivre | Validee | [0,1,2]
+ENJOINDRE ZETA SAS · SIREN 511 000 106 | Injonction du {J-10} | Injonction à suivre | Validee | [0,1,2]
+ENJOINDRE GAMMA SARL · SIREN 511 000 103 | Injonction du {J-20} | Injonction à suivre | Validee | [0,1,2]
+ENJOINDRE DELTA SAS · SIREN 511 000 104 | Injonction du {J-100} · régularisée le {J-3} | Injonction à suivre | Validee | [0,1,2,3]
+ENJOINDRE EPSILON SARL · SIREN 511 000 105 | Injonction du {J-200} · close sans régularisation | Injonction à suivre | Validee | [0,1,2,3]
+controle: SELECT COUNT(*) FROM v2.INSTANCE WHERE INSTN_CODE_AFFAIRE = 'INJ18' AND INSTN_TYPE_INSTANCE = 'RP' AND INSTN_ETAT_INSTANCE = '0' AND INSTN_NATURE_AFFAIRE = 'INJ18' AND INSTN_CODE_ACTE_PROCE = 'QP8' => 2
+controle: SELECT STRING_AGG(p.PRT_QUALIF_PARTIE + ':' + p.PRT_DESIGNATION + ':' + p.PRT_CIVILITE, ' / ') WITHIN GROUP (ORDER BY p.PRT_QUALIF_PARTIE) FROM v2.PARTIE AS p JOIN v2.RELANCE_RCS AS r ON r.RLCRC_ID_INSTN = p.PRT_ID_INSTN WHERE r.RLCRC_ID_DLGRC = 1100101 AND r.RLCRC_TYPE_RELANCE = 'IDBE' => D:Le PRESIDENT DU TRIBUNAL DE COMMERCE:MR / F:ENJOINDRE ALPHA SARL:PM / I:DURAND Paul Henri:MR
+controle: SELECT CAST(p.PRT_ID_DSRCS AS varchar(10)) + '|' + CAST(p.PRT_ID_RPRTR AS varchar(10)) + '|' + p.PRT_MODE_PRESENTATION FROM v2.PARTIE AS p JOIN v2.RELANCE_RCS AS r ON r.RLCRC_ID_INSTN = p.PRT_ID_INSTN WHERE r.RLCRC_ID_DLGRC = 1100101 AND r.RLCRC_TYPE_RELANCE = 'IDBE' AND p.PRT_QUALIF_PARTIE = 'F' => 1100101|1100101|A
+controle: SELECT p.PRT_DESIGNATION + '|' + p.PRT_SIREN + '|' + CONVERT(varchar(10), p.PRT_DATE_NAISSANCE, 103) + '|' + p.PRT_LIEU_NAISSANCE FROM v2.PARTIE AS p JOIN v2.RELANCE_RCS AS r ON r.RLCRC_ID_INSTN = p.PRT_ID_INSTN WHERE r.RLCRC_ID_DLGRC = 1100102 AND r.RLCRC_TYPE_RELANCE = 'IDBE' AND p.PRT_QUALIF_PARTIE = 'I' => BERNARD Julie|123456789|02/01/1980|Nantes
+controle: SELECT d.DCJDC_TYPE_DECISION + '|' + CAST(d.DCJDC_ID_JUG AS varchar(10)) + '|' + CAST(d.DCJDC_ID_GRASS AS varchar(10)) + '|' + d.DCJDC_SENS_GENERAL + '|' + CONVERT(varchar(10), d.DCJDC_DATE_PREVUE, 103) + '|' + CAST(CAST(d.DCJDC_AVEC_PIECE_NUMERISE AS int) AS varchar(1)) + '|' + d.DCJDC_NATURE_DOC_GED + '|' + d.DCJDC_NOM_DEPOSANT_GED FROM v2.DECISION_JUDICIAIRE AS d JOIN v2.RELANCE_RCS AS r ON r.RLCRC_ID_INSTN = d.DCJDC_ID_INSTN WHERE r.RLCRC_ID_DLGRC = 1100101 AND r.RLCRC_TYPE_RELANCE = 'IDBE' => OPRBE18|1800061|1800071|ACCTT|15/01/2099|1|OPHP|PDT
+controle: SELECT CAST(a.APPAF_ID_ADNC AS varchar(10)) + '|' + a.APPAF_TYPE_CLASSEMENT + '|' + a.APPAF_HEURE_APPEL + '|' + CAST(a.APPAF_NUM_ORDRE AS varchar(3)) FROM v2.APPEL_AFFAIRE AS a JOIN v2.RELANCE_RCS AS r ON r.RLCRC_ID_INSTN = a.APPAF_ID_INSTN WHERE r.RLCRC_ID_DLGRC = 1100101 AND r.RLCRC_TYPE_RELANCE = 'IDBE' => 1800051|CJ|09:45|1
+controle: SELECT STRING_AGG(e.EVNPR_CODE_EVE_PRO, ',') WITHIN GROUP (ORDER BY e.EVNPR_CODE_EVE_PRO) FROM v2.EVENEMENT_PROCEDURE AS e JOIN v2.RELANCE_RCS AS r ON r.RLCRC_ID_INSTN = e.EVNPR_ID_INSTN WHERE r.RLCRC_ID_DLGRC = 1100101 AND r.RLCRC_TYPE_RELANCE = 'IDBE' => INJQ18,RBEI18
+controle: SELECT CAST(r.RLCRC_NUM_ORDRE AS varchar(3)) + '|' + r.RLCRC_AUTEUR + '|' + r.RLCRC_INTERVENANT + '|' + g.DLGRC_ETAT_RELANCE + '|' + p.DLGPA_NON_DISTRIBUE + '|' + p.DLGPA_NPAI + '|' + p.DLGPA_RETRAIT_ROLE + '|' + CAST(CAST(p.DLGPA_TARIFER AS int) AS varchar(1)) + CAST(CAST(p.DLGPA_EDITIONS_DIFFEREES AS int) AS varchar(1)) FROM v2.RELANCE_RCS AS r JOIN v2.DILIGENCE_RCS AS g ON g.DLGRC_ID_DLGRC = r.RLCRC_ID_DLGRC JOIN v2.DILIGENCE_RCS_PARAMETRE AS p ON p.DLGPA_ID_DLGPA = g.DLGRC_ID_DLGPA WHERE r.RLCRC_ID_DLGRC = 1100101 AND r.RLCRC_TYPE_RELANCE = 'IDBE' => 2|4|1|4|CITA|LRAR|ORDO|11
+controle: SELECT COUNT(*) FROM v2.DEMANDE AS d JOIN v2.DEMANDE AS m ON m.DMND_ID_DMND = d.DMND_ID_DMND_MERE JOIN v2.DOSSIER_DEMANDE AS dd ON dd.DSSDM_ID_DMND = d.DMND_ID_DMND AND dd.DSSDM_CODE_SEQUENCEUR = '2J' WHERE d.DMND_CODE_PROSS = 'OPE' AND d.DMND_ETAT_DEMANDE = 'V' AND m.DMND_CODE_PROSS = 'ISURV' AND m.DMND_ETAT_DEMANDE = 'V' AND d.DMND_ID_DSRCS IN (1100101, 1100102) => 2
+controle: SELECT COUNT(*) FROM v2.DEMANDE_EDITION WHERE DMNED_CODE_ENTITE_SOURCE = 'DECI_JUDICIAIRE' AND DMNED_LIBELLE_DOCUMENT = 'Ordonnance d injonction DBE' => 2
+controle: SELECT COUNT(*) FROM v2.CHEF_DEMANDE AS c JOIN v2.INSTANCE AS i ON i.INSTN_ID_INSTN = c.CHFDM_ID_INSTN WHERE i.INSTN_CODE_AFFAIRE = 'INJ18' => 0
+---
+# 8. Refus : rejouer 1100101 -- son injonction est emise (bloc 7) : rien a enjoindre. Jumeau accepte : bloc 7.
+geste: Agir Générer les injonctions
+ids: 1100101
+valeur: Date du cabinet = 2099-01-15
+valeur: Cabinet = CB18
+valeur: Date prévue = 2099-01-15
+resultat: refuse
+message: ENJOINDRE ALPHA SARL · SIREN 511 000 101 : rien à enjoindre (seule une relance restée sans effet, sans injonction émise, sur un dossier que la recherche d'injonction de RIG v2 retient, s'enjoint).

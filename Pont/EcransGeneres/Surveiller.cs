@@ -14,12 +14,13 @@ namespace RigV3Desktop.Pont.EcransGeneres;
 //   - PROC_SUIVI_IMPRESSION n'a pas de fiche, mais son code existe (Source\Outils\Exe\Processus\
 //     PROC_SUIVI_IMPRESSION) : il lit TRAVAIL_IMPRESSION, de la base commune du service d'impression, absente
 //     de la base V3 du greffe -- l'ecran reste en exemple (lot 9) ; criteres, colonnes et gestes de ce code.
-//   - PROC_DBE_RELANCE et PROC_DBE_INJ ont une fiche courte (« source non trouvee ») : leurs
-//     etapes sont calquees sur la relance DCA (PROC_DCA_RELANCE). A confirmer.
+//   - PROC_DBE_RELANCE et PROC_DBE_INJ ont une fiche courte (« source non trouvee ») : ils suivent le
+//     code qui tourne, les moteurs PROC_RSURV et PROC_ISURV, nature SDBE (lot 8, 26/11/2026).
 //   - PROC_DBEN_ALERT : fiche sans étape (lecture seule), fondé sur le formulaire FORM_DBEN_ALERT.cs
 //     (VALIDER, VERIFIER, INTERROMPRE masqués, lignes 12-14) : une seule marche, « Visualiser le
-//     signalement » (OPE_DIVERGENCES.Designer.cs:97). La tuile « En cours » reste vide : la source
-//     n'a pas d'état intermédiaire. A confirmer par le chef.
+//     signalement » (OPE_DIVERGENCES.Designer.cs:97), qui ouvre un autre écran et n'écrit rien :
+//     lue dans la base (LecteurDivergencesBen.cs, lot 8), sans écrivain. La source n'a pas d'état
+//     intermédiaire (aucune ligne « En cours »).
 //   - PROC_STATCA : le tableau a lignes fixes de la fiche -- une ligne par categorie de role (J, F, R,
 //     IP), ses sept colonnes calculees dans la base (lot 9, LecteurStatistiquesCourAppel.cs).
 //   - PROC_SURVBOD : la « requete principale » du haut de la fiche est inventee (le Detail OPE le dit) ;
@@ -27,8 +28,12 @@ namespace RigV3Desktop.Pont.EcransGeneres;
 //   - PROC_XPILOTAGE : les lignes sont les cellules pilotees (table PILOTAGE_REQUETES), par feuille.
 //   - PROC_RELANCELOT : le bouton Réinitialiser n'est jamais activable (TODO de la fiche,
 //     OPE_EDITGRP.cs:120) : il n'est pas offert ici.
-//   - PROC_IPSUIVI : dix etats dans le code (TypeTraitement), cinq ici ; « Suspendue » et
-//     « transférée » partagent l'etat figé EnAttente, « Rejetée » est l'etat Rejetee.
+//   - PROC_IPSUIVI : une Fiche a trois etats (A signifier, Signifiee, Close), lus des evenements de
+//     l'IP (LecteurSuiviIp.cs) ; les dix etats de la partie haute de la fiche V2 ne sont pas dans le code
+//     (proc_ipsuivi.md:165-171). Lot 8, 27/11/2026.
+// fix-ok: les descripteurs du lot 8 sont retouches en plusieurs passes parce que chaque geste branche
+// (relances, injonctions, puis traitements des IP et desistement, 26-27/11/2026) change ce que leur
+// commentaire et leurs Parametres disent : aucune retouche n'est une correction a l'aveugle.
 public sealed class DomaineSurveiller : IDomaineEcrans
 {
     public IEnumerable<DescripteurEcran> Ecrans() =>
@@ -367,7 +372,8 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         new DescripteurEcran
         {
             // Lot 8 (26/11/2026) : lue et relancee dans la base -- LecteurRelancesComptesAnnuels.cs, EcrivainRelancesComptesAnnuels.cs
-            // (« Valider » : la relance suivante des diligences dont la relance precedente est echue, moteur PROC_RSURV de RIG v2).
+            // (« Valider » : la relance 1 des dossiers que la recherche SDCA / RSURV / 1 de RIG v2 propose, et la relance suivante des
+            // diligences dont la relance precedente est echue ; moteur PROC_RSURV de RIG v2).
             Code = "PROC_DCA_RELANCE", Titre = "Relances comptes annuels", Sujet = "dossiers RCS en retard",
             Forme = FormeEcran.File,
             Recherche = "Rechercher un dossier RCS, un numéro de gestion, un SIREN…",
@@ -404,69 +410,74 @@ public sealed class DomaineSurveiller : IDomaineEcrans
 
         new DescripteurEcran
         {
-            // Lot 8 (26/11/2026) : lue dans la base (LecteurInjonctionsComptesAnnuels.cs) ; le geste N'EST PAS BRANCHE. L'injonction de RIG v2 passe par
-            // le moteur PROC_ISURV (SURVEILLANCES\PROC_ISURV\PROC_ISURV.cs) : instance creee (l. 252), evenement futur « date limite »
-            // (l. 423), editions (l. 437, 468), numeros de role et de repertoire JGAFF (l. 494, 499), restitues en cas d'erreur
-            // (l. 739-781) -- une transaction sur plusieurs objets, a faire dans un lot a elle. L'ecran dit « Demonstration ».
+            // Lot 8 (26/11/2026) : lue et enjointe dans la base -- LecteurInjonctionsComptesAnnuels.cs, EcrivainInjonctionsComptesAnnuels.cs,
+            // moteur InjonctionsIsurv.cs. L'injonction qui tourne est PROC_ISURV (« Injonctions des surveillances », menu ISURV de RIG_DEV),
+            // nature SDCA ; « INJDCA » (PROC_SDCA.dll / FORM_INJDCA), au menu, herite de PROC_SURVEILLANCE_INJ, absente des sources, et son
+            // projet ne compile plus (Source\CompilationFull\PowerShell\buildErrors.txt:116). Les lignes : les dossiers dont la relance 1
+            // est echue (« A traiter »), les injonctions qui attendent leur depot (« En cours »), puis les depots recus depuis une injonction
+            // (la fiche proc_dca_inj.md ; ils se valident a l'ecran des comptes annuels, sans geste ici). Les Parametres sont les saisies de
+            // l'etape obligatoire « Cabinet et decision » (ETP_CABINET_DECISION.cs:24-28), envoyees avec le geste.
             Code = "PROC_DCA_INJ", Titre = "Injonctions comptes annuels", Sujet = "dépôts de comptes annuels",
             Forme = FormeEcran.File,
             Recherche = "Rechercher un dossier RCS, un numéro de gestion, un SIREN…",
             Criteres = ["Numéro de gestion ou SIREN", "Exercices non déposés", "Origine : papier ou dématérialisé"],
-            Valider = "Valider le dépôt", // proc_dca_inj.md, Rôle : « valide le dépôt ».
+            // Le bouton VALIDER de PROC_ISURV (FORM_ISURV.cs:31-37) : « création des instances en cours » (PROC_ISURV.cs:228) ; le meme
+            // libelle que les injonctions beneficiaires (proc_dbe_inj.md, Contexte : « la génération de ces injonctions »), meme moteur.
+            Valider = "Générer les injonctions",
             Rang = 5,
             Etats = [.. EtatsEcran.Trois("À traiter", "En cours", "Déposée"), new EtatEcran("Rejetee", "Refusée", "rejetee")],
-            Groupes = ["Dépôts dématérialisés", "Dépôts papier", "Réclamations et refus"],
+            Groupes = ["Relance restée sans effet", "Injonction à suivre", "Dépôts dématérialisés", "Dépôts papier", "Réclamations et refus"],
+            Parametres = [Champ.Date("Date du cabinet"), "Cabinet", "Heure d'appel", "Type de classement", "Juge", "Greffier", Champ.Date("Date prévue")],
             Sections =
             [
-                Marche("Dossier RCS", "Le dossier se charge en premier, par numéro de gestion ou par SIREN.", true,
-                    "Numéro de gestion", "SIREN"),
-                Marche("Exercices", "Les exercices non déposés sont proposés ; le dépôt porte sur ceux cochés. Un seul exercice de moins de trois ans est coché d'office.", true,
-                    "Exercice non déposé", "Date de clôture", "Date de réception"),
-                Marche("Facturation", "Client, encaissement et frais. Les articles changent selon le canal : démat ou papier.", false,
-                    "Client", "Encaissement", "Frais"),
-                Marche("Réclamation ou refus", "Un motif est saisi pour une réclamation ou un refus.", false,
-                    "Motif", "Date de réception"),
-                Marche("Validation", "Valider le dépôt : la demande passe en récapitulatif, en lecture seule.", true,
-                    "Récapitulatif"),
+                Marche("Dossier RCS", "Les exercices non déposés dont la relance 1 est échue, sans injonction : une injonction par exercice.", true,
+                    "Numéro de gestion", "SIREN", "Exercice non déposé"),
+                Marche("Cabinet et décision", "Le cabinet de liquidation d'astreinte (à venir), le type de classement, puis le juge, le greffier et la date prévue de l'ordonnance. Juge, greffier et type de classement viennent du cabinet s'ils ne sont pas saisis.", true,
+                    "Cabinet", "Type de classement", "Juge", "Greffier", "Date prévue"),
+                Marche("Injonction", "L'instance est créée et numérotée avec ses parties (le président, la société, son dirigeant), l'ordonnance et la relance d'injonction de l'exercice.", true,
+                    "Numéro de rôle", "Ordonnance"),
+                Marche("Dépôt", "Le dépôt reçu après l'injonction se traite à l'écran des comptes annuels : démat ou papier, réclamation ou refus.", false,
+                    "Origine", "Date de réception", "Motif"),
             ],
             Lignes =
             [
-                Ligne("Alpha Services SARL · SIREN 900 210 001", "Dépôt démat reçu · exercice 2025", "Dépôts dématérialisés", "AFaire"),
-                Ligne("Bêta Industrie SAS · SIREN 900 210 002", "Dépôt démat · exercice coché", "Dépôts dématérialisés", "EnCours", 0, 1),
-                Ligne("Gamma Conseil SARL · SIREN 900 210 003", "Dépôt démat validé le 11/03/2026", "Dépôts dématérialisés", "Validee", 0, 1, 2, 4),
-                Ligne("Delta Transports SAS · SIREN 900 210 004", "Dépôt papier · exercice à cocher", "Dépôts papier", "EnCours", 0),
-                Ligne("Epsilon Habitat SARL · SIREN 900 210 005", "Dépôt papier validé le 12/03/2026", "Dépôts papier", "Validee", 0, 1, 4),
-                Ligne("Zêta Commerce SAS · SIREN 900 210 006", "Réclamation reçue le 13/03/2026", "Réclamations et refus", "EnCours", 0, 1, 3),
-                Ligne("Êta Boulangerie SARL · SIREN 900 210 007", "Refus reçu le 14/03/2026", "Réclamations et refus", "Rejetee"),
-                Ligne("Thêta Import SAS · SIREN 900 210 008", "Dépôt démat à valider", "Dépôts dématérialisés", "AFaire"),
+                Ligne("Alpha Services SARL · SIREN 900 210 001", "1 exercice à enjoindre · clôture du 31/12/2024 · relance 1 échue", "Relance restée sans effet", "AFaire"),
+                Ligne("Thêta Import SAS · SIREN 900 210 008", "2 exercices à enjoindre · clôture du 31/12/2024 · relance 1 échue", "Relance restée sans effet", "AFaire"),
+                Ligne("Bêta Industrie SAS · SIREN 900 210 002", "Injonction du 02/03/2026 · rôle 2026OP00012 · clôture du 31/12/2024 · non régularisée", "Injonction à suivre", "EnCours", 0, 1, 2),
+                Ligne("Gamma Conseil SARL · SIREN 900 210 003", "Injonction du 11/02/2026 · déposé le 11/03/2026", "Dépôts dématérialisés", "Validee", 0, 1, 2, 3),
+                Ligne("Delta Transports SAS · SIREN 900 210 004", "Injonction du 05/02/2026 · reçu le 10/03/2026", "Dépôts papier", "AFaire"),
+                Ligne("Epsilon Habitat SARL · SIREN 900 210 005", "Injonction du 05/02/2026 · déposé le 12/03/2026", "Dépôts papier", "Validee", 0, 1, 2, 3),
+                Ligne("Zêta Commerce SAS · SIREN 900 210 006", "Injonction du 01/02/2026 · réclamation du 13/03/2026", "Réclamations et refus", "EnCours", 0, 1, 2, 3),
+                Ligne("Êta Boulangerie SARL · SIREN 900 210 007", "Injonction du 01/02/2026 · refusé le 14/03/2026", "Réclamations et refus", "Rejetee"),
             ],
         },
 
-        // DBE : fiche courte (« source non trouvée »). Étapes calquées sur la relance DCA :
-        // à confirmer par le chef avant la livraison.
+        // DBE : la fiche proc_dbe_relance.md est courte (« Contexte métier probable ») ; ce descripteur suit le code qui tourne,
+        // le moteur PROC_RSURV nature SDBE (lot 8, 26/11/2026). Un seul groupe : rien dans l'ancien RIG ne distingue une
+        // déclaration « incomplète » (motif de diligence toujours « NP », MOTIF_DILIGENCE de RIG_DEV ; LecteurRelancesBeneficiaires.cs).
         new DescripteurEcran
         {
-            // Lot 8 (26/11/2026) : lue dans la base (LecteurRelancesBeneficiaires.cs) ; le geste N'EST PAS BRANCHE. RIG v2 relance
-            // les dossiers SANS diligence choisis par la requete de reglage NATURE_DILIGENCE_PARAM SDBE / RSURV / 1 (SqlSelect de
-            // RIG_DEV, lue le 26/11/2026) et leur CREE une diligence (moteur PROC_RSURV, relance 1). Toutes les tables qu'elle lit sont
-            // dans la base V3 (INSCRIT_PM, FORME_JURIDIQUE_UTI, ETABLISSEMENT, PAYS, EVENEMENT_RCS... : verifie le meme jour) : le
-            // geste est faisable, il reste a faire, avec la relance 1 des comptes annuels (meme moteur).
+            // Lot 8 (26/11/2026) : lue et relancee dans la base -- LecteurRelancesBeneficiaires.cs, EcrivainRelancesBeneficiaires.cs.
+            // RIG v2 relance les dossiers SANS diligence choisis par la requete de reglage NATURE_DILIGENCE_PARAM SDBE / RSURV / 1
+            // (SqlSelect de RIG_DEV, traduite dans le lecteur) et leur CREE action, diligence et relance 1 (moteur PROC_RSURV) : les
+            // lignes « À relancer » sont ces dossiers, « Générer les courriers de relance » les relance.
             Code = "PROC_DBE_RELANCE", Titre = "Relances beneficiaires", Sujet = "entreprises en retard de déclaration",
             Forme = FormeEcran.File,
             Recherche = "Rechercher une entreprise, un numéro de gestion, un SIREN…",
-            Criteres = ["Numéro de gestion ou SIREN", "Déclaration DBE (bénéficiaires effectifs) non faite ou incomplète", "Mode d'envoi : LRAR ou notification électronique"],
-            Valider = "Générer les courriers de relance", // proc_dbe_relance.md, Contexte : « Il peut générer des courriers de relance LRAR ou des notifications électroniques ».
+            // Le critere de la recherche de RIG v2 (numero de gestion ou liste de SIREN, NatureDiligence.parametre.cs:643-651).
+            Criteres = ["Numéro de gestion ou SIREN"],
+            Valider = "Générer les courriers de relance", // la relance 1 de PROC_RSURV : action, diligence, relance et courrier (PROC_RSURV.cs:159-166, :320-380).
             Rang = 5,
             Etats = EtatsEcran.Trois("À relancer", "En cours", "Relancée"),
-            Groupes = ["DBE non déposée", "DBE incomplète"],
+            Groupes = ["DBE non déposée"],
             Sections =
             [
                 Marche("Entreprise", "Le dossier RCS se retrouve par son numéro de gestion ou son SIREN.", true,
                     "Numéro de gestion", "SIREN"),
-                Marche("Déclaration", "Entreprise sans déclaration DBE, ou dont la déclaration est incomplète.", true,
+                Marche("Déclaration", "Entreprise sans dépôt ni formalité de bénéficiaires effectifs (requête de relance SDBE de RIG v2).", true,
                     "Déclaration DBE", "Date limite"),
-                Marche("Courrier", "Relance par lettre recommandée (LRAR) ou notification électronique.", true,
-                    "Mode d'envoi", "Courrier de relance"),
+                Marche("Courrier", "Le courrier de la relance part en file d'édition quand son paramètre d'édition existe dans la base du greffe.", true,
+                    "Courrier de relance"),
                 Marche("Suivi", "Si la relance reste sans effet, l'injonction DBE prend la suite.", false,
                     "Réponse", "Injonction DBE"),
             ],
@@ -475,20 +486,20 @@ public sealed class DomaineSurveiller : IDomaineEcrans
                 Ligne("Alpha Services SARL · SIREN 900 220 001", "DBE non déposée · relance à envoyer", "DBE non déposée", "AFaire"),
                 Ligne("Bêta Industrie SAS · SIREN 900 220 002", "DBE non déposée · courrier préparé", "DBE non déposée", "EnCours", 0, 1),
                 Ligne("Gamma Conseil SARL · SIREN 900 220 003", "Relance LRAR envoyée", "DBE non déposée", "Validee", 0, 1, 2),
-                Ligne("Delta Transports SAS · SIREN 900 220 004", "DBE incomplète · relance à envoyer", "DBE incomplète", "AFaire"),
-                Ligne("Epsilon Habitat SARL · SIREN 900 220 005", "DBE incomplète · notification envoyée", "DBE incomplète", "Validee", 0, 1, 2, 3),
-                Ligne("Zêta Commerce SAS · SIREN 900 220 006", "DBE incomplète · relance en cours", "DBE incomplète", "EnCours", 0),
+                Ligne("Delta Transports SAS · SIREN 900 220 004", "DBE non déposée · relance à envoyer", "DBE non déposée", "AFaire"),
+                Ligne("Zêta Commerce SAS · SIREN 900 220 006", "DBE non déposée · relance en cours", "DBE non déposée", "EnCours", 0),
                 Ligne("Êta Boulangerie SARL · SIREN 900 220 007", "DBE non déposée · déjà relancée", "DBE non déposée", "Validee", 0, 1, 2),
             ],
         },
 
-        // DBE : fiche courte (« source non trouvée »). Injonction : à confirmer par le chef.
         new DescripteurEcran
         {
-            // Lot 8 (26/11/2026) : lue dans la base (LecteurInjonctionsBeneficiaires.cs) ; le geste N'EST PAS BRANCHE. L'injonction de RIG v2 passe par
-            // le moteur PROC_ISURV (SURVEILLANCES\PROC_ISURV\PROC_ISURV.cs) : instance creee (l. 252), evenement futur « date limite »
-            // (l. 423), editions (l. 437, 468), numeros de role et de repertoire JGAFF (l. 494, 499), restitues en cas d'erreur
-            // (l. 739-781) -- une transaction sur plusieurs objets, a faire dans un lot a elle. L'ecran dit « Demonstration ».
+            // Lot 8 (26/11/2026) : lue et enjointe dans la base -- LecteurInjonctionsBeneficiaires.cs, EcrivainInjonctionsBeneficiaires.cs,
+            // moteur InjonctionsIsurv.cs. La fiche proc_dbe_inj.md est courte (« source non trouvée ») ; « IDBE » (PROC_SRBE.dll / FORM_IDBE)
+            // est masque du menu de RIG v2 (PROCF_VISIBLE_DANS_MENU 0, RIG_DEV lu le 26/11/2026) et herite de PROC_SURVEILLANCE_INJ,
+            // absente des sources ; l'injonction qui tourne est PROC_ISURV, nature SDBE (reglages SDBE / ISURV de RIG_DEV : code affaire
+            // INJRBE, decision OPRBEINJAA). Les Parametres sont les saisies de l'etape obligatoire « Cabinet et decision »
+            // (ETP_CABINET_DECISION.cs:24-28), envoyees avec le geste, les memes que PROC_DCA_INJ.
             Code = "PROC_DBE_INJ", Titre = "Injonctions beneficiaires", Sujet = "injonctions DBE",
             Forme = FormeEcran.File,
             Recherche = "Rechercher une entreprise, une relance, un numéro de gestion…",
@@ -497,33 +508,38 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             Rang = 5,
             Etats = EtatsEcran.Trois("À enjoindre", "En cours", "Injonction émise"),
             Groupes = ["Relance restée sans effet", "Injonction à suivre"],
+            Parametres = [Champ.Date("Date du cabinet"), "Cabinet", "Heure d'appel", "Type de classement", "Juge", "Greffier", Champ.Date("Date prévue")],
             Sections =
             [
                 Marche("Entreprise", "Le dossier RCS se retrouve par son numéro de gestion ou son SIREN.", true,
                     "Numéro de gestion", "SIREN"),
                 Marche("Relance", "Une relance DBE doit être restée sans effet dans les délais.", true,
                     "Relance DBE", "Date de la relance"),
-                Marche("Injonction", "L'injonction de déclarer les bénéficiaires effectifs se prépare, puis se génère.", true,
-                    "Texte de l'injonction", "Date d'émission"),
+                Marche("Cabinet et décision", "Le cabinet de liquidation d'astreinte (à venir), le type de classement, puis le juge, le greffier et la date prévue de l'ordonnance. Juge, greffier et type de classement viennent du cabinet s'ils ne sont pas saisis.", true,
+                    "Cabinet", "Type de classement", "Juge", "Greffier", "Date prévue"),
                 Marche("Suivi", "Le suivi de l'injonction reste ouvert tant que la déclaration n'est pas faite.", false,
                     "Suivi"),
             ],
             Lignes =
             [
-                Ligne("Alpha Services SARL · SIREN 900 230 001", "Relance restée sans effet", "Relance restée sans effet", "AFaire"),
-                Ligne("Bêta Industrie SAS · SIREN 900 230 002", "Injonction à générer", "Relance restée sans effet", "EnCours", 0, 1),
-                Ligne("Gamma Conseil SARL · SIREN 900 230 003", "Injonction émise le 09/03/2026", "Injonction à suivre", "Validee", 0, 1, 2),
-                Ligne("Delta Transports SAS · SIREN 900 230 004", "Relance à reprendre", "Relance restée sans effet", "AFaire"),
-                Ligne("Epsilon Habitat SARL · SIREN 900 230 005", "Injonction en préparation", "Injonction à suivre", "EnCours", 0, 1),
-                Ligne("Zêta Commerce SAS · SIREN 900 230 006", "Injonction émise le 12/03/2026", "Injonction à suivre", "Validee", 0, 1, 2),
+                Ligne("Alpha Services SARL · SIREN 900 230 001", "Relance du 02/01/2026 · délai expiré le 02/02/2026", "Relance restée sans effet", "AFaire"),
+                Ligne("Bêta Industrie SAS · SIREN 900 230 002", "Relance du 05/01/2026 · délai expiré le 05/02/2026", "Relance restée sans effet", "AFaire"),
+                Ligne("Gamma Conseil SARL · SIREN 900 230 003", "Injonction du 09/03/2026", "Injonction à suivre", "Validee", 0, 1, 2),
+                Ligne("Delta Transports SAS · SIREN 900 230 004", "Relance du 10/01/2026 · délai expiré le 10/02/2026", "Relance restée sans effet", "AFaire"),
+                Ligne("Epsilon Habitat SARL · SIREN 900 230 005", "Injonction du 11/03/2026 · régularisée le 20/04/2026", "Injonction à suivre", "Validee", 0, 1, 2, 3),
+                Ligne("Zêta Commerce SAS · SIREN 900 230 006", "Injonction du 12/03/2026", "Injonction à suivre", "Validee", 0, 1, 2),
             ],
         },
 
         new DescripteurEcran
         {
-            // Lot 8 (26/11/2026) : lue dans la base (LecteurRappelsRbe.cs) ; le geste N'EST PAS BRANCHE : la recherche des dossiers a
-            // rappeler de RIG v2 ne compile plus (Source\CompilationFull\PowerShelluildErrors.txt:110), et le courrier « Relance RBE »
-            // passe par le moteur PROC_ISURV (PROC_ISURV.cs:685), comme les injonctions.
+            // Lot 8 (26/11/2026) : lue dans la base (LecteurRappelsRbe.cs) ; pas d'ecrivain, l'ecran dit « Demonstration ». Le geste de
+            // RIG v2 (« Édition » : une demande SRBE validee et son courrier par dossier, PROC_SRBE_RAPPEL.cs:109-203) porte sur les
+            // dossiers de SA recherche, qui n'existe plus : ses trois requetes (DossierRCS.GetNRBEPourRappel, ...PourRelance,
+            // ...PourRappelOuRelance, OPE_RECHERCHE_CRITERES.cs:153-162) sont absentes de RigMetier (grep : 0 occurrence), le projet ne
+            // compile plus (Source\CompilationFull\PowerShell\buildErrors.txt:110) et le traitement « SRBE » est masque du menu
+            // (PROCF_VISIBLE_DANS_MENU 0, RIG_DEV lu le 26/11/2026). Les lignes de cet ecran sont les demandes SRBE passees ; RIG v2 n'a
+            // aucun geste sur elles. La relance des beneficiaires qui tourne est PROC_DBE_RELANCE (PROC_RSURV, nature SDBE), branchee.
             Code = "PROC_SRBE_RAPPEL", Titre = "Rappels RBE", Sujet = "dossiers RCS",
             Forme = FormeEcran.File,
             Recherche = "Rechercher un dossier, une date d'immatriculation, un numéro de gestion…",
@@ -638,7 +654,8 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         new DescripteurEcran
         {
             // Fondé sur la source (formulaire FORM_DBEN_ALERT.cs) : la fiche proc_dben_alert.md n'a
-            // pas d'étape, elle est en lecture seule. Les lignes sont une démonstration anonyme.
+            // pas d'étape, elle est en lecture seule. Avec la base du greffe, les lignes sont lues par
+            // LecteurDivergencesBen.cs (lot 8) ; les lignes ci-dessous ne servent que sans serveur, étiquetées « exemple ».
             Code = "PROC_DBEN_ALERT", Titre = "Divergences BEN", Sujet = "divergences BEN ouvertes",
             Forme = FormeEcran.File,
             Recherche = "Rechercher un dossier, un demandeur…",
@@ -675,10 +692,17 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             Recherche = "Rechercher une injonction, un numéro de rôle, un demandeur…",
             Criteres = ["Juge", "Greffier", "Titre exécutoire", "Non avenue", "Caducité", "Certificat de non-opposition"],
             Valider = "Appliquer les traitements", // proc_survip.md, Rôle : « Appliquer les traitements : Titre exécutoire, Caducité, IP Non avenue, Certificat de non-opposition ».
+            // Les saisies du traitement (EcrivainSurveillanceIp.cs) : juge (obligatoire), greffier et date prevue de l'etape de
+            // recherche (OPE_RECHERCHE.Designer.cs:133-157), et les cases LRAR / LR de la grille de RIG v2 (OPE_TRAITEMENTS.cs:744-800).
+            // RIG v2 a une case LRAR / LR PAR LIGNE ; la liste a cocher envoie une saisie pour toutes les lignes cochees : pour des
+            // envois differents, deux passages (les IP en LRAR, puis les autres). Raison detaillee : EcrivainSurveillanceIp.cs.
+            // fix-ok: 4e retouche du lot 8 sur ce fichier ce passage (27/11/2026), chacune sur un commentaire ou un texte devenu faux
+            // par un geste branche (Divergences BEN lue en base, dates du suivi des preventions, LRAR par lot) -- aucune a l'aveugle.
+            Parametres = ["Juge", "Greffier", Champ.Date("Date prévue"), Champ.Case("LRAR"), Champ.Case("LR")],
             Rang = 5,
             // La V2 ne liste que les echeances a traiter : toute ligne est « A traiter » ; une IP traitee sort de la liste
-            // (son evenement futur expire). Lot 8 (26/11/2026) : lu dans la base -- LecteurSurveillanceIp.cs ; le traitement
-            // (OPE_TRAITEMENTS.PreparationTraitements) n'est pas encore branche : l'ecran le dit (« Demonstration »).
+            // (son evenement futur expire ou survient). Lot 8 : lu dans la base -- LecteurSurveillanceIp.cs (26/11/2026) ; le
+            // traitement (OPE_TRAITEMENTS.PreparationTraitements) ecrit -- EcrivainSurveillanceIp.cs (27/11/2026).
             Etats = EtatsEcran.Trois("À traiter", "En cours", "Traitée"),
             // Les TypeTrt de la V2 au mot pres (PROC_SURVIP.cs:18-23), dans l'ordre de chargementTraitements
             // (OPE_RECHERCHE.cs:278-306).
@@ -714,8 +738,11 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             // FICHE, pas File (decision du chef, formes a revoir : proc_ipsuivi.md:173). Le « Detail OPE » fait foi : IPSUIVI
             // est le suivi d'UNE injonction de payer apres son ordonnance, ouverte par son numero (PROC_IPSUIVI.cs:20-26,
             // ETP_IPSUIVI.cs:14-15) ; la partie haute de la fiche (dix etats NonTraite... Transfere, IP_SUIVI) ne correspond
-            // pas au code (proc_ipsuivi.md:165-171). Lot 8 (26/11/2026) : lue dans la base -- LecteurSuiviIp.cs ; la saisie
-            // des dates (Valider : evenements, instance J ou OP, facture, editions) n'est pas branchee, la fiche est en lecture.
+            // pas au code (proc_ipsuivi.md:165-171). Lot 8 : lue dans la base -- LecteurSuiviIp.cs (26/11/2026) ; Valider
+            // enregistre la date saisie (desistement, signification, certificat, opposition, LRAR, provision) ou le 2e executoire :
+            // l'evenement attendu survient (ou expire hors delai : non-avenue, caducite), son suivant est cree, l'opposition est
+            // enrolee au fond (TIP1, avec son appel a l'audience) ou une OP de caducite ouverte, les editions partent --
+            // EcrivainSuiviIp.cs (27/11/2026). La facture de la provision (facultative dans RIG v2) n'est pas reprise.
             Forme = FormeEcran.Fiche,
             Recherche = "Rechercher une injonction de payer par son numéro…",
             Criteres = ["N° IP"], // le champ de saisie de la V2 (ETP_IPSUIVI.cs:14-15, GetUltByMetierTitre("N° IP"))
@@ -732,9 +759,20 @@ public sealed class DomaineSurveiller : IDomaineEcrans
                     "N° IP", Champ.Date("Date IP"), "Demandeur", "Défendeur"),
                 // Les dates des actes qui suivent l'ordonnance (OPE_IPSUIVI.cs:879-944) : l'evenement survenu, sinon la date
                 // d'expiration de l'evenement expire (signification, opposition, provision).
-                Marche("Actes après l'ordonnance", "Chaque date vient de l'événement de procédure survenu ; à défaut, de la date d'expiration de l'événement expiré. Dans RIG v2, saisir une date fait survenir l'événement : la V3 ne le reprend pas encore, la fiche se lit.", true,
+                Marche("Actes après l'ordonnance", "Chaque date vient de l'événement de procédure survenu ; à défaut, de la date d'expiration de l'événement expiré. Une date à la fois (sauf signification et certificat) : l'événement attendu survient, le suivant est créé, ses éditions partent. La provision reçue à temps enrôle l'opposition au fond ; après sa date prévue, elle est caduque.", true,
                     Champ.Date("Signification"), Champ.Case("À personne"), Champ.Date("Opposition"), Champ.Date("Réception LRAR"),
-                    Champ.Date("Provision"), Champ.Date("Certificat de non-opposition")),
+                    Champ.Date("Provision"), Champ.Date("Certificat de non-opposition"),
+                    Champ.Date("Désistement")), // ult_Desistement (OPE_IPSUIVI.Designer.cs:412)
+                // Les cases et zones montrees a cote des dates (MetierTitre d'OPE_IPSUIVI.Designer.cs : :516, :455/:309, :289, :400,
+                // :564, :372, :359, :350) ; leurs regles : en tete de LecteurSuiviIp.cs.
+                Marche("Options du traitement", "Dans les délais : garder une provision reçue après sa date prévue. Enrôlement : enrôler l'opposition au fond (sans juridiction extérieure). Enrôler une OP : ouvrir l'opposition de caducité, avec son juge. Envoi en LRAR ou en LR : la lettre de l'événement créé. 2ème exécut. : le second exécutoire.", false,
+                    Champ.Case("Dans les délais"), Champ.Case("Envoi en LRAR"), Champ.Case("Envoi en LR"), Champ.Case("Enrôlement"),
+                    Champ.Case("Enrôler une OP"), Champ.Case("2ème exécut."), "Juge", "Greffier", Champ.Date("Date Prévue")),
+                // L'appel a l'audience de l'instance au fond, obligatoire avec l'enrolement (opE_APP_AFFAIRE, OPE_IPSUIVI.cs:3211-3225 ;
+                // OPE_APP_AFFAIRE() = this(true), OPE_APP_AFFAIRE.cs:324-337) ; MetierTitre d'OPE_APP_AFFAIRE_AUDIENCE.Designer.cs
+                // (:232, :142, :131, :118, :170, :190) ; regles : AppelAuFondAsync d'EcrivainSuiviIp.cs.
+                Marche("Audience", "Avec l'enrôlement au fond : l'audience où l'instance est appelée, parmi celles du greffe (sa date, et son heure ou sa chambre s'il y en a plusieurs ce jour-là). Le type de classement est celui du code affaire TIP1, sauf saisie.", false,
+                    Champ.Date("Date"), "Heure", "Chambre", "Type de classement", "H. appel"),
             ],
             Lignes =
             [

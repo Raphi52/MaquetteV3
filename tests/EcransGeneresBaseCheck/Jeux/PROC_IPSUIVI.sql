@@ -46,3 +46,149 @@ INSERT INTO v2.EVENEMENT_PROCEDURE (EVNPR_ID_EVNPR, EVNPR_ID_INSTN, EVNPR_NUM_OR
     (1801576, 1801503, 2, ''IPDESIN'', DATEADD(DAY, -30, @aujourdhui), 1, 0, NULL, NULL);
 ',
     N'@aujourdhui datetime', @aujourdhui;
+
+-- LE DESISTEMENT (EcrivainSuiviIp, « Valider », lot 8, 27/11/2026) : cinq IP de plus (18016xx), une par regle de Remplir_IP
+-- (OPE_IPSUIVI.cs:976-1055). Leur ordonnance porte un type de decision : IPACC18 accepte, IPREJ18 rejete (R_TYPEDECISI_ACCEPTE).
+-- Aucune partie (elles entreraient a l'ecran « Parties ») ; aucune n'a d'evenement futur echu (elles n'entrent pas a PROC_SURVIP).
+--   1801601 : ordonnance rendue et acceptee, une signification attendue dans 20 jours : le desistement est offert -- jumeau de tous ;
+--   1801602 : la meme, mais IP europeenne : refusee ;
+--   1801603 : ordonnance de type rejete : « IP rejetée » ;
+--   1801604 : ordonnance acceptee, sans aucun evenement futur : la case n'est pas offerte ;
+--   1801605 : ordonnance acceptee prevue, SANS date rendue : seul le desistement est offert (meme sans evenement futur).
+-- 1801503 (deja desistee, plus haut) et 1801501 (ordonnance sans type : IsAccepter faux) sont refusees aussi.
+IF COL_LENGTH('v2.INSTANCE', 'INSTN_NOTE_AUDIENCE') IS NULL ALTER TABLE v2.INSTANCE ADD INSTN_NOTE_AUDIENCE varchar(max) NULL;
+IF COL_LENGTH('v2.INSTANCE', 'INSTN_ID_AFFRE') IS NULL ALTER TABLE v2.INSTANCE ADD INSTN_ID_AFFRE int NULL;
+IF OBJECT_ID(N'v2.TYPE_DECISION') IS NULL
+    CREATE TABLE v2.TYPE_DECISION (R_TYPEDECISI_VALEUR varchar(10) NOT NULL PRIMARY KEY, R_TYPEDECISI_LIBELLE_ECRAN varchar(100) NOT NULL);
+IF COL_LENGTH('v2.TYPE_DECISION', 'R_TYPEDECISI_ACCEPTE') IS NULL ALTER TABLE v2.TYPE_DECISION ADD R_TYPEDECISI_ACCEPTE bit NULL;
+
+EXEC sp_executesql N'
+INSERT INTO v2.TYPE_DECISION (R_TYPEDECISI_VALEUR, R_TYPEDECISI_LIBELLE_ECRAN, R_TYPEDECISI_ACCEPTE) VALUES
+    (''IPACC18'', ''Ordonnance IP acceptee lot 8'', 1), (''IPREJ18'', ''Ordonnance IP rejetee lot 8'', 0);
+INSERT INTO v2.INSTANCE (INSTN_ID_INSTN, INSTN_NUM_ROLE, INSTN_NOM_COURANT, INSTN_TYPE_INSTANCE, INSTN_IP_EUROPEENNE, INSTN_NOTE_AUDIENCE) VALUES
+    (1801601, ''2026IP81601'', N''DESISTER OK'', ''IP'', 0, N''Relance faite''), (1801602, ''2026IP81602'', N''DESISTER EUROPE'', ''IP'', 1, NULL),
+    (1801603, ''2026IP81603'', N''DESISTER REJETEE'', ''IP'', 0, NULL), (1801604, ''2026IP81604'', N''DESISTER SANS FUTUR'', ''IP'', 0, NULL),
+    (1801605, ''2026IP81605'', N''DESISTER NON SIGNEE'', ''IP'', 0, NULL);
+INSERT INTO v2.DECISION_JUDICIAIRE (DCJDC_ID_DCJDC, DCJDC_ID_INSTN, DCJDC_NUM_ORDRE, DCJDC_DATE_PREVUE, DCJDC_DATE, DCJDC_TYPE_DECISION) VALUES
+    (1801651, 1801601, 1, NULL, DATEADD(DAY, -20, @aujourdhui), ''IPACC18''), (1801652, 1801602, 1, NULL, DATEADD(DAY, -20, @aujourdhui), ''IPACC18''),
+    (1801653, 1801603, 1, NULL, DATEADD(DAY, -20, @aujourdhui), ''IPREJ18''), (1801654, 1801604, 1, NULL, DATEADD(DAY, -20, @aujourdhui), ''IPACC18''),
+    (1801655, 1801605, 1, DATEADD(DAY, -5, @aujourdhui), NULL, ''IPACC18'');
+INSERT INTO v2.EVENEMENT_PROCEDURE (EVNPR_ID_EVNPR, EVNPR_ID_INSTN, EVNPR_NUM_ORDRE, EVNPR_CODE_EVE_PRO, EVNPR_DATE, EVNPR_SURVENU,
+    EVNPR_DELAI_EXPIRE, EVNPR_DATE_MAXI, EVNPR_SIGNIF_A_PERSONNE) VALUES
+    (1801671, 1801601, 1, ''IPSIGNIF'', NULL, 0, 0, DATEADD(DAY, 20, @aujourdhui), NULL),
+    (1801672, 1801602, 1, ''IPSIGNIF'', NULL, 0, 0, DATEADD(DAY, 20, @aujourdhui), NULL),
+    (1801673, 1801603, 1, ''IPSIGNIF'', NULL, 0, 0, DATEADD(DAY, 20, @aujourdhui), NULL);
+',
+    N'@aujourdhui datetime', @aujourdhui;
+
+-- LES AUTRES DATES (EcrivainSuiviIp, controle final du lot 8, 27/11/2026 : OPE_IPSUIVI.cs:1774-2140 les ecrit). IP 18017xx,
+-- ordonnance IPACC18 acceptee (rendue il y a 20 jours : loi « nouvelle », a partir du 01/03/2022) sauf 1801706-07 (2021 :
+-- ancienne loi). Les codes d'evenement de RIG_DEV (CODE_EVE_PRO lu le 27/11/2026) : leur suivant (R_CODEEVEPRO_CODE_EVE_PRO_FUTUR)
+-- et le delai de sa date maxi -- IPSIGNIF -> IPCERTNOPP (1 mois), IPOPOS -> IPAROPOS (1 mois), IPAROPOS -> IPCONSOPOS (15 jours),
+-- ISIGNI -> IOIP (1 mois) ; IOIP expire en IPEXECUT, ISIGNI en IPNAV, IPCONSOPOS en IPCAD (les memes que PROC_SURVIP.sql, plus
+-- loin dans l'ordre : son INSERT ... WHERE NOT EXISTS les saute). Les editions de RIG_DEV (CEP_EDITION) : IPOPOS -> IP_OPPO
+-- (condition -IE, destinataire D en LRAR) et IP_OPPO_JEXT (+IE, juridiction exterieure : pas ici), IPDESIN -> IP_COUR_DESIS (AVD).
+--   1801701 : signification attendue (IPSIGNIF, maxi dans 20 jours) -- la signifier, puis le certificat ; 2 parties (D, F) ;
+--   1801702 : opposition attendue (IPOPOS) -- l'opposer (editions IP_OPPO a son demandeur, en LRAR), puis la LRAR, puis la
+--             provision (a temps : enrolee au fond, bloc 17) ; 2 parties ;
+--   1801703 : signification attendue -- signification ET certificat ensemble (seul couple permis) ;
+--   1801704 : signifiee le 10/01/2099 (date du banc), opposition attendue -- une opposition AVANT la signification est refusee ;
+--   1801706 : ancienne loi, signification attendue au plus tard le 01/01/2099 -- signifiee APRES : non avenue (bloc 21) ;
+--   1801707 : ancienne loi, signification attendue jusqu'au 31/12/2099 -- signifiee a temps : ISIGNI survient, IOIP attendue.
+-- Les parties de 1801701 et 1801702 entrent aussi a l'ecran « Parties » (PROC_PARTIES.attendu).
+IF COL_LENGTH('v2.CODE_EVE_PRO', 'R_CODEEVEPRO_CODE_EVE_PRO_FUTUR') IS NULL ALTER TABLE v2.CODE_EVE_PRO ADD R_CODEEVEPRO_CODE_EVE_PRO_FUTUR varchar(10) NULL;
+IF COL_LENGTH('v2.CODE_EVE_PRO', 'R_CODEEVEPRO_MOIS_DATE_MAXI') IS NULL ALTER TABLE v2.CODE_EVE_PRO ADD R_CODEEVEPRO_MOIS_DATE_MAXI smallint NULL;
+IF COL_LENGTH('v2.CODE_EVE_PRO', 'R_CODEEVEPRO_JOURS_DATE_MAXI') IS NULL ALTER TABLE v2.CODE_EVE_PRO ADD R_CODEEVEPRO_JOURS_DATE_MAXI smallint NULL;
+IF COL_LENGTH('v2.CODE_EVE_PRO', 'R_CODEEVEPRO_TYPE_EVE_PRO') IS NULL ALTER TABLE v2.CODE_EVE_PRO ADD R_CODEEVEPRO_TYPE_EVE_PRO varchar(1) NULL;
+IF COL_LENGTH('v2.CODE_EVE_PRO', 'R_CODEEVEPRO_CODE_EVE_PRO_EXPIRE') IS NULL ALTER TABLE v2.CODE_EVE_PRO ADD R_CODEEVEPRO_CODE_EVE_PRO_EXPIRE varchar(10) NULL;
+IF COL_LENGTH('v2.EVENEMENT_PROCEDURE', 'EVNPR_NUMERO_SOURCE') IS NULL ALTER TABLE v2.EVENEMENT_PROCEDURE ADD EVNPR_NUMERO_SOURCE varchar(40) NULL;
+IF COL_LENGTH('v2.EVENEMENT_PROCEDURE', 'EVNPR_NUMERO_SOURCE_EP_LIE') IS NULL ALTER TABLE v2.EVENEMENT_PROCEDURE ADD EVNPR_NUMERO_SOURCE_EP_LIE varchar(40) NULL;
+IF COL_LENGTH('v2.EVENEMENT_PROCEDURE', 'EVNPR_TYPE_EVE_PRO') IS NULL ALTER TABLE v2.EVENEMENT_PROCEDURE ADD EVNPR_TYPE_EVE_PRO varchar(1) NULL;
+IF COL_LENGTH('v2.PARTIE', 'PRT_NUMERO_SOURCE') IS NULL ALTER TABLE v2.PARTIE ADD PRT_NUMERO_SOURCE varchar(40) NULL;
+IF COL_LENGTH('v2.CEP_EDITION', 'CEPED_CONDITION') IS NULL ALTER TABLE v2.CEP_EDITION ADD CEPED_CONDITION varchar(max) NULL;
+
+EXEC sp_executesql N'
+INSERT INTO v2.CODE_EVE_PRO (R_CODEEVEPRO_VALEUR, R_CODEEVEPRO_LIBELLE_ECRAN, R_CODEEVEPRO_TYPE_EVE_PRO, R_CODEEVEPRO_CODE_EVE_PRO_EXPIRE,
+    R_CODEEVEPRO_CODE_EVE_PRO_FUTUR, R_CODEEVEPRO_MOIS_DATE_MAXI, R_CODEEVEPRO_JOURS_DATE_MAXI)
+SELECT v.c, v.l, ''I'', v.e, v.f, v.m, v.j FROM (VALUES
+    (''IPSIGNIF'', ''Signification (2022)'', NULL, ''IPCERTNOPP'', 1, NULL), (''IPOPOS'', ''Opposition attendue (2022)'', NULL, ''IPAROPOS'', 1, NULL),
+    (''IPAROPOS'', ''Reception LRAR (2022)'', NULL, ''IPCONSOPOS'', NULL, 15), (''IPCONSOPOS'', ''Consignation (2022)'', ''IPCAD'', NULL, NULL, NULL),
+    (''ISIGNI'', ''Signification attendue'', ''IPNAV'', ''IOIP'', 1, NULL), (''IOIP'', ''Opposition attendue'', ''IPEXECUT'', ''IPAROPOS'', 1, NULL),
+    (''IPCERTNOPP'', ''Certificat de non-opposition'', NULL, NULL, NULL, NULL), (''IPDESIN'', ''Desistement'', NULL, NULL, NULL, NULL)) AS v (c, l, e, f, m, j)
+WHERE NOT EXISTS (SELECT 1 FROM v2.CODE_EVE_PRO AS x WHERE x.R_CODEEVEPRO_VALEUR = v.c);
+INSERT INTO v2.PARAMETRE_EDITION (PRMED_CODE, PRMED_LIBELLE, PRMED_TYPE_GENERATION, PRMED_LISTE) VALUES
+    (''IP_OPPO'', N''IP opposition'', ''FUSION_RIG'', N''<PARAMETRES LIBELLE_DOCUMENT="IP opposition" TYPE_GENERATION="FUSION_RIG" CODE_MAQUETTE="LOT2_IP_OPPO" CODE_PROCESSUS="EDIT_EPI" CODE_ENTITE_SOURCE="EVT_PROC" IMPRESSION="1" NOMBRE_EXEMPLAIRES="1" />''),
+    (''IP_COUR_DESIS'', N''IP courrier desistement'', ''FUSION_RIG'', N''<PARAMETRES LIBELLE_DOCUMENT="IP courrier desistement" TYPE_GENERATION="FUSION_RIG" CODE_PROCESSUS="EDIT_EPI" CODE_ENTITE_SOURCE="EVT_PROC" />'');
+INSERT INTO v2.CEP_EDITION (CEPED_ID_CEPED, CEPED_CODE_EVE_PRO, CEPED_TYPE_EP, CEPED_CODE_EDITION, CEPED_DESTI_MODE_ENVOI, CEPED_CONDITION) VALUES
+    (1801791, ''IPOPOS'', ''I'', ''IP_OPPO'', ''D,LRAR'', ''-IE''), (1801792, ''IPOPOS'', ''I'', ''IP_OPPO'', ''D,LRAR'', ''+IE''),
+    (1801793, ''IPDESIN'', ''I'', ''IP_COUR_DESIS'', ''AVD'', NULL);
+INSERT INTO v2.INSTANCE (INSTN_ID_INSTN, INSTN_NUM_ROLE, INSTN_NOM_COURANT, INSTN_TYPE_INSTANCE, INSTN_IP_EUROPEENNE) VALUES
+    (1801701, ''2026IP81701'', N''SIGNIFIER OK'', ''IP'', 0), (1801702, ''2026IP81702'', N''OPPOSER OK'', ''IP'', 0),
+    (1801703, ''2026IP81703'', N''SIGNIFIER ET CERTIFIER'', ''IP'', 0), (1801704, ''2026IP81704'', N''OPPOSER TROP TOT'', ''IP'', 0),
+    (1801706, ''2021IP81706'', N''ANCIENNE LOI HORS DELAI'', ''IP'', 0), (1801707, ''2021IP81707'', N''ANCIENNE LOI A TEMPS'', ''IP'', 0);
+INSERT INTO v2.DECISION_JUDICIAIRE (DCJDC_ID_DCJDC, DCJDC_ID_INSTN, DCJDC_NUM_ORDRE, DCJDC_DATE_PREVUE, DCJDC_DATE, DCJDC_TYPE_DECISION) VALUES
+    (1801751, 1801701, 1, NULL, DATEADD(DAY, -20, @aujourdhui), ''IPACC18''), (1801752, 1801702, 1, NULL, DATEADD(DAY, -20, @aujourdhui), ''IPACC18''),
+    (1801753, 1801703, 1, NULL, DATEADD(DAY, -20, @aujourdhui), ''IPACC18''), (1801754, 1801704, 1, NULL, DATEADD(DAY, -20, @aujourdhui), ''IPACC18''),
+    (1801756, 1801706, 1, NULL, ''20210601'', ''IPACC18''), (1801757, 1801707, 1, NULL, ''20210601'', ''IPACC18'');
+INSERT INTO v2.PARTIE (PRT_ID_PRT, PRT_ID_INSTN, PRT_NUM_ORDRE, PRT_CIVILITE, PRT_DESIGNATION, PRT_QUALIF_PARTIE, PRT_NUMERO_SOURCE) VALUES
+    (1801761, 1801701, 1, ''PM'', N''CREANCIER SIGMA'', ''D'', ''PRT-1801761''), (1801762, 1801701, 2, ''PM'', N''DEBITEUR SIGMA'', ''F'', ''PRT-1801762''),
+    (1801763, 1801702, 1, ''PM'', N''CREANCIER OMICRON'', ''D'', ''PRT-1801763''), (1801764, 1801702, 2, ''PM'', N''DEBITEUR OMICRON'', ''F'', ''PRT-1801764'');
+INSERT INTO v2.EVENEMENT_PROCEDURE (EVNPR_ID_EVNPR, EVNPR_ID_INSTN, EVNPR_NUM_ORDRE, EVNPR_CODE_EVE_PRO, EVNPR_DATE, EVNPR_SURVENU,
+    EVNPR_DELAI_EXPIRE, EVNPR_DATE_MAXI, EVNPR_SIGNIF_A_PERSONNE, EVNPR_NUMERO_SOURCE) VALUES
+    (1801771, 1801701, 1, ''IPSIGNIF'', NULL, 0, 0, DATEADD(DAY, 20, @aujourdhui), NULL, ''SRC-1801771''),
+    (1801772, 1801702, 1, ''IPOPOS'', NULL, 0, 0, DATEADD(DAY, 20, @aujourdhui), NULL, ''SRC-1801772''),
+    (1801773, 1801703, 1, ''IPSIGNIF'', NULL, 0, 0, DATEADD(DAY, 20, @aujourdhui), NULL, ''SRC-1801773''),
+    (1801774, 1801704, 1, ''IPSIGNIF'', ''20990110'', 1, 0, NULL, 0, ''SRC-1801774''),
+    (1801775, 1801704, 2, ''IPOPOS'', NULL, 0, 0, ''20990210'', NULL, ''SRC-1801775''),
+    (1801776, 1801706, 1, ''ISIGNI'', NULL, 0, 0, ''20990101'', NULL, ''SRC-1801776''),
+    (1801777, 1801707, 1, ''ISIGNI'', NULL, 0, 0, ''20991231'', NULL, ''SRC-1801777'');
+',
+    N'@aujourdhui datetime', @aujourdhui;
+
+-- LA PROVISION ET LE 2e EXECUTOIRE (EcrivainSuiviIp, controle final du lot 8, 27/11/2026 : OPE_IPSUIVI.cs:2028-2111 les ecrit ; leurs
+-- references -- le code affaire TIP1, NOIP, IPEXECU2, la serie JRCT, le type de voie BD18 -- sont a la fin de PROC_SURVIP.sql, qui
+-- pose deja les tables communes). 1801702 (plus haut) recoit un chef de demande et l'adresse de son demandeur : sa provision a temps
+-- (bloc 17) l'enrole au fond, chef et parties dupliques, et la convocation part a cette adresse. IP 18019xx, ordonnance IPACC18
+-- rendue il y a 20 jours (nouvelle loi), signifiee, opposee, LRAR recue, provision attendue au plus tard le 04/02/2099 (un mercredi) :
+--   1801901 : provision recue le 01/03/2099, apres : caducite et OP IPCADSO avec le juge JIP18 (refusee d'abord sans juge) ;
+--   1801902 : la meme, « Enrôler une OP » decochee : caducite sans OP ;
+--   1801903 : la meme, « Dans les délais » cochee et « Enrôlement » decochee : la provision survient, la note le dit ;
+--   1801904 : signification attendue -- le 2e executoire (nouvelle loi), edition au demandeur (« AVD », sans avocat) a son adresse.
+-- Leurs parties entrent aussi a l'ecran « Parties » (PROC_PARTIES.attendu).
+IF COL_LENGTH('v2.PARTIE', 'PRT_ID_ADRBS') IS NULL ALTER TABLE v2.PARTIE ADD PRT_ID_ADRBS int NULL;
+IF COL_LENGTH('v2.CHEF_DEMANDE', 'CHFDM_TEXTE_LIBRE') IS NULL ALTER TABLE v2.CHEF_DEMANDE ADD CHFDM_TEXTE_LIBRE varchar(1000) NULL;
+SET IDENTITY_INSERT rec.Adresse ON;
+INSERT INTO rec.Adresse (Id, PreAdresse, NumeroVoie, TypeVoie, NomVoie, CodePostal, Localite, Cedex, EtatInfo) VALUES
+    (1801991, N'Bâtiment B', '7', 'BD18', N'des Essais', '38000', 'GRENOBLE', '5', 'C');
+SET IDENTITY_INSERT rec.Adresse OFF;
+
+EXEC sp_executesql N'
+UPDATE v2.PARTIE SET PRT_ID_ADRBS = 1801991 WHERE PRT_ID_PRT = 1801763;
+INSERT INTO v2.CHEF_DEMANDE (CHFDM_ID_CHFDM, CHFDM_ID_INSTN, CHFDM_NUM_ORDRE, CHFDM_CODE_CHEF, CHFDM_TEXTE_LIBRE) VALUES
+    (1801981, 1801702, 1, ''NCPC'', N''Facture impayee lot 8'');
+INSERT INTO v2.INSTANCE (INSTN_ID_INSTN, INSTN_NUM_ROLE, INSTN_NOM_COURANT, INSTN_TYPE_INSTANCE, INSTN_IP_EUROPEENNE) VALUES
+    (1801901, ''2026IP81901'', N''PROVISION CADUQUE OP'', ''IP'', 0), (1801902, ''2026IP81902'', N''PROVISION CADUQUE SANS OP'', ''IP'', 0),
+    (1801903, ''2026IP81903'', N''PROVISION FORCEE'', ''IP'', 0), (1801904, ''2026IP81904'', N''SECOND EXECUTOIRE'', ''IP'', 0);
+INSERT INTO v2.DECISION_JUDICIAIRE (DCJDC_ID_DCJDC, DCJDC_ID_INSTN, DCJDC_NUM_ORDRE, DCJDC_DATE_PREVUE, DCJDC_DATE, DCJDC_TYPE_DECISION) VALUES
+    (1801951, 1801901, 1, NULL, DATEADD(DAY, -20, @aujourdhui), ''IPACC18''), (1801952, 1801902, 1, NULL, DATEADD(DAY, -20, @aujourdhui), ''IPACC18''),
+    (1801953, 1801903, 1, NULL, DATEADD(DAY, -20, @aujourdhui), ''IPACC18''), (1801954, 1801904, 1, NULL, DATEADD(DAY, -20, @aujourdhui), ''IPACC18'');
+INSERT INTO v2.PARTIE (PRT_ID_PRT, PRT_ID_INSTN, PRT_NUM_ORDRE, PRT_CIVILITE, PRT_DESIGNATION, PRT_QUALIF_PARTIE, PRT_NUMERO_SOURCE, PRT_ID_ADRBS) VALUES
+    (1801961, 1801901, 1, ''PM'', N''CREANCIER RHO'', ''D'', ''PRT-1801961'', NULL), (1801962, 1801901, 2, ''PM'', N''DEBITEUR RHO'', ''F'', ''PRT-1801962'', NULL),
+    (1801964, 1801904, 1, ''PM'', N''CREANCIER PHI'', ''D'', ''PRT-1801964'', 1801991);
+INSERT INTO v2.EVENEMENT_PROCEDURE (EVNPR_ID_EVNPR, EVNPR_ID_INSTN, EVNPR_NUM_ORDRE, EVNPR_CODE_EVE_PRO, EVNPR_DATE, EVNPR_SURVENU,
+    EVNPR_DELAI_EXPIRE, EVNPR_DATE_MAXI, EVNPR_SIGNIF_A_PERSONNE, EVNPR_NUMERO_SOURCE) VALUES
+    (1801971, 1801901, 1, ''IPSIGNIF'', DATEADD(DAY, -15, @aujourdhui), 1, 0, NULL, 0, ''SRC-1801971''),
+    (1801972, 1801901, 2, ''IPOPOS'', DATEADD(DAY, -10, @aujourdhui), 1, 0, NULL, NULL, ''SRC-1801972''),
+    (1801973, 1801901, 3, ''IPAROPOS'', DATEADD(DAY, -5, @aujourdhui), 1, 0, NULL, NULL, ''SRC-1801973''),
+    (1801974, 1801901, 4, ''IPCONSOPOS'', NULL, 0, 0, ''20990204'', NULL, ''SRC-1801974''),
+    (1801975, 1801902, 1, ''IPSIGNIF'', DATEADD(DAY, -15, @aujourdhui), 1, 0, NULL, 0, ''SRC-1801975''),
+    (1801976, 1801902, 2, ''IPOPOS'', DATEADD(DAY, -10, @aujourdhui), 1, 0, NULL, NULL, ''SRC-1801976''),
+    (1801977, 1801902, 3, ''IPAROPOS'', DATEADD(DAY, -5, @aujourdhui), 1, 0, NULL, NULL, ''SRC-1801977''),
+    (1801978, 1801902, 4, ''IPCONSOPOS'', NULL, 0, 0, ''20990204'', NULL, ''SRC-1801978''),
+    (1801979, 1801903, 1, ''IPSIGNIF'', DATEADD(DAY, -15, @aujourdhui), 1, 0, NULL, 0, ''SRC-1801979''),
+    (1801980, 1801903, 2, ''IPOPOS'', DATEADD(DAY, -10, @aujourdhui), 1, 0, NULL, NULL, ''SRC-1801980''),
+    (1801982, 1801903, 3, ''IPAROPOS'', DATEADD(DAY, -5, @aujourdhui), 1, 0, NULL, NULL, ''SRC-1801982''),
+    (1801983, 1801903, 4, ''IPCONSOPOS'', NULL, 0, 0, ''20990204'', NULL, ''SRC-1801983''),
+    (1801984, 1801904, 1, ''IPSIGNIF'', NULL, 0, 0, DATEADD(DAY, 20, @aujourdhui), NULL, ''SRC-1801984'');
+',
+    N'@aujourdhui datetime', @aujourdhui;
