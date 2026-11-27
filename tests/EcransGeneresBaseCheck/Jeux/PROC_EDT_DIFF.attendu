@@ -10,5 +10,10 @@ Lot AMI_BANC9 | 1 document · ouvert le {J-1} · imprimante « Imprimante Amitel
 # sans imprimante ; 1900404 dans BANC9-G07, a imprimer (« À clôturer », l'imprimante de son lot). Ecartes : les editions des groupes BANC9_*
 # des lots invisibles (PROC_RELANCELOT.sql : 1900401, 1900403...) ; jumeau : 1900404, du lot visible. Ni destinataire, ni date, ni demande
 # dans ces jeux : les precisions n'en disent rien.
-Courrier différé du banc 10 | Lot AMI_BANC9 · ne pas imprimer | Documents des lots | Rejetee | []
+# ETAT D'UN DOCUMENT : jamais fige. RIG v2 barre et retablit un document de tout lot ouvert, sans regarder l'imprimante
+# (OPE_LISTE_LOT._TraiterEditionsCochees, :53-78) ; or la forme File ne donne pas de case a une ligne ni AFaire ni EnCours
+# (web/src/ecrans/formes/commun.tsx:78, figee). Donc : barre = EnCours « Ne pas imprimer » (2000304, lot SANS imprimante : ce document
+# rendait « Rejetee », sans case : « Remettre à l'impression » etait injouable a l'ecran, constate le 27/11/2026) ; a imprimer = AFaire,
+# meme dans un lot sans imprimante (seule la cloture l'exige, ligne du lot).
+Courrier différé du banc 10 | Lot AMI_BANC9 · ne pas imprimer | Documents des lots | EnCours | []
 Courrier Amitel du banc 9 | Lot AMI_BANC9 | Documents des lots | AFaire | []

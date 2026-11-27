@@ -44,8 +44,8 @@ message: Document « Courrier Amitel du banc 9 » marqué « Ne pas imprimer » 
 lignes:
 Lot AMI_BANC9 | 1 document · 1 à ne pas imprimer · ouvert le {J-2} · aucune imprimante choisie · groupe BANC10-G01 | Lots ouverts | EnAttente | []
 Lot AMI_BANC9 | 1 document · 1 à ne pas imprimer · ouvert le {J-1} · imprimante « Imprimante Amitel » · groupe BANC9-G07 | Lots ouverts | AFaire | []
-Courrier différé du banc 10 | Lot AMI_BANC9 · ne pas imprimer | Documents des lots | Rejetee | []
-Courrier Amitel du banc 9 | Lot AMI_BANC9 · ne pas imprimer | Documents des lots | Rejetee | []
+Courrier différé du banc 10 | Lot AMI_BANC9 · ne pas imprimer | Documents des lots | EnCours | []
+Courrier Amitel du banc 9 | Lot AMI_BANC9 · ne pas imprimer | Documents des lots | EnCours | []
 controle: SELECT CONVERT(varchar(1), DMNED_IMPRESSION) + ' / ' + DMNED_PHASE_TRAITEMENT + ' / ' + DMNED_NUM_GROUPE FROM v2.DEMANDE_EDITION WHERE DMNED_ID_DMNED = 1900404 => 0 / E / BANC9-G07
 ---
 # Refus : 1900404 est deja barre (la case est deja cochee). Jumeau accepte : bloc 6, le meme document a imprimer.
@@ -60,6 +60,14 @@ geste: Agir Remettre à l'impression
 ids: E-2000304
 resultat: fait
 message: Document « Courrier différé du banc 10 » remis à l'impression.
+# Relu : 2000304 redevient AFaire, case cochable, bien que son lot n'ait pas d'imprimante (un document n'est jamais fige, voir .attendu).
+# fix-ok: case grisee constatee a l'ecran le 27/11/2026 (essai3\e09) : le lecteur rendait un document barre « Rejetee » et un document d'un
+# lot sans imprimante « EnAttente », deux etats figes par commun.tsx:78 ; le banc jouait ces gestes par la route, l'ecran ne le pouvait pas.
+lignes:
+Lot AMI_BANC9 | 1 document · ouvert le {J-2} · aucune imprimante choisie · groupe BANC10-G01 | Lots ouverts | EnAttente | []
+Lot AMI_BANC9 | 1 document · 1 à ne pas imprimer · ouvert le {J-1} · imprimante « Imprimante Amitel » · groupe BANC9-G07 | Lots ouverts | AFaire | []
+Courrier différé du banc 10 | Lot AMI_BANC9 | Documents des lots | AFaire | []
+Courrier Amitel du banc 9 | Lot AMI_BANC9 · ne pas imprimer | Documents des lots | EnCours | []
 controle: SELECT CONVERT(varchar(1), DMNED_IMPRESSION) + ' / ' + DMNED_PHASE_TRAITEMENT + ' / ' + DMNED_NUM_GROUPE FROM v2.DEMANDE_EDITION WHERE DMNED_ID_DMNED = 2000304 => 1 / P / BANC10-G01
 ---
 # Refus : 2000304 est deja a imprimer. Jumeau accepte : bloc 8, le meme document barre.
@@ -77,6 +85,6 @@ resultat: fait
 message: Lot AMI_BANC9 clôturé : prêt à imprimer, le service d'impression de RIG v2 le prend. 1 document marqué « Ne pas imprimer » quitte le lot. Attention, l'imprimante choisie est l'imprimante d'Amitel (Imprimante Amitel).
 lignes:
 Lot AMI_BANC9 | 1 document · ouvert le {J-2} · aucune imprimante choisie · groupe BANC10-G01 | Lots ouverts | EnAttente | []
-Courrier différé du banc 10 | Lot AMI_BANC9 | Documents des lots | EnAttente | []
+Courrier différé du banc 10 | Lot AMI_BANC9 | Documents des lots | AFaire | []
 controle: SELECT GPIMP_PHASE_TRAITEMENT + ' / ' + CASE WHEN GPIMP_DATE_FIN IS NULL THEN 'ouvert' ELSE 'clos' END FROM v2.GROUPE_IMPRESSION WHERE GPIMP_NUM_GROUPE = 'BANC9-G07' => P / clos
 controle: SELECT ISNULL(DMNED_NUM_GROUPE, 'hors lot') + ' / ' + CONVERT(varchar(1), DMNED_IMPRESSION) FROM v2.DEMANDE_EDITION WHERE DMNED_ID_DMNED = 1900404 => hors lot / 0
