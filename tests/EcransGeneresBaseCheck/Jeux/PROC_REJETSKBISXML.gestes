@@ -1,0 +1,46 @@
+# « Kbis XML rejetes » (EcrivainKbisXmlRejetes) : « Annuler le rejet » des Kbis coches, comme tsmiAnnulerRejet_Click de la V2
+# (FrmRejetsKbisXml.cs:159-184 : KBIS_CATEGORIE_ERREUR = '', KBIS_LIBELLE_ERREUR = NULL) ; le rejet sort de la liste. Lignes du jeu :
+# PROC_REJETSKBISXML.sql et .attendu -- 200218 (ETA) et 200211 (ALPHA) bloquantes, 200212 (BETA) avertissement, 200217 rejet deja
+# annule. « agent: banc.amitel.l16 » : le compte Amitel du jeu (la V2 n'offre le geste qu'en mode Amitel, l. 141-144, 255).
+
+# Refus : rien de coche. Jumeau accepte : dernier bloc.
+agent: banc.amitel.l16
+geste: Agir Annuler le rejet
+resultat: refuse
+message: Aucun Kbis coché : rien n'est annulé.
+---
+# Refus : l'agent du banc n'est pas de l'equipe Amitel (mode Amitel de la V2, l. 141-144, 255 ; message du lot 8, actes rejetes).
+# Jumeau accepte : dernier bloc, meme geste au nom du compte Amitel.
+geste: Agir Annuler le rejet
+ids: 200218
+resultat: refuse
+message: L'annulation d'un rejet est réservée à l'équipe Amitel.
+---
+# Refus : un Kbis introuvable, au message de la V2 (l. 172, au mot pres). Jumeau accepte : dernier bloc (200218 existe).
+agent: banc.amitel.l16
+geste: Agir Annuler le rejet
+ids: 2699999
+resultat: refuse
+message: Impossible d'annuler le rejet correspondant au kbis d'id.2699999 car une erreur est survenue durant sa récupération.
+---
+# Refus : 200217 n'a plus de rejet (libelle nul, hors de la liste) ; le refus vise tout le lot coche, 200212 coche avec lui n'est
+# pas annule. Jumeau accepte : dernier bloc (200212, rejet pose).
+agent: banc.amitel.l16
+geste: Agir Annuler le rejet
+ids: 200212,200217
+resultat: refuse
+message: Le rejet du Kbis 200217 du dossier 2020 B 20206 est déjà annulé : il n'est plus dans la liste.
+controle: SELECT KBIS_CATEGORIE_ERREUR FROM v2.KBIS_XML WHERE KBIS_ID_KBIS = 200212 => A
+---
+# Annulation en lot de DEUX rejets (bloquante et avertissement) : categorie vide, libelle nul ; ils quittent la liste relue, 200211
+# non coche y reste.
+agent: banc.amitel.l16
+geste: Agir Annuler le rejet
+ids: 200218,200212
+resultat: fait
+message: 2 rejets de Kbis XML annulés : ils sortent de la liste.
+lignes:
+KBIS ALPHA SARL · 2020 B 20201 | Transmis le {J-5} · retour du {J-5} · La date doit-être obligatoirement inférieure à la date du jour. | Bloquantes | AFaire | []
+controle: SELECT CONCAT('[', KBIS_CATEGORIE_ERREUR, ']/', ISNULL(KBIS_LIBELLE_ERREUR, 'NULL')) FROM v2.KBIS_XML WHERE KBIS_ID_KBIS = 200218 => []/NULL
+controle: SELECT CONCAT('[', KBIS_CATEGORIE_ERREUR, ']/', ISNULL(KBIS_LIBELLE_ERREUR, 'NULL')) FROM v2.KBIS_XML WHERE KBIS_ID_KBIS = 200212 => []/NULL
+controle: SELECT COUNT(*) FROM soc.Journal WHERE Ecran = 'Kbis XML rejetés' AND Famille = 'dossier' AND Verbe = 'a modifie' => 2

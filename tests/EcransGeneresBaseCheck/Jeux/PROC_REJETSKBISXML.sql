@@ -61,3 +61,14 @@ INSERT INTO v2.KBIS_XML (KBIS_ID_KBIS, KBIS_ID_DSRCS, KBIS_LIBELLE_ERREUR, KBIS_
     -- bloquante revenue hier : avant 200211 (retour plus recent)
     (200218, 200207, N'Le numéro SIRET(NIC) de l''établissement n''est pas valide.', 'B', 1,
         DATEADD(HOUR, -28, @aujourdhui), DATEADD(HOUR, -25, @aujourdhui));
+
+-- Lot 16 du plan « RIG v3 100 % fonctionnel » (EcrivainKbisXmlRejetes, PROC_REJETSKBISXML.gestes) : « Annuler le rejet » n'est
+-- offert par la V2 qu'en mode Amitel (FrmRejetsKbisXml.cs:141-144, 255), ce que l'agent du banc n'est pas -- ses refus sont les blocs
+-- joues sans « agent: ». Un second compte, Amitel (pas administrateur), admis comme lui (meme service, role BANC), comme
+-- banc.amitel.l15 (PROC_REDAA.sql). Sans IdV2 : aucun lecteur ne le montre.
+IF NOT EXISTS (SELECT 1 FROM soc.Compte WHERE CompteWindows = 'banc.amitel.l16')
+BEGIN
+    INSERT INTO soc.Compte (CompteWindows, Nom, Prenom, Abrege, Civilite, CodeGreffe, IdService, Desactive, EstAmitel, EstAdministrateur)
+    SELECT 'banc.amitel.l16', 'AMITELL16', 'Banc', 'BANCA16', 'M.', CodeGreffe, IdService, 0, 1, 0 FROM soc.Compte WHERE CompteWindows = 'banc.ecrans';
+    INSERT INTO soc.CompteRole (IdCompte, Role) SELECT Id, 'BANC' FROM soc.Compte WHERE CompteWindows = 'banc.amitel.l16';
+END

@@ -103,6 +103,10 @@ public sealed class DomaineFonctionsRetrouvees : IDomaineEcrans
             Recherche = "Rechercher un dossier, un SIREN, un numéro de dépôt…",
             Criteres = ["N° dossier", "Siren", "Date de la commande"],
             Valider = "Envoyer au VGED", // OPE_RES.Designer.cs : tsmiSendToVged « Envoyer au VGED ».
+            // Le seul geste du menu de la ligne qui ECRIT : « Annuler » (tsmiAnnuler, OPE_RESULTATS.cs:84-117), sur UNE ligne -- la
+            // commande web quitte l'acte ; son flux dans la base EDI du greffe (hors de la V3) n'est pas appele, simule (lot 16 du plan
+            // « RIG v3 100 % fonctionnel » : EcrivainActesWebNonTransmis.cs). « Envoyer au VGED » ouvre la GED, un autre ecran : non repris.
+            Gestes = ["Annuler"],
             Rang = 5,
             Etats = [.. EtatsEcran.Trois("À transmettre", "En cours", "Transmis"), new EtatEcran("Rejetee", "Annulé", "rejetee")],
             Groupes = ["Commandes du jour", "Commandes plus anciennes"],
@@ -138,6 +142,10 @@ public sealed class DomaineFonctionsRetrouvees : IDomaineEcrans
             Recherche = "Rechercher un dossier, une erreur…",
             Criteres = ["Types d'erreur : bloquantes, avertissements, informations", "Dossiers : vivants, radiés", "Historiques"],
             Valider = "Extrait Kbis", // FrmRejetsKbisXml.Designer.cs : « Extrait &Kbis », « Afficher à l'écran l'extrait kbis du kbis sélectionné ».
+            // Le geste qui ECRIT : « Annuler le rejet » (tsmiAnnulerRejet_Click, FrmRejetsKbisXml.cs:159-184), offert par la V2 en mode
+            // Amitel seulement (l. 141-144, 255) : reserve a l'equipe Amitel (lot 16 : EcrivainKbisXmlRejetes.cs). « Extrait Kbis »
+            // affiche le Kbis, il n'ecrit rien : non repris dans la file.
+            Gestes = ["Annuler le rejet"],
             Rang = 5,
             Etats = EtatsEcran.Trois("À examiner", "En cours", "Examiné"),
             Groupes = ["Bloquantes", "Avertissements", "Informations"],
