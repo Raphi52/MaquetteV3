@@ -78,6 +78,27 @@ describe('Referentiel : les champs d’une ligne neuve (sectionsAjout)', () => {
       { Code: 'DZ', Libellé: '', [`${SectionZone} › Synonyme`]: 'DZON', [`${SectionZone} › Type`]: '' }))
   })
 
+  // Lot 15 (27/11/2026) : la section d'une entree du glossaire (PROC_REDAA) nomme Code et Libellé, colonnes de la ligne ; vu a l'ecran
+  // sur le bureau cache, « Ajouter » les faisait saisir deux fois. Une colonne se saisit dans la ligne, jamais deux fois (comme sous
+  // une ligne ouverte) ; le jumeau : Synonyme, hors colonnes, reste saisi sous la ligne.
+  it('un champ de la section d’ajout qui est une colonne se saisit dans la ligne seulement, envoye une fois', async () => {
+    const pont = installerFauxPont({ 'EcranGenere.Lignes': () => base([etat, zone]), 'EcranGenere.Geste': fait })
+    const sections = grille().sections.map((s) => (s.titre === SectionZone
+      ? { ...s, champs: [{ libelle: 'Libellé', type: 'Texte' as const, options: [] }, ...s.champs] } : s))
+    const { container } = render(<EcranGenere descripteur={avecLigneNeuve({ sections })} />)
+    await waitFor(() => expect(container.querySelector('tbody tr')).not.toBeNull())
+    fireEvent.click(bouton(container, Zones)!)
+    fireEvent.click(bouton(container, 'Ajouter')!)
+    expect(champ(container, 'Libellé')).toBeNull()
+    expect(champ(container, 'Synonyme')).not.toBeNull()
+    const [code, libelle] = cellules(container)
+    fireEvent.change(code!, { target: { value: 'DZ' } })
+    fireEvent.change(libelle!, { target: { value: 'Date de zone' } })
+    fireEvent.click(bouton(container, 'Enregistrer')!)
+    await waitFor(() => expect(pont.appels).toHaveBeenCalledWith('EcranGenere.Geste', 'ECRAN_TEST', Zones, 'Ajouter', null, [],
+      { Code: 'DZ', Libellé: 'Date de zone', [`${SectionZone} › Synonyme`]: '', [`${SectionZone} › Type`]: '' }))
+  })
+
   it('jumeau : dans un onglet sans section d’ajout (ou sans sectionsAjout), la ligne neuve n’a que ses colonnes', async () => {
     const pont = installerFauxPont({ 'EcranGenere.Lignes': () => base([etat, zone]), 'EcranGenere.Geste': fait })
     const { container } = render(<EcranGenere descripteur={avecLigneNeuve()} />)

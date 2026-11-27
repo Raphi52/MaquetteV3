@@ -110,9 +110,11 @@ export function FormeReferentiel({ d }: { d: DescripteurEcranVue }) {
   // La fiche lue : celle de la ligne modifiee, ou de la ligne copiee (ses champs pre-remplissent la copie).
   const { fiche: vueFiche } = useFiche(d, enModification ?? edition?.source, vue)
   const fiche = vueFiche?.fiche ?? null
-  // Les sections saisies sous une ligne neuve : celles que le descripteur fait saisir a l'ajout dans son groupe.
+  // Les sections saisies sous une ligne neuve : celles que le descripteur fait saisir a l'ajout dans son groupe, sans leurs champs
+  // qui sont des colonnes -- saisis dans la ligne, jamais deux fois (lot 15 : Code et Libellé d'une entree du glossaire, en double).
   const sectionsNeuves = (e: Edition) =>
     (e.groupe === undefined ? [] : d.sectionsAjout?.[e.groupe] ?? []).flatMap((t) => d.sections.filter((s) => s.titre === t))
+      .map((s) => ({ ...s, champs: s.champs.filter((c) => !estColonne(c.libelle)) }))
   // Les groupes ou RIG v2 ne fait que modifier : ni Ajouter dans leur onglet, ni Supprimer, ni Dupliquer.
   const modificationSeule = (g: string) => (d.groupesModificationSeule ?? []).includes(g)
   // Les sections d'une ligne ouverte : celles de son groupe (sectionsParGroupe), qui se saisissent ; sinon toutes celles de sa

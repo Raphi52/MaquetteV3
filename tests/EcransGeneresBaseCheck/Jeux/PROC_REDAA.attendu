@@ -1,10 +1,11 @@
-# « Modèles de rédaction » (LecteurModelesRedaction) : par groupe (un plafond chacun), par nature (modele, maquette REDA, section,
-# glossaire) puis par code ; sections et glossaire, deux groupes (deux onglets de la V2). Ecartes : L15_RIG et L6_FICHE_CLIENT (PROC_RECHERCHE_GED.sql), maquettes de type RIG ; L15_PRIV, glossaire
-# prive. Etat : modele sans maquette (L15_ORD), maquette sans document (L15_DISPO) -> AFaire ; sinon Validee. « Jugements » : vide.
-L15_JGT - Jugement banc | modèle · 2 maquette(s) | Modèles et maquettes | Validee | []
-L15_ORD - Ordonnance banc | modèle · aucune maquette | Modèles et maquettes | AFaire | []
-L15_DISPO - Dispositif banc | maquette REDA · sans document Word | Modèles et maquettes | AFaire | []
-L15_ENTETE - Entete banc | maquette REDA · utilisée par 1 modèle(s) | Modèles et maquettes | Validee | [] | valeurs: L15_ENTETE ; Entete banc ; maquette REDA ; utilisée par 1 modèle(s)
-L15_LIBRE - Libre banc | maquette REDA · utilisée par aucun modèle | Modèles et maquettes | Validee | []
+# « Modèles de rédaction » (LecteurModelesRedaction) : par groupe (un plafond chacun) puis par code -- modeles de document et maquettes
+# REDA, deux listes de la V2 (le choix « modèle » / « maquette » de sa recherche) ; sections et glossaire, deux onglets. Ecartes :
+# L15_RIG et L6_FICHE_CLIENT (PROC_RECHERCHE_GED.sql), maquettes de type RIG ; L15_PRIV, glossaire prive. Etat : modele sans maquette
+# (L15_ORD), maquette sans document (L15_DISPO) -> AFaire ; sinon Validee. « Jugements » : vide.
+L15_JGT - Jugement banc | modèle · 2 maquette(s) | Modèles de document | Validee | []
+L15_ORD - Ordonnance banc | modèle · aucune maquette | Modèles de document | AFaire | []
+L15_DISPO - Dispositif banc | maquette REDA · sans document Word | Maquettes REDA | AFaire | []
+L15_ENTETE - Entete banc | maquette REDA · utilisée par 1 modèle(s) | Maquettes REDA | Validee | [] | valeurs: L15_ENTETE ; Entete banc ; maquette REDA ; utilisée par 1 modèle(s)
+L15_LIBRE - Libre banc | maquette REDA · utilisée par aucun modèle | Maquettes REDA | Validee | []
 L15_MOTIFS - Motifs banc | section | Sections | Validee | []
 L15_ART - Article banc | glossaire public | Glossaire | Validee | []

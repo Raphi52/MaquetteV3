@@ -61,6 +61,9 @@ using RigV3Desktop.Pont.EcransGeneres;
 //          fiche: <id>                              facultatif : puis des « Section › Libelle = valeur » que la fiche relue porte ;
 //                                                   la ligne n d'une sous-liste (Tableau) : « Section › Libelle › n = cellule | cellule »
 //          controle: <SELECT d'une valeur> => <attendu>   facultatif : ce que RIG v2 ecrit en plus (dates, etats...)
+//          agent: <compte Windows>                  facultatif : le bloc est joue au nom de ce compte (cree par le .sql du jeu,
+//                                                   admis dans le greffe) au lieu de l'agent du banc -- un geste que la V2 reserve a
+//                                                   un utilisateur Amitel (PROC_REDAA, les sections : OPE_EDT_SECTION.cs:64-72, lot 15)
 //        Un refus est verifie SANS ECRITURE : lignes relues identiques, journal des gestes inchange. Un geste fait ajoute au
 //        moins une ligne au journal des gestes. Chaque refus a son jumeau accepte, dit en commentaire ;
 //      - <PROCEDURE>.recherches (pour un lecteur qui cherche, IRechercheEcran) : des blocs « texte: », « critere: <Libelle> =
@@ -620,7 +623,21 @@ await Sql("INSERT INTO soc.RoleFonction (Role, Fonction) VALUES ('BANC', 'EXPCOM
 
 // Les GESTES (<PROCEDURE>.gestes), joues par la route POST, dans l'ordre, au nom de l'agent du banc : admis, ni Amitel ni administrateur
 // (section 0). Lot 14 (27/11/2026, refus du chef) : un geste n'exige que l'agent admis (EcrivainEcran.cs, « Le droit »), meme celui
-// qui ecrit un reglage ; le bloc « agent: » (un autre compte, administrateur) n'a donc plus d'usage et a ete retire.
+// qui ecrit un reglage. Un bloc « agent: » (en-tete, 6) est joue au nom d'un autre compte : rendre Amitel l'agent du banc changerait
+// tous les autres jeux, or la V2 reserve certains gestes a l'equipe Amitel -- leur jumeau accepte (PROC_REDAA, sections, lot 15).
+// Le code est celui que le lot 14 avait pose puis retire faute d'usage (git show ae2c532^:tests/EcransGeneresBaseCheck/Program.cs).
+var clientsParAgent = new Dictionary<string, HttpClient>(StringComparer.OrdinalIgnoreCase);
+HttpClient ClientDe(string? agent)
+{
+    if (agent is null) return http;
+    if (!clientsParAgent.TryGetValue(agent, out var client))
+    {
+        client = app.GetTestClient();
+        client.DefaultRequestHeaders.Add(RoutesIdentite.EnTeteCompte, agent);
+        clientsParAgent[agent] = client;
+    }
+    return client;
+}
 foreach (var fichier in Directory.GetFiles(dossierJeux, "*.gestes").Order(StringComparer.Ordinal))
 {
     var code = Path.GetFileNameWithoutExtension(fichier);
@@ -633,7 +650,7 @@ foreach (var fichier in Directory.GetFiles(dossierJeux, "*.gestes").Order(String
         if (bloc.Geste is null || bloc.Resultat is null) { Exiger(false, $"{quoi} : « geste: » et « resultat: » sont obligatoires"); continue; }
         var avant = (await Lire(code)).Lignes.Select(Texte).ToArray();
         var journalAvant = await Valeur("SELECT COUNT(*) FROM soc.Journal");
-        var reponse = await http.PostAsJsonAsync(RoutesEcransGeneres.GestesPour(Greffe, code), bloc.Geste, json);
+        var reponse = await ClientDe(bloc.Agent).PostAsJsonAsync(RoutesEcransGeneres.GestesPour(Greffe, code), bloc.Geste, json);
         var r = await reponse.Content.ReadFromJsonAsync<ResultatGeste>(json);
         var obtenu = r is null ? "illisible" : r.SansEcrivain ? "sans-ecrivain" : r.Fait ? "fait" : "refuse";
         var statut = obtenu == "refuse" ? HttpStatusCode.UnprocessableEntity : HttpStatusCode.OK;
@@ -951,6 +968,7 @@ sealed class Bloc
     public string? Fiche { get; set; }
     public List<(string Cle, string Valeur)> ValeursFiche { get; } = [];
     public List<(string Sql, string Attendu)> Controles { get; } = [];
+    public string? Agent { get; set; }
     public string? Texte { get; set; }
     public Dictionary<string, string> Criteres { get; } = new(StringComparer.Ordinal);
 }
@@ -958,7 +976,7 @@ sealed class Bloc
 /// <summary>La lecture des jeux .gestes et .recherches : des blocs separes par « --- », des lignes « cle: valeur ».</summary>
 static class Blocs
 {
-    private static readonly string[] Cles = ["geste:", "ids:", "valeur:", "resultat:", "message:", "lignes:", "fiche:", "controle:", "texte:", "critere:"];
+    private static readonly string[] Cles = ["geste:", "ids:", "valeur:", "resultat:", "message:", "lignes:", "fiche:", "controle:", "agent:", "texte:", "critere:"];
 
     /// <summary>« cle = valeur » (le premier « = » precede d'un blanc ; une valeur vide est permise).</summary>
     private static (string, string) Paire(string texte)
@@ -1014,6 +1032,7 @@ static class Blocs
                     var i = v.LastIndexOf(" => ", StringComparison.Ordinal);
                     b.Controles.Add((v[..i].Trim(), v[(i + 4)..].Trim()));
                     break;
+                case "agent:": b.Agent = v; break;
                 case "texte:": b.Texte = v; break;
                 case "critere:": var (c, y) = Paire(v); b.Criteres[c] = y; break;
             }

@@ -1,37 +1,394 @@
-# « Modèles de rédaction » (EcrivainModelesRedaction), en grille : le GLOSSAIRE s'ajoute, se modifie et se supprime comme dans
-# l'onglet glossaire de la V2 (OPE_EDT_GLOSSAIRE.cs:66-91 ; .Designer.cs:79-100 ; Glossaire.GetAllGlossaireOfUserAndPublic). Lignes :
-# PROC_REDAA.sql (L15_ART public, L15_PRIV prive d'un autre agent, BANC). L'agent du banc : banc.ecrans.
+# « Modèles de rédaction » (EcrivainModelesRedaction), en grille : ce que les fiches de la V2 enregistrent en base sans document Word.
+# Le MODELE se modifie, se duplique et se supprime (OPE_EDT_MODEL.cs:149-216) ; la SECTION s'ajoute, se modifie et se supprime par
+# l'equipe Amitel (OPE_EDT_SECTION.cs:54-82, :64-72) ; le GLOSSAIRE s'ajoute, se modifie et se supprime (OPE_EDT_GLOSSAIRE.cs:66-91).
+# Lignes : PROC_REDAA.sql. L'agent du banc : banc.ecrans (ni Amitel ni administrateur) ; « agent: banc.amitel.l15 » : un compte Amitel
+# du jeu, pour les sections. Les blocs remettent chaque objet comme ils l'ont trouve : la liste finit comme PROC_REDAA.attendu.
 
-# Refus : un ajout sans la section du glossaire (onglet modeles ou sections) -- modeles et maquettes passent par leur document Word
-# en GED, les sections par Amitel. Jumeau accepte : bloc 6 (ajout dans l'onglet du glossaire, avec son texte).
+# Refus : un ajout sans section saisie (onglet des modeles ou des maquettes) -- la V2 n'a aucun chemin vers un modele vide
+# (ModeleDocument.cs:17-18), une maquette se cree avec son document Word en GED. Jumeaux acceptes : la DUPLICATION d'un modele (bloc
+# « CREE »), l'ajout d'une section et d'une entree du glossaire, plus bas.
 geste: Ajouter
 valeur: Code = L15_X
 valeur: Libellé = Autre banc
 resultat: refuse
-message: Seul le glossaire s'ajoute ici, avec son « Texte associé » : un modèle ou une maquette se crée par son document Word en GED, une section par l'équipe Amitel dans RIG v2.
+message: Un modèle de document ne se crée qu'en dupliquant un modèle existant (« Dupliquer » au menu de sa ligne), comme dans RIG v2. Une maquette REDA se crée avec son document Word en GED ; une section et une entrée du glossaire, dans leur onglet.
 ---
-# Refus : le code est obligatoire (.Designer.cs:79). Jumeau accepte : bloc 6.
+# ---- MODELE DE DOCUMENT : Valider (OPE_EDT_MODEL.cs:58, 149-169).
+# Refus : le code ne se modifie pas (TextCode.MetierReadOnly, l. 98). Jumeau accepte : le bloc « MODIFIE » (code inchange).
+geste: Modifier
+ids: modele:L15_JGT
+valeur: Code = L15_AUTRE
+resultat: refuse
+message: Le code ne se modifie pas : RIG v2 le fige une fois la ligne enregistrée.
+---
+# Refus : le libelle est obligatoire (OPE_EDT_MODEL.Designer.cs:92). Jumeau accepte : le bloc « MODIFIE ».
+geste: Modifier
+ids: modele:L15_JGT
+valeur: Libellé =
+resultat: refuse
+message: « Libellé » est obligatoire.
+---
+# Refus : le type est une valeur de TYPE_MODELE_DOCUMENT (ULT_COMBO_TYPE_MODELE_DOCUMENT.cs:8-9). Jumeau accepte : le bloc « MODIFIE »
+# (PR, de la table).
+geste: Modifier
+ids: modele:L15_JGT
+valeur: Modèle de document › Type de modèle = ZZ
+resultat: refuse
+message: « Type de modèle » : « ZZ » n'est pas un type de modèle de ce greffe (CX, PC, PR).
+---
+# Refus : une maquette deja presente dans la liste (OPE_EDT_MODEL.cs:219-220, message de la V2). Jumeau accepte : le bloc « MODIFIE »
+# (deux maquettes differentes).
+geste: Modifier
+ids: modele:L15_JGT
+valeur: Modèle de document › Maquettes, dans l'ordre = L15_ENTETE, L15_ENTETE
+resultat: refuse
+message: Maquette déjà présente dans la liste !
+---
+# Refus : L15_RIG n'est pas une maquette REDA ; la V2 ne propose que celles-la (LoadMaquetteByType("REDA"), l. 91). Jumeau accepte :
+# le bloc « MODIFIE » (L15_LIBRE, REDA).
+geste: Modifier
+ids: modele:L15_JGT
+valeur: Modèle de document › Maquettes, dans l'ordre = L15_ENTETE, L15_RIG
+resultat: refuse
+message: « L15_RIG » n'est pas une maquette REDA de ce greffe : RIG v2 ne propose que celles-là.
+---
+# Refus : rien ne change (Valider n'est actif que sur un changement, ChangeOnOpe, l. 137-142). Jumeau accepte : le bloc « MODIFIE ».
+geste: Modifier
+ids: modele:L15_JGT
+valeur: Modèle de document › Actif = oui
+valeur: Modèle de document › Maquettes, dans l'ordre = L15_ENTETE, L15_DISPO
+resultat: refuse
+message: Rien à enregistrer : aucune valeur ne change.
+---
+# MODIFIE : libelle, type, actif decoche, et les maquettes -- L15_ENTETE retiree (supprimee, ModeleDocument.cs:135-137), L15_DISPO
+# passe en 1re, L15_LIBRE ajoutee en 2e ; Sauve numerote 1..n dans l'ordre (l. 127-133).
+geste: Modifier
+ids: modele:L15_JGT
+valeur: Libellé = Jugement banc modifié
+valeur: Modèle de document › Type de modèle = PR
+valeur: Modèle de document › Actif =
+valeur: Modèle de document › Maquettes, dans l'ordre = L15_DISPO, L15_LIBRE
+resultat: fait
+message: Modèle « L15_JGT » enregistré.
+lignes:
+L15_JGT - Jugement banc modifié | modèle · 2 maquette(s) | Modèles de document | Validee | []
+L15_ORD - Ordonnance banc | modèle · aucune maquette | Modèles de document | AFaire | []
+L15_DISPO - Dispositif banc | maquette REDA · sans document Word | Maquettes REDA | AFaire | []
+L15_ENTETE - Entete banc | maquette REDA · utilisée par aucun modèle | Maquettes REDA | Validee | []
+L15_LIBRE - Libre banc | maquette REDA · utilisée par 1 modèle(s) | Maquettes REDA | Validee | []
+L15_MOTIFS - Motifs banc | section | Sections | Validee | []
+L15_ART - Article banc | glossaire public | Glossaire | Validee | []
+fiche: modele:L15_JGT
+Modèle de document › Libellé = Jugement banc modifié
+Modèle de document › Type de modèle = PR
+Modèle de document › Actif =
+controle: SELECT CONCAT(MDDCM_LIBELLE, '/', MDDCM_TYPE_MODELE_DOCUMENT, '/', CAST(MDDCM_ACTIF AS int)) FROM v2.MODELE_DOCUMENT WHERE MDDCM_CODE_MODELE_DOCUMENT = 'L15_JGT' => Jugement banc modifié/PR/0
+controle: SELECT STRING_AGG(CONCAT(X_CMPMD_CODE_MAQUETTE, ':', X_CMPMD_INDEX), ',') WITHIN GROUP (ORDER BY X_CMPMD_INDEX) FROM v2.COMPOSITION_MODELE WHERE X_CMPMD_CODE_MODELE_DOCUMENT = 'L15_JGT' => L15_DISPO:1,L15_LIBRE:2
+---
+# Refus : un modele qui garde des maquettes ne se supprime pas (OPE_EDT_MODEL.cs:210-211, message de la V2). Jumeau accepte : la
+# suppression de L15_JGT2, sans maquette, plus bas.
+geste: Supprimer
+ids: modele:L15_JGT
+resultat: refuse
+message: Vous devez supprimer les maquettes liées au modèle avant de le supprimer
+---
+# ---- DUPLIQUER un modele (OPE_EDT_MODEL.cs:171-207) : un Ajouter dont Ids porte le modele copie.
+# Refus : le code saisi existe deja (VerifierSaisieDupliquer, l. 201-205, message de la V2). Jumeau accepte : le bloc « CREE » (L15_JGT2).
+geste: Ajouter
+ids: modele:L15_JGT
+valeur: Code = L15_ORD
+resultat: refuse
+message: Ce code existe déjà
+---
+# Refus : sans code. Jumeau accepte : le bloc « CREE ».
+geste: Ajouter
+ids: modele:L15_JGT
+valeur: Code =
+resultat: refuse
+message: « Code » est obligatoire.
+---
+# Refus : un code de 31 caracteres (MDDCM_CODE_MODELE_DOCUMENT : 30). Jumeau accepte : le bloc « CREE » (8 caracteres).
+geste: Ajouter
+ids: modele:L15_JGT
+valeur: Code = L15_CODE_DE_MODELE_TROP_LONG_XY
+resultat: refuse
+message: « Code » : 30 caractères au plus.
+---
+# CREE : L15_JGT2, copie de L15_JGT -- libelle, type et actif copies (ModeleDocument.cs:20) ; ses maquettes NON (la V2 prepare leur
+# copie, l. 187-196, sans la rattacher : Sauve n'ecrit que l'en-tete, ModeleDocument.cs:126). La grille envoie les cellules copiees.
+geste: Ajouter
+ids: modele:L15_JGT
+valeur: Code = L15_JGT2
+valeur: Libellé = Jugement banc modifié
+valeur: Nature = modèle
+valeur: Utilisation = 2 maquette(s)
+resultat: fait
+message: Modèle « L15_JGT2 » créé, copie de « L15_JGT » (libellé, type, actif). Comme dans RIG v2, ses maquettes ne sont pas recopiées : ajoutez-les en le modifiant.
+lignes:
+L15_JGT - Jugement banc modifié | modèle · 2 maquette(s) | Modèles de document | Validee | []
+L15_JGT2 - Jugement banc modifié | modèle · aucune maquette | Modèles de document | AFaire | []
+L15_ORD - Ordonnance banc | modèle · aucune maquette | Modèles de document | AFaire | []
+L15_DISPO - Dispositif banc | maquette REDA · sans document Word | Maquettes REDA | AFaire | []
+L15_ENTETE - Entete banc | maquette REDA · utilisée par aucun modèle | Maquettes REDA | Validee | []
+L15_LIBRE - Libre banc | maquette REDA · utilisée par 1 modèle(s) | Maquettes REDA | Validee | []
+L15_MOTIFS - Motifs banc | section | Sections | Validee | []
+L15_ART - Article banc | glossaire public | Glossaire | Validee | []
+controle: SELECT CONCAT(MDDCM_LIBELLE, '/', MDDCM_TYPE_MODELE_DOCUMENT, '/', CAST(MDDCM_ACTIF AS int)) FROM v2.MODELE_DOCUMENT WHERE MDDCM_CODE_MODELE_DOCUMENT = 'L15_JGT2' => Jugement banc modifié/PR/0
+controle: SELECT COUNT(*) FROM v2.COMPOSITION_MODELE WHERE X_CMPMD_CODE_MODELE_DOCUMENT = 'L15_JGT2' => 0
+---
+# SUPPRIME : L15_JGT2, sans maquette (OPE_EDT_MODEL.cs:212-215).
+geste: Supprimer
+ids: modele:L15_JGT2
+resultat: fait
+message: Modèle « L15_JGT2 » supprimé.
+controle: SELECT COUNT(*) FROM v2.MODELE_DOCUMENT WHERE MDDCM_CODE_MODELE_DOCUMENT = 'L15_JGT2' => 0
+---
+# Refus : une maquette REDA se modifie avec son document Word en GED (OPE_EDT_MAQ). Jumeau accepte : le bloc « MODIFIE » (un modele).
+geste: Modifier
+ids: maquette:L15_LIBRE
+valeur: Libellé = Libre renommee
+resultat: refuse
+message: Une maquette REDA se crée, se duplique, se modifie et se supprime avec son document Word en GED : RIG v2 le fait dans sa fiche (OPE_EDT_MAQ), pas dans cette grille.
+---
+# Refus : ni supprimee. Jumeau accepte : la suppression de L15_JGT2 (un modele).
+geste: Supprimer
+ids: maquette:L15_LIBRE
+resultat: refuse
+message: Une maquette REDA se crée, se duplique, se modifie et se supprime avec son document Word en GED : RIG v2 le fait dans sa fiche (OPE_EDT_MAQ), pas dans cette grille.
+---
+# Refus : ni dupliquee (OPE_EDT_MAQ.cs:40, avec son document). Jumeau accepte : le bloc « CREE » (un modele).
+geste: Ajouter
+ids: maquette:L15_LIBRE
+valeur: Code = L15_LIBRE2
+resultat: refuse
+message: Une maquette REDA se crée, se duplique, se modifie et se supprime avec son document Word en GED : RIG v2 le fait dans sa fiche (OPE_EDT_MAQ), pas dans cette grille.
+---
+# MODIFIE (remise) : L15_JGT redevient celui de PROC_REDAA.sql -- L15_ENTETE reprise en 1re (une composition neuve), L15_DISPO en 2e,
+# L15_LIBRE retiree.
+geste: Modifier
+ids: modele:L15_JGT
+valeur: Libellé = Jugement banc
+valeur: Modèle de document › Type de modèle = PC
+valeur: Modèle de document › Actif = oui
+valeur: Modèle de document › Maquettes, dans l'ordre = L15_ENTETE, L15_DISPO
+resultat: fait
+message: Modèle « L15_JGT » enregistré.
+lignes:
+L15_JGT - Jugement banc | modèle · 2 maquette(s) | Modèles de document | Validee | []
+L15_ORD - Ordonnance banc | modèle · aucune maquette | Modèles de document | AFaire | []
+L15_DISPO - Dispositif banc | maquette REDA · sans document Word | Maquettes REDA | AFaire | []
+L15_ENTETE - Entete banc | maquette REDA · utilisée par 1 modèle(s) | Maquettes REDA | Validee | []
+L15_LIBRE - Libre banc | maquette REDA · utilisée par aucun modèle | Maquettes REDA | Validee | []
+L15_MOTIFS - Motifs banc | section | Sections | Validee | []
+L15_ART - Article banc | glossaire public | Glossaire | Validee | []
+controle: SELECT CONCAT(MDDCM_LIBELLE, '/', MDDCM_TYPE_MODELE_DOCUMENT, '/', CAST(MDDCM_ACTIF AS int)) FROM v2.MODELE_DOCUMENT WHERE MDDCM_CODE_MODELE_DOCUMENT = 'L15_JGT' => Jugement banc/PC/1
+controle: SELECT STRING_AGG(CONCAT(X_CMPMD_CODE_MAQUETTE, ':', X_CMPMD_INDEX), ',') WITHIN GROUP (ORDER BY X_CMPMD_INDEX) FROM v2.COMPOSITION_MODELE WHERE X_CMPMD_CODE_MODELE_DOCUMENT = 'L15_JGT' => L15_ENTETE:1,L15_DISPO:2
+---
+# ---- SECTION (OPE_EDT_SECTION.cs) : reservee a l'equipe Amitel (l. 64-72).
+# Refus : banc.ecrans n'est pas Amitel, la V2 lui cache la barre d'edition. Jumeau accepte : le bloc « AJOUTEE » (banc.amitel.l15).
+geste: Ajouter
+valeur: Code = L15_SECT
+valeur: Libellé = Section banc
+valeur: Section › Requête SQL = SELECT 2
+valeur: Section › Occurrence = occurence multiples
+valeur: Section › Fusion = fusion à l'édition
+valeur: Section › Génération = régénérable
+valeur: Section › Persistance = persistante
+resultat: refuse
+message: Les sections ne se modifient que par l'équipe Amitel : RIG v2 cache leur barre d'édition aux autres agents.
+---
+# Refus : la requete SQL est obligatoire (OPE_EDT_SECTION.Designer.cs:101). Jumeau accepte : le bloc « AJOUTEE ».
+agent: banc.amitel.l15
+geste: Ajouter
+valeur: Code = L15_SECT
+valeur: Libellé = Section banc
+valeur: Section › Requête SQL = 
+valeur: Section › Occurrence = occurence multiples
+valeur: Section › Fusion = fusion à l'édition
+valeur: Section › Génération = régénérable
+valeur: Section › Persistance = persistante
+resultat: refuse
+message: « Requête SQL » est obligatoire.
+---
+# Refus : la description (colonne « Libellé ») est obligatoire (.Designer.cs:90). Jumeau accepte : le bloc « AJOUTEE ».
+agent: banc.amitel.l15
+geste: Ajouter
+valeur: Code = L15_SECT
+valeur: Libellé = 
+valeur: Section › Requête SQL = SELECT 2
+valeur: Section › Occurrence = occurence multiples
+valeur: Section › Fusion = fusion à l'édition
+valeur: Section › Génération = régénérable
+valeur: Section › Persistance = persistante
+resultat: refuse
+message: « Libellé » est obligatoire.
+---
+# Refus : un niveau hors de sa liste (ULT_COMBO_FUSION.cs:12). Jumeau accepte : le bloc « AJOUTEE » (fusion à l'édition).
+agent: banc.amitel.l15
+geste: Ajouter
+valeur: Code = L15_SECT
+valeur: Libellé = Section banc
+valeur: Section › Requête SQL = SELECT 2
+valeur: Section › Occurrence = occurence multiples
+valeur: Section › Fusion = fusion libre
+valeur: Section › Génération = régénérable
+valeur: Section › Persistance = persistante
+resultat: refuse
+message: « Fusion » : choisissez « fusion à la génération » ou « fusion à l'édition ».
+---
+# Refus : un code deja pris (cle SCTMQ_CODE_SECTION_MAQUETTE ; la V2 l'insererait et la base le refuserait). Jumeau accepte : le
+# bloc « AJOUTEE » (code libre).
+agent: banc.amitel.l15
+geste: Ajouter
+valeur: Code = L15_MOTIFS
+valeur: Libellé = Section banc
+valeur: Section › Requête SQL = SELECT 2
+valeur: Section › Occurrence = occurence multiples
+valeur: Section › Fusion = fusion à l'édition
+valeur: Section › Génération = régénérable
+valeur: Section › Persistance = persistante
+resultat: refuse
+message: Le code « L15_MOTIFS » existe déjà dans les sections.
+---
+# Refus : un code de 33 caracteres (SCTMQ_CODE_SECTION_MAQUETTE : 32). Jumeau accepte : le bloc « AJOUTEE » (8 caracteres).
+agent: banc.amitel.l15
+geste: Ajouter
+valeur: Code = L15_CODE_DE_SECTION_TROP_LONG_XYZ
+valeur: Libellé = Section banc
+valeur: Section › Requête SQL = SELECT 2
+valeur: Section › Occurrence = occurence multiples
+valeur: Section › Fusion = fusion à l'édition
+valeur: Section › Génération = régénérable
+valeur: Section › Persistance = persistante
+resultat: refuse
+message: « Code » : 32 caractères au plus.
+---
+# AJOUTEE (OPE_RECH_SECTION.cs:114-115, puis Valider, OPE_EDT_SECTION.cs:54-57) par l'agent Amitel : les niveaux en base, valeurs
+# de leurs listes (2, 2, 1, 1).
+agent: banc.amitel.l15
+geste: Ajouter
+valeur: Code = L15_SECT
+valeur: Libellé = Section banc
+valeur: Section › Requête SQL = SELECT 2
+valeur: Section › Occurrence = occurence multiples
+valeur: Section › Fusion = fusion à l'édition
+valeur: Section › Génération = régénérable
+valeur: Section › Persistance = persistante
+resultat: fait
+message: Section « L15_SECT » ajoutée.
+lignes:
+L15_JGT - Jugement banc | modèle · 2 maquette(s) | Modèles de document | Validee | []
+L15_ORD - Ordonnance banc | modèle · aucune maquette | Modèles de document | AFaire | []
+L15_DISPO - Dispositif banc | maquette REDA · sans document Word | Maquettes REDA | AFaire | []
+L15_ENTETE - Entete banc | maquette REDA · utilisée par 1 modèle(s) | Maquettes REDA | Validee | []
+L15_LIBRE - Libre banc | maquette REDA · utilisée par aucun modèle | Maquettes REDA | Validee | []
+L15_MOTIFS - Motifs banc | section | Sections | Validee | []
+L15_SECT - Section banc | section | Sections | Validee | []
+L15_ART - Article banc | glossaire public | Glossaire | Validee | []
+controle: SELECT CONCAT(SCTMQ_LIBELLE, '/', SCTMQ_REQUETE_SQL, '/', SCTMQ_NIVEAU_OCCURRENCE, '/', SCTMQ_NIVEAU_FUSION, '/', SCTMQ_NIVEAU_GENERATION, '/', SCTMQ_NIVEAU_PERSISTANCE) FROM v2.SECTION_MAQUETTE WHERE SCTMQ_CODE_SECTION_MAQUETTE = 'L15_SECT' => Section banc/SELECT 2/2/2/1/1
+---
+# Refus : banc.ecrans ne modifie pas une section. Jumeau accepte : le bloc « MODIFIEE » (banc.amitel.l15).
+geste: Modifier
+ids: section:L15_SECT
+valeur: Libellé = Section renommee
+resultat: refuse
+message: Les sections ne se modifient que par l'équipe Amitel : RIG v2 cache leur barre d'édition aux autres agents.
+---
+# Refus : le code d'une section enregistree ne se modifie pas (TextCode.MetierReadOnly = !modeCrea, l. 108). Jumeau accepte : le bloc
+# « MODIFIEE ».
+agent: banc.amitel.l15
+geste: Modifier
+ids: section:L15_SECT
+valeur: Code = L15_AUTRE
+resultat: refuse
+message: Le code ne se modifie pas : RIG v2 le fige une fois la ligne enregistrée.
+---
+# Refus : rien ne change (Valider n'est actif que sur un changement, l. 37-39). Jumeau accepte : le bloc « MODIFIEE ».
+agent: banc.amitel.l15
+geste: Modifier
+ids: section:L15_SECT
+valeur: Section › Persistance = persistante
+resultat: refuse
+message: Rien à enregistrer : aucune valeur ne change.
+---
+# Refus : un niveau hors de sa liste (ULT_COMBO_OCCURENCE.cs:12, son texte au mot pres). Jumeau accepte : le bloc « MODIFIEE ».
+agent: banc.amitel.l15
+geste: Modifier
+ids: section:L15_SECT
+valeur: Section › Occurrence = toujours
+resultat: refuse
+message: « Occurrence » : choisissez « occurence unique » ou « occurence multiples ».
+---
+# MODIFIEE : la description, la requete et la persistance ; la fiche relue les porte.
+agent: banc.amitel.l15
+geste: Modifier
+ids: section:L15_SECT
+valeur: Libellé = Section banc modifiée
+valeur: Section › Requête SQL = SELECT 3
+valeur: Section › Persistance = non persistante
+resultat: fait
+message: Section « L15_SECT » enregistrée.
+fiche: section:L15_SECT
+Section › Libellé = Section banc modifiée
+Section › Requête SQL = SELECT 3
+Section › Persistance = non persistante
+Section › Fusion = fusion à l'édition
+controle: SELECT CONCAT(SCTMQ_LIBELLE, '/', SCTMQ_REQUETE_SQL, '/', SCTMQ_NIVEAU_OCCURRENCE, '/', SCTMQ_NIVEAU_FUSION, '/', SCTMQ_NIVEAU_GENERATION, '/', SCTMQ_NIVEAU_PERSISTANCE) FROM v2.SECTION_MAQUETTE WHERE SCTMQ_CODE_SECTION_MAQUETTE = 'L15_SECT' => Section banc modifiée/SELECT 3/2/2/1/0
+---
+# Refus : la V2 ne duplique pas une section (MetierAllowUserDuplicate = false, OPE_EDT_SECTION.cs:22). Jumeau accepte : le bloc « CREE »
+# (un modele se duplique).
+geste: Ajouter
+ids: section:L15_SECT
+valeur: Code = L15_SECT2
+resultat: refuse
+message: RIG v2 ne duplique pas une section (OPE_EDT_SECTION : duplication interdite).
+---
+# Refus : banc.ecrans ne supprime pas une section. Jumeau accepte : le bloc « SUPPRIMEE » (banc.amitel.l15).
+geste: Supprimer
+ids: section:L15_SECT
+resultat: refuse
+message: Les sections ne se modifient que par l'équipe Amitel : RIG v2 cache leur barre d'édition aux autres agents.
+---
+# SUPPRIMEE (OPE_EDT_SECTION.cs:75-77) par l'agent Amitel : la liste revient a celle de PROC_REDAA.attendu.
+agent: banc.amitel.l15
+geste: Supprimer
+ids: section:L15_SECT
+resultat: fait
+message: Section « L15_SECT » supprimée.
+lignes:
+L15_JGT - Jugement banc | modèle · 2 maquette(s) | Modèles de document | Validee | []
+L15_ORD - Ordonnance banc | modèle · aucune maquette | Modèles de document | AFaire | []
+L15_DISPO - Dispositif banc | maquette REDA · sans document Word | Maquettes REDA | AFaire | []
+L15_ENTETE - Entete banc | maquette REDA · utilisée par 1 modèle(s) | Maquettes REDA | Validee | []
+L15_LIBRE - Libre banc | maquette REDA · utilisée par aucun modèle | Maquettes REDA | Validee | []
+L15_MOTIFS - Motifs banc | section | Sections | Validee | []
+L15_ART - Article banc | glossaire public | Glossaire | Validee | []
+controle: SELECT COUNT(*) FROM v2.SECTION_MAQUETTE WHERE SCTMQ_CODE_SECTION_MAQUETTE = 'L15_SECT' => 0
+---
+# ---- GLOSSAIRE (OPE_EDT_GLOSSAIRE.cs:66-91 ; .Designer.cs:79-100 ; Glossaire.GetAllGlossaireOfUserAndPublic). Lignes : L15_ART public,
+# L15_PRIV prive d'un autre agent (BANC).
+# Refus : le code est obligatoire (.Designer.cs:79). Jumeau accepte : le bloc « AJOUTEE, publique ».
 geste: Ajouter
 valeur: Libellé = Sans code
 valeur: Entrée du glossaire › Texte associé = Un texte
 resultat: refuse
 message: « Code » est obligatoire.
 ---
-# Refus : le texte associe est obligatoire (.Designer.cs:98). Jumeau accepte : bloc 6.
+# Refus : le texte associe est obligatoire (.Designer.cs:98). Jumeau accepte : le bloc « AJOUTEE, publique ».
 geste: Ajouter
 valeur: Code = L15_SANS
 valeur: Entrée du glossaire › Privé = non
 resultat: refuse
 message: « Texte associé » est obligatoire.
 ---
-# Refus : un code deja pris (cle primaire GLOSS_CODE_GLOSSAIRE). Jumeau accepte : bloc 6 (code libre).
+# Refus : un code deja pris (cle primaire GLOSS_CODE_GLOSSAIRE). Jumeau accepte : le bloc « AJOUTEE, publique » (code libre).
 geste: Ajouter
 valeur: Code = L15_ART
 valeur: Entrée du glossaire › Texte associé = Un texte
 resultat: refuse
 message: Le code « L15_ART » existe déjà dans le glossaire.
 ---
-# Refus : un code de 21 caracteres (GLOSS_CODE_GLOSSAIRE : 20 dans la base du greffe). Jumeau accepte : bloc 6 (8 caracteres).
+# Refus : un code de 21 caracteres (GLOSS_CODE_GLOSSAIRE : 20 dans la base du greffe). Jumeau accepte : le bloc « AJOUTEE, publique ».
 geste: Ajouter
 valeur: Code = L15_CODE_TROP_LONG_XY
 valeur: Entrée du glossaire › Texte associé = Un texte
@@ -46,11 +403,11 @@ valeur: Entrée du glossaire › Texte associé = Texte du nouveau terme
 resultat: fait
 message: Entrée « L15_NEUF » ajoutée au glossaire public.
 lignes:
-L15_JGT - Jugement banc | modèle · 2 maquette(s) | Modèles et maquettes | Validee | []
-L15_ORD - Ordonnance banc | modèle · aucune maquette | Modèles et maquettes | AFaire | []
-L15_DISPO - Dispositif banc | maquette REDA · sans document Word | Modèles et maquettes | AFaire | []
-L15_ENTETE - Entete banc | maquette REDA · utilisée par 1 modèle(s) | Modèles et maquettes | Validee | []
-L15_LIBRE - Libre banc | maquette REDA · utilisée par aucun modèle | Modèles et maquettes | Validee | []
+L15_JGT - Jugement banc | modèle · 2 maquette(s) | Modèles de document | Validee | []
+L15_ORD - Ordonnance banc | modèle · aucune maquette | Modèles de document | AFaire | []
+L15_DISPO - Dispositif banc | maquette REDA · sans document Word | Maquettes REDA | AFaire | []
+L15_ENTETE - Entete banc | maquette REDA · utilisée par 1 modèle(s) | Maquettes REDA | Validee | []
+L15_LIBRE - Libre banc | maquette REDA · utilisée par aucun modèle | Maquettes REDA | Validee | []
 L15_MOTIFS - Motifs banc | section | Sections | Validee | []
 L15_ART - Article banc | glossaire public | Glossaire | Validee | []
 L15_NEUF - Nouveau banc | glossaire public | Glossaire | Validee | []
@@ -65,29 +422,29 @@ resultat: fait
 message: Entrée « L15_MIEN » ajoutée à votre glossaire privé : la liste ne montre que le glossaire public.
 controle: SELECT CONCAT(ISNULL(GLOSS_LIBELLE, 'sans libelle'), '/', GLOSS_TEXTE, '/', GLOSS_PROPRIETAIRE) FROM v2.GLOSSAIRE WHERE GLOSS_CODE_GLOSSAIRE = 'L15_MIEN' => sans libelle/Mon texte/banc.ecrans
 ---
-# Refus : le code ne se modifie plus (TextCode.MetierReadOnly = !modeCrea, l. 117). Jumeau accepte : bloc 11 (le libelle et le texte).
+# Refus : le code ne se modifie plus (TextCode.MetierReadOnly = !modeCrea, l. 117). Jumeau accepte : le bloc « MODIFIEE » du glossaire.
 geste: Modifier
 ids: glossaire:L15_NEUF
 valeur: Code = L15_AUTRE
 resultat: refuse
-message: Le code ne se modifie pas : RIG v2 le fige une fois l'entrée du glossaire enregistrée.
+message: Le code ne se modifie pas : RIG v2 le fige une fois la ligne enregistrée.
 ---
-# Refus : une entree publique ne redevient pas privee (GrbPublicPrive en lecture, l. 118). Jumeau accepte : bloc 12 (une privee
-# devient publique).
+# Refus : une entree publique ne redevient pas privee (GrbPublicPrive en lecture, l. 118). Jumeau accepte : L15_MIEN, privee, devient
+# publique, plus bas.
 geste: Modifier
 ids: glossaire:L15_NEUF
 valeur: Entrée du glossaire › Privé = oui
 resultat: refuse
 message: Une entrée publique ne redevient pas privée : RIG v2 fige ce choix une fois l'entrée publique.
 ---
-# Refus : rien ne change (la V2 n'active Valider que sur un changement, l. 49-51). Jumeau accepte : bloc 11.
+# Refus : rien ne change (la V2 n'active Valider que sur un changement, l. 49-51). Jumeau accepte : le bloc « MODIFIEE » du glossaire.
 geste: Modifier
 ids: glossaire:L15_NEUF
 valeur: Libellé = Nouveau banc
 resultat: refuse
 message: Rien à enregistrer : aucune valeur ne change.
 ---
-# MODIFIEE : le libelle (la description de la V2) et le texte associe (OPE_EDT_GLOSSAIRE.cs:124-125).
+# MODIFIEE : le libelle (la description de la V2) et le texte associe (OPE_EDT_GLOSSAIRE.cs:124-125) ; la fiche relue les porte.
 geste: Modifier
 ids: glossaire:L15_NEUF
 valeur: Libellé = Nouveau banc modifié
@@ -95,14 +452,17 @@ valeur: Entrée du glossaire › Texte associé = Texte modifié
 resultat: fait
 message: Entrée « L15_NEUF » du glossaire enregistrée.
 lignes:
-L15_JGT - Jugement banc | modèle · 2 maquette(s) | Modèles et maquettes | Validee | []
-L15_ORD - Ordonnance banc | modèle · aucune maquette | Modèles et maquettes | AFaire | []
-L15_DISPO - Dispositif banc | maquette REDA · sans document Word | Modèles et maquettes | AFaire | []
-L15_ENTETE - Entete banc | maquette REDA · utilisée par 1 modèle(s) | Modèles et maquettes | Validee | []
-L15_LIBRE - Libre banc | maquette REDA · utilisée par aucun modèle | Modèles et maquettes | Validee | []
+L15_JGT - Jugement banc | modèle · 2 maquette(s) | Modèles de document | Validee | []
+L15_ORD - Ordonnance banc | modèle · aucune maquette | Modèles de document | AFaire | []
+L15_DISPO - Dispositif banc | maquette REDA · sans document Word | Maquettes REDA | AFaire | []
+L15_ENTETE - Entete banc | maquette REDA · utilisée par 1 modèle(s) | Maquettes REDA | Validee | []
+L15_LIBRE - Libre banc | maquette REDA · utilisée par aucun modèle | Maquettes REDA | Validee | []
 L15_MOTIFS - Motifs banc | section | Sections | Validee | []
 L15_ART - Article banc | glossaire public | Glossaire | Validee | []
 L15_NEUF - Nouveau banc modifié | glossaire public | Glossaire | Validee | []
+fiche: glossaire:L15_NEUF
+Entrée du glossaire › Libellé = Nouveau banc modifié
+Entrée du glossaire › Texte associé = Texte modifié
 controle: SELECT CONCAT(GLOSS_LIBELLE, '/', GLOSS_TEXTE, '/', GLOSS_PROPRIETAIRE) FROM v2.GLOSSAIRE WHERE GLOSS_CODE_GLOSSAIRE = 'L15_NEUF' => Nouveau banc modifié/Texte modifié/*
 ---
 # MODIFIEE : l'entree privee de l'agent devient publique (l. 71) : elle entre dans la liste.
@@ -112,11 +472,11 @@ valeur: Entrée du glossaire › Privé = non
 resultat: fait
 message: Entrée « L15_MIEN » du glossaire enregistrée.
 lignes:
-L15_JGT - Jugement banc | modèle · 2 maquette(s) | Modèles et maquettes | Validee | []
-L15_ORD - Ordonnance banc | modèle · aucune maquette | Modèles et maquettes | AFaire | []
-L15_DISPO - Dispositif banc | maquette REDA · sans document Word | Modèles et maquettes | AFaire | []
-L15_ENTETE - Entete banc | maquette REDA · utilisée par 1 modèle(s) | Modèles et maquettes | Validee | []
-L15_LIBRE - Libre banc | maquette REDA · utilisée par aucun modèle | Modèles et maquettes | Validee | []
+L15_JGT - Jugement banc | modèle · 2 maquette(s) | Modèles de document | Validee | []
+L15_ORD - Ordonnance banc | modèle · aucune maquette | Modèles de document | AFaire | []
+L15_DISPO - Dispositif banc | maquette REDA · sans document Word | Maquettes REDA | AFaire | []
+L15_ENTETE - Entete banc | maquette REDA · utilisée par 1 modèle(s) | Maquettes REDA | Validee | []
+L15_LIBRE - Libre banc | maquette REDA · utilisée par aucun modèle | Maquettes REDA | Validee | []
 L15_MOTIFS - Motifs banc | section | Sections | Validee | []
 L15_ART - Article banc | glossaire public | Glossaire | Validee | []
 L15_MIEN | glossaire public | Glossaire | Validee | []
@@ -124,40 +484,27 @@ L15_NEUF - Nouveau banc modifié | glossaire public | Glossaire | Validee | []
 controle: SELECT GLOSS_PROPRIETAIRE FROM v2.GLOSSAIRE WHERE GLOSS_CODE_GLOSSAIRE = 'L15_MIEN' => *
 ---
 # Refus : l'entree privee d'un AUTRE agent (BANC) n'est pas dans le glossaire de banc.ecrans (Glossaire.cs:64-66). Jumeau accepte :
-# bloc 12 (privee de l'agent).
+# L15_MIEN, privee de l'agent, plus haut.
 geste: Modifier
 ids: glossaire:L15_PRIV
 valeur: Libellé = Pas a moi
 resultat: refuse
 message: Entrée introuvable dans votre glossaire (publique, ou privée à vous) : « L15_PRIV ».
 ---
-# Refus : « Nature » est lue (la nature de la ligne). Jumeau accepte : bloc 11 (le libelle).
+# Refus : « Nature » est lue (la nature de la ligne). Jumeau accepte : le bloc « MODIFIEE » du glossaire (le libelle).
 geste: Modifier
 ids: glossaire:L15_ART
 valeur: Nature = section
 resultat: refuse
 message: « Nature » se lit, ne se saisit pas.
 ---
-# Refus : un modele se modifie avec son document Word en GED (OPE_EDT_MAQ). Jumeau accepte : bloc 11 (une entree du glossaire).
-geste: Modifier
-ids: modele:L15_JGT
-valeur: Libellé = Jugement renomme
+# Refus : la fiche du glossaire n'a pas de « Dupliquer » (OPE_EDT_GLOSSAIRE : Valider, Annuler, Supprimer). Jumeau accepte : le bloc
+# « CREE » (un modele se duplique).
+geste: Ajouter
+ids: glossaire:L15_ART
+valeur: Code = L15_ART2
 resultat: refuse
-message: Un modèle ou une maquette se modifie et se supprime avec son document Word en GED : RIG v2 le fait dans sa fiche (OPE_EDT_MAQ), pas dans cette grille.
----
-# Refus : une section ne s'edite que par l'equipe Amitel (OPE_EDT_SECTION.cs:64-72) ; banc.ecrans n'en est pas. Jumeau accepte :
-# bloc 11 (le glossaire, ouvert a tout agent).
-geste: Modifier
-ids: section:L15_MOTIFS
-valeur: Libellé = Motifs renommes
-resultat: refuse
-message: Les sections ne se modifient que par l'équipe Amitel : RIG v2 cache leur barre d'édition aux autres agents.
----
-# Refus : une maquette se supprime avec son document Word. Jumeau accepte : bloc 18 (une entree du glossaire).
-geste: Supprimer
-ids: maquette:L15_LIBRE
-resultat: refuse
-message: Un modèle ou une maquette se modifie et se supprime avec son document Word en GED : RIG v2 le fait dans sa fiche (OPE_EDT_MAQ), pas dans cette grille.
+message: RIG v2 ne duplique pas une entrée du glossaire : sa fiche n'a pas de « Dupliquer ».
 ---
 # SUPPRIMEE (l. 84-88) : L15_NEUF quitte la liste.
 geste: Supprimer
@@ -165,11 +512,11 @@ ids: glossaire:L15_NEUF
 resultat: fait
 message: Entrée « L15_NEUF » supprimée du glossaire.
 lignes:
-L15_JGT - Jugement banc | modèle · 2 maquette(s) | Modèles et maquettes | Validee | []
-L15_ORD - Ordonnance banc | modèle · aucune maquette | Modèles et maquettes | AFaire | []
-L15_DISPO - Dispositif banc | maquette REDA · sans document Word | Modèles et maquettes | AFaire | []
-L15_ENTETE - Entete banc | maquette REDA · utilisée par 1 modèle(s) | Modèles et maquettes | Validee | []
-L15_LIBRE - Libre banc | maquette REDA · utilisée par aucun modèle | Modèles et maquettes | Validee | []
+L15_JGT - Jugement banc | modèle · 2 maquette(s) | Modèles de document | Validee | []
+L15_ORD - Ordonnance banc | modèle · aucune maquette | Modèles de document | AFaire | []
+L15_DISPO - Dispositif banc | maquette REDA · sans document Word | Maquettes REDA | AFaire | []
+L15_ENTETE - Entete banc | maquette REDA · utilisée par 1 modèle(s) | Maquettes REDA | Validee | []
+L15_LIBRE - Libre banc | maquette REDA · utilisée par aucun modèle | Maquettes REDA | Validee | []
 L15_MOTIFS - Motifs banc | section | Sections | Validee | []
 L15_ART - Article banc | glossaire public | Glossaire | Validee | []
 L15_MIEN | glossaire public | Glossaire | Validee | []
@@ -181,11 +528,11 @@ ids: glossaire:L15_MIEN
 resultat: fait
 message: Entrée « L15_MIEN » supprimée du glossaire.
 lignes:
-L15_JGT - Jugement banc | modèle · 2 maquette(s) | Modèles et maquettes | Validee | []
-L15_ORD - Ordonnance banc | modèle · aucune maquette | Modèles et maquettes | AFaire | []
-L15_DISPO - Dispositif banc | maquette REDA · sans document Word | Modèles et maquettes | AFaire | []
-L15_ENTETE - Entete banc | maquette REDA · utilisée par 1 modèle(s) | Modèles et maquettes | Validee | []
-L15_LIBRE - Libre banc | maquette REDA · utilisée par aucun modèle | Modèles et maquettes | Validee | []
+L15_JGT - Jugement banc | modèle · 2 maquette(s) | Modèles de document | Validee | []
+L15_ORD - Ordonnance banc | modèle · aucune maquette | Modèles de document | AFaire | []
+L15_DISPO - Dispositif banc | maquette REDA · sans document Word | Maquettes REDA | AFaire | []
+L15_ENTETE - Entete banc | maquette REDA · utilisée par 1 modèle(s) | Maquettes REDA | Validee | []
+L15_LIBRE - Libre banc | maquette REDA · utilisée par aucun modèle | Maquettes REDA | Validee | []
 L15_MOTIFS - Motifs banc | section | Sections | Validee | []
 L15_ART - Article banc | glossaire public | Glossaire | Validee | []
 controle: SELECT COUNT(*) FROM v2.GLOSSAIRE WHERE GLOSS_CODE_GLOSSAIRE IN ('L15_MIEN', 'L15_NEUF') => 0
