@@ -31,10 +31,17 @@ internal static class OrganesPc
         """;
 
     /// <summary>dbo.ListeMandataireJudiciaire(p.PRCLL_ID_PRCLL, 0, 0) : les mandataires en mission de la PC d'alias <paramref name="pc"/>.</summary>
-    public static string Mandataires(string pc) => $"""
+    public static string Mandataires(string pc) => MandatairesEnFonction(pc, "'MDJ', 'RDC', 'LQJ', 'LIQ'");
+
+    /// <summary>
+    /// Les mandataires en mission de la PC d'alias <paramref name="pc"/> dans les fonctions <paramref name="fonctions"/> (liste SQL
+    /// de codes entre quotes), memes noms et meme separateur que <see cref="Mandataires"/>. « Clôture » (lot 20) n'y prend que les
+    /// liquidateurs : ListeMandatairesPC_PCFiltre("LIQ", false) (PROC_CLOT, OPE_SELECT_PC.cs:525-542, :624-626).
+    /// </summary>
+    public static string MandatairesEnFonction(string pc, string fonctions) => $"""
         ISNULL(STUFF((SELECT '/' + {CiviliteNomPrenom("mp.MNDPC_CIVILITE", "mp.MNDPC_NOM", "mp.MNDPC_COMPLEMENT_NOM")}
                       FROM v2.GERER_PC AS g JOIN v2.MANDATAIRE_PC AS mp ON mp.MNDPC_ID_MNDPC = g.GRRPC_ID_MNDPC
-                      WHERE g.GRRPC_ID_PRCLL = {pc}.PRCLL_ID_PRCLL AND g.GRRPC_FONCTION_PC IN ('MDJ', 'RDC', 'LQJ', 'LIQ') AND g.GRRPC_FIN_MISSION = 0
+                      WHERE g.GRRPC_ID_PRCLL = {pc}.PRCLL_ID_PRCLL AND g.GRRPC_FONCTION_PC IN ({fonctions}) AND g.GRRPC_FIN_MISSION = 0
                       ORDER BY g.GRRPC_ID_GRRPC FOR XML PATH(''), TYPE).value('.', 'varchar(max)'), 1, 1, ''), '')
         """;
 }

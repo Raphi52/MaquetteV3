@@ -1,8 +1,20 @@
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { EcranCoffreFort } from './EcranCoffreFort'
+import { ATransmettreNonLu, EcranCoffreFort, type VueCoffreFort } from './EcranCoffreFort'
+import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
 
-afterEach(cleanup)
+afterEach(() => { cleanup(); retirerFauxPont() })
+
+// Sans serveur, le pont rend le mode « demo » : l'ecran montre ses depots d'exemple (Pont/EcranCoffreFortBase.cs).
+const Demo: VueCoffreFort = { mode: 'demo', message: null, depots: [], total: 0 }
+/** L'ecran sans serveur, une fois le pont repondu (les depots d'exemple sont alors comptes). */
+async function ouvrir(v: VueCoffreFort = Demo) {
+  const pont = installerFauxPont({ 'EcranCoffreFort.Depots': () => v })
+  const r = render(<EcranCoffreFort />)
+  await vi.waitFor(() => expect(pont.appels).toHaveBeenCalledWith('EcranCoffreFort.Depots'))
+  await vi.waitFor(() => expect(r.container.querySelector('.rig-lm-vue')!.textContent).not.toBe('A transmettre 0'))
+  return r
+}
 
 // Valeurs attendues : celles de l'ecran Blazor (EcranCoffreFort.razor) : 4 depots, dont 2
 // « A transmettre » (jamais envoye, ou en erreur) et 2 « Deja transmis ».
@@ -16,8 +28,8 @@ const compte = (c: HTMLElement) => c.querySelector('.rig-lm-synthese')!.textCont
 const puce = (nom: RegExp) => screen.getByRole('button', { name: nom })
 
 describe('EcranCoffreFort', () => {
-  it('affiche les depots a transmettre, le depot en erreur en alerte', () => {
-    const { container } = render(<EcranCoffreFort />)
+  it('affiche les depots a transmettre, le depot en erreur en alerte', async () => {
+    const { container } = await ouvrir()
     expect(compte(container)).toBe('2 depots a transmettre · 1 en erreur')
     expect([...container.querySelectorAll('thead th')].map((th) => th.textContent))
       .toEqual(['', 'Destinataire', 'Etat', 'Date envoi infogreffe', 'Code de depot', 'Erreur'])
@@ -33,8 +45,8 @@ describe('EcranCoffreFort', () => {
       .toEqual(['Tous', 'COFFRE_BLANC', 'COFFRE_LEROY', 'COFFRE_PETIT'])
   })
 
-  it('la puce « Deja transmis » et les criteres filtrent la liste', () => {
-    const { container } = render(<EcranCoffreFort />)
+  it('la puce « Deja transmis » et les criteres filtrent la liste', async () => {
+    const { container } = await ouvrir()
     fireEvent.click(puce(/^Deja transmis/))
     expect(puce(/^Deja transmis/).getAttribute('aria-pressed')).toBe('true')
     expect(puce(/^A transmettre/).getAttribute('aria-pressed')).toBe('false')
@@ -48,8 +60,8 @@ describe('EcranCoffreFort', () => {
     expect(container.querySelector('.rig-table__vide')!.textContent).toBe('Aucun depot ne repond a ces criteres.')
   })
 
-  it('un clic sur un depot montre son historique, borne par le nombre de lignes', () => {
-    const { container } = render(<EcranCoffreFort />)
+  it('un clic sur un depot montre son historique, borne par le nombre de lignes', async () => {
+    const { container } = await ouvrir()
     fireEvent.click(puce(/^Deja transmis/))
     fireEvent.click(container.querySelectorAll('tbody tr')[0]!)
     expect(screen.getByText('Historique de CF-2026-0412 (20 ligne(s) au plus)')).toBeTruthy()
@@ -58,8 +70,8 @@ describe('EcranCoffreFort', () => {
     expect(container.querySelectorAll('.rig-historique__liste li')).toHaveLength(2)
   })
 
-  it('le chevron deplie les dates de suivi sans choisir le depot ; « Voir l\'historique » le choisit', () => {
-    const { container } = render(<EcranCoffreFort />)
+  it('le chevron deplie les dates de suivi sans choisir le depot ; « Voir l\'historique » le choisit', async () => {
+    const { container } = await ouvrir()
     fireEvent.click(puce(/^Deja transmis/))
     fireEvent.click(screen.getAllByRole('button', { name: 'Deplier la ligne' })[0]!)
     expect(screen.queryByText(/^Historique de/)).toBeNull()
@@ -70,8 +82,8 @@ describe('EcranCoffreFort', () => {
     expect(screen.getByText('Historique de CF-2026-0412 (20 ligne(s) au plus)')).toBeTruthy()
   })
 
-  it('« Aller a un depot… » EST le critere « Code ou destinataire » : un seul champ, les puces le comptent ; Entree choisit le depot reste seul', () => {
-    const { container } = render(<EcranCoffreFort />)
+  it('« Aller a un depot… » EST le critere « Code ou destinataire » : un seul champ, les puces le comptent ; Entree choisit le depot reste seul', async () => {
+    const { container } = await ouvrir()
     // Un seul champ pour un seul filtre : plus de champ « Code ou destinataire » a gauche.
     expect(screen.queryByLabelText('Code ou destinataire')).toBeNull()
     const champ = screen.getByLabelText('Aller a un depot…')
@@ -85,5 +97,35 @@ describe('EcranCoffreFort', () => {
     // Le code du depot, comme le critere d'avant.
     fireEvent.change(champ, { target: { value: 'cf-2026-0603' } })
     expect(codes(container)).toEqual(['CF-2026-0603'])
+  })
+})
+
+// Branche sur la base (plan « RIG v3 100 % fonctionnel », lot 20) : l'historique des depots de RIG v2 ; « A transmettre » vide
+// et dit pourquoi ; aucun exemple ; en panne, le motif et aucun depot.
+describe('EcranCoffreFort branche sur la base', () => {
+  const lu = {
+    code: '2160001', abrege: '2004J00007', destinataire: 'MANDATAIRE BANC', coffre: '', typeDecision: 'ACAD', etat: '3 - Déposé', statut: 'ok',
+    envoiInfogreffe: null, arInfogreffe: '2004-06-02', arDestinataire: '2004-06-03', lectureDestinataire: null, traitementRig: '2004-06-01',
+    avisDepotCoffre: '2004-06-02', codeDepot: 'DEP-1', erreur: '', historique: [], nomDocument: 'decision.pdf', aTransmettre: false,
+  }
+
+  it('s ouvre sur l historique de la base ; « A transmettre » le dit vide ; le nom du document se deplie', async () => {
+    installerFauxPont({ 'EcranCoffreFort.Depots': () => ({ mode: 'serveur', message: null, depots: [lu], total: 1 }) })
+    const r = render(<EcranCoffreFort />)
+    await screen.findByText('MANDATAIRE BANC')
+    expect(screen.getByRole('button', { name: /^Deja transmis/ }).getAttribute('aria-pressed')).toBe('true')
+    expect(r.container.querySelector('.rig-tcw__exemple')).toBeNull()
+    expect(screen.queryByText('Me LEROY')).toBeNull()
+    fireEvent.click(r.container.querySelector('tbody .rig-lm-chevron')!)
+    expect(r.container.querySelector('.rig-lm-detail')!.textContent).toContain('decision.pdf')
+    fireEvent.click(screen.getByRole('button', { name: /^A transmettre/ }))
+    expect(screen.getByText(ATransmettreNonLu)).toBeTruthy()
+  })
+
+  it('en panne : le motif, aucun depot d exemple', async () => {
+    installerFauxPont({ 'EcranCoffreFort.Depots': () => ({ mode: 'erreur', message: 'La base du greffe 3801 ne répond pas.', depots: [], total: 0 }) })
+    render(<EcranCoffreFort />)
+    await screen.findByText(/La base du greffe 3801 ne répond pas/)
+    expect(screen.queryByText('Me LEROY')).toBeNull()
   })
 })

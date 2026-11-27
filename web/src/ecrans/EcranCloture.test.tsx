@@ -10,9 +10,15 @@ afterEach(() => { cleanup(); retirerFauxPont(); oublierVuesDeSession() })
 
 // Valeurs attendues : celles de l'ecran Blazor (EcranCloture.razor), JeuDemo.Aujourdhui = 09/09/2026 :
 // seule la limite d'examen du 05/09/2026 (SAS TRANSPORTS MARNE) est depassee.
-function ouvrir(ouvrirDossier = vi.fn()) {
-  const pont = installerFauxPont({ 'EcranCloture.DateDuJour': () => '2026-09-09' })
-  return { pont, ouvrirDossier, ...render(<EcranCloture ouvrirDossier={ouvrirDossier} />) }
+// Sans serveur, le pont rend le mode « demo » et la date du jeu : l'ecran montre ses affaires d'exemple (Pont/EcranClotureBase.cs).
+const Demonstration = { mode: 'demo', message: null, lignes: [], total: 0, aujourdhui: '2026-09-09' }
+/** Attend que le pont ait repondu : la synthese compte alors les cinq affaires d'exemple. */
+const pret = (c: HTMLElement) => vi.waitFor(() => expect(c.querySelector('.rig-lm-synthese')!.textContent).toContain('sur 5'))
+async function ouvrir(ouvrirDossier = vi.fn()) {
+  const pont = installerFauxPont({ 'EcranCloture.Affaires': () => Demonstration })
+  const r = render(<EcranCloture ouvrirDossier={ouvrirDossier} />)
+  await pret(r.container)
+  return { pont, ouvrirDossier, ...r }
 }
 const lignes = (c: HTMLElement) =>
   [...c.querySelectorAll('tbody tr:not(.rig-lm-detail)')].map((tr) => [...tr.querySelectorAll('td')].map((td) => td.textContent))
@@ -26,14 +32,14 @@ const numerosPc = (c: HTMLElement) =>
 
 describe('EcranCloture', () => {
   it('affiche les cinq affaires de « Selection PC » et marque la limite depassee', async () => {
-    const { container, pont } = ouvrir()
+    const { container, pont } = await ouvrir()
     expect(resultat(container)).toBe('5 affaires sur 5 · 3 a facturer · forfaits 2\u00a0350,00 €')
     // Les colonnes principales ; les secondaires de v2 sont dans la ligne depliee (test suivant).
     expect(entetes(container)).toEqual(['', 'Nom de l\'Affaire', 'Date d\'audience', 'Type de classement', 'Limite Examen', 'A facturer', 'Forfait', ''])
     expect(lignes(container)[0]!.slice(1, 7)).toEqual([
       'BDSARL BOULANGERIE DUVALPC-2024-0118 · 1re', '15/09/2026 09:00', 'Insuffisance d\'actif', '12/09/2026', 'oui', '450,00 €'])
     await vi.waitFor(() => expect(alertes(container)).toHaveLength(1))
-    expect(pont.appels).toHaveBeenCalledWith('EcranCloture.DateDuJour')
+    expect(pont.appels).toHaveBeenCalledWith('EcranCloture.Affaires', '', '')
     expect(alertes(container)[0]!.textContent).toContain('SAS TRANSPORTS MARNE')
     // La limite depassee est un point rouge, les autres un point vert.
     expect(alertes(container)[0]!.querySelector('.rig-lm-etat')!.className).toBe('rig-lm-etat rig-lm-t-rouge')
@@ -42,8 +48,8 @@ describe('EcranCloture', () => {
     expect(container.querySelector('.rig-lm-pied')!.textContent).toContain('5 affaires affichees')
   })
 
-  it('le chevron deplie les colonnes secondaires de v2 sans ouvrir le dossier ; « Ouvrir le dossier » l\'ouvre', () => {
-    const { container, ouvrirDossier } = ouvrir()
+  it('le chevron deplie les colonnes secondaires de v2 sans ouvrir le dossier ; « Ouvrir le dossier » l\'ouvre', async () => {
+    const { container, ouvrirDossier } = await ouvrir()
     fireEvent.click(screen.getAllByRole('button', { name: 'Deplier la ligne' })[0]!)
     expect(ouvrirDossier).not.toHaveBeenCalled()
     expect([...container.querySelectorAll('.rig-lm-champ')].map((c) => c.textContent)).toEqual([
@@ -53,14 +59,14 @@ describe('EcranCloture', () => {
     expect(ouvrirDossier).toHaveBeenCalledWith('2024B00318')
   })
 
-  it('un clic sur une ligne remonte le dossier a Blazor', () => {
-    const { container, ouvrirDossier } = ouvrir()
+  it('un clic sur une ligne remonte le dossier a Blazor', async () => {
+    const { container, ouvrirDossier } = await ouvrir()
     fireEvent.click(container.querySelectorAll('tbody tr')[0]!)
     expect(ouvrirDossier).toHaveBeenCalledWith('2024B00318')
   })
 
   it('les criteres filtrent ; l\'onglet « Enrolement / requete » a ses propres colonnes', async () => {
-    const { container } = ouvrir()
+    const { container } = await ouvrir()
     await vi.waitFor(() => expect(alertes(container)).toHaveLength(1))
     fireEvent.click(screen.getByRole('button', { name: 'Limite d\'examen depassee' }))
     expect(numerosPc(container)).toEqual(['PC-2024-0207'])
@@ -80,7 +86,7 @@ describe('EcranCloture', () => {
   })
 
   it('les cartes chiffrent les forfaits et POSENT les criteres existants (classement, a facturer, limite depassee)', async () => {
-    const { container } = ouvrir()
+    const { container } = await ouvrir()
     await vi.waitFor(() => expect(alertes(container)).toHaveLength(1))
     const valeurs = () => [...container.querySelectorAll('.rig-lm-carte__valeur')].map((v) => v.textContent)
     expect(valeurs()).toEqual(['2\u00a0350,00 €', '3 sur 5', '1 sur 5'])
@@ -102,7 +108,7 @@ describe('EcranCloture', () => {
   })
 
   it('les vues POSENT leurs criteres et sont comptees ; « + Nouvelle vue » garde les criteres pour la session', async () => {
-    const premier = ouvrir()
+    const premier = await ouvrir()
     await vi.waitFor(() => expect(alertes(premier.container)).toHaveLength(1))
     const vue = (nom: RegExp) => screen.getByRole('button', { name: nom })
     expect([...premier.container.querySelectorAll('.rig-lm-vue')].map((v) => v.textContent)).toEqual([
@@ -119,14 +125,14 @@ describe('EcranCloture', () => {
     premier.unmount()
     retirerFauxPont()
 
-    const second = ouvrir()
+    const second = await ouvrir()
     fireEvent.click(vue(/^2e a facturer/))
     expect((screen.getByLabelText('Chambre') as HTMLSelectElement).value).toBe('2e')
     expect(numerosPc(second.container)).toEqual(['PC-2022-0876'])
   })
 
-  it('« Aller a une affaire… » EST le critere « Affaire » (nom ou n de role) : un seul champ, il compte et pose les vues ; Entree ouvre le dossier reste seul', () => {
-    const { container, ouvrirDossier } = ouvrir()
+  it('« Aller a une affaire… » EST le critere « Affaire » (nom ou n de role) : un seul champ, il compte et pose les vues ; Entree ouvre le dossier reste seul', async () => {
+    const { container, ouvrirDossier } = await ouvrir()
     // Un seul champ pour un seul filtre : plus de champ « Affaire » a gauche.
     expect(screen.queryByLabelText('Affaire')).toBeNull()
     const champ = screen.getByLabelText('Aller a une affaire…') as HTMLInputElement
@@ -154,26 +160,75 @@ describe('EcranCloture', () => {
 // Ouvert depuis la page d'une affaire : cherchee par son NOM dans « Affaire »
 // (nom ou n de role ; plan « Vue du dossier », lot 2).
 describe('EcranCloture ouvert depuis une affaire', () => {
-  const rendre = (dossier: ReturnType<typeof contexteDossier> | null) => {
-    installerFauxPont({ 'EcranCloture.DateDuJour': () => '2026-09-09' })
-    return render(<EcranCloture ouvrirDossier={vi.fn()} dossier={dossier} />)
+  const rendre = async (dossier: ReturnType<typeof contexteDossier> | null) => {
+    installerFauxPont({ 'EcranCloture.Affaires': () => Demonstration })
+    const r = render(<EcranCloture ouvrirDossier={vi.fn()} dossier={dossier} />)
+    await pret(r.container)
+    return r
   }
 
-  it('ne montre qu\'elle, le critere deja rempli', () => {
-    const { container } = rendre(contexteDossier({ numero: '2025B00044', nom: 'SCI DU MOULIN' }))
+  it('ne montre qu\'elle, le critere deja rempli', async () => {
+    const { container } = await rendre(contexteDossier({ numero: '2025B00044', nom: 'SCI DU MOULIN' }))
     expect(resultat(container)).toBe('1 affaire sur 5 · 0 a facturer · forfaits 380,00 €')
     expect(lignes(container)[0]![1]).toBe('MSCI DU MOULINPC-2025-0044 · 3e')
     expect((screen.getByLabelText('Aller a une affaire…') as HTMLInputElement).value).toBe('SCI DU MOULIN')
   })
 
-  it('une affaire sans procedure le dit ; sans affaire, les cinq', () => {
-    const avec = rendre(contexteDossier())
+  it('une affaire sans procedure le dit ; sans affaire, les cinq', async () => {
+    const avec = await rendre(contexteDossier())
     expect(screen.getByText('Aucune affaire ne repond a ces criteres.')).toBeTruthy()
     avec.unmount()
     retirerFauxPont()
 
-    const sans = rendre(null)
+    const sans = await rendre(null)
     expect(resultat(sans.container)).toBe('5 affaires sur 5 · 3 a facturer · forfaits 2\u00a0350,00 €')
     expect((screen.getByLabelText('Aller a une affaire…') as HTMLInputElement).value).toBe('')
+  })
+})
+
+// Branche sur la base (plan « RIG v3 100 % fonctionnel », lot 20) : les procedures de la base, aucune d'exemple ; Du / Au
+// partent au pont (la limite d'examen de RIG v2) ; « Forfait » est la case de RIG v2 ; en panne, le motif et aucune ligne.
+describe('EcranCloture branche sur la base', () => {
+  const base = {
+    role: 'P2700701', affaire: 'GAMMA BASE', demandeur: '', defendeur: 'GAMMA BASE', chambre: '', audience: '', heureAppel: '', classement: '',
+    limiteExamen: '2026-11-20', aFacturer: false, dernierCourrier: '', dossier: '2019B27001', numPc: 'P2700701', heureDebut: '', dirigeants: '',
+    liquidateurs: 'Me Liquidateur', forfait: '', huissier: '', codePostalVille: '', acteSaisine: '', depot: '', facturation: '', auForfait: true,
+  }
+
+  it('montre les procedures lues, la case « au forfait », et relit la base quand les dates changent', async () => {
+    const pont = installerFauxPont({
+      'EcranCloture.Affaires': () => ({ mode: 'serveur', message: null, lignes: [base], total: 1, aujourdhui: '2026-11-27' }),
+    })
+    const { container } = render(<EcranCloture ouvrirDossier={vi.fn()} />)
+    await vi.waitFor(() => expect(container.querySelector('.rig-lm-synthese')!.textContent).toContain('1 affaire sur 1'))
+    expect(screen.queryByText('SARL BOULANGERIE DUVAL')).toBeNull()
+    expect(screen.getByText("Limite d'examen")).toBeTruthy()
+    const ligne = container.querySelector('tbody tr')!
+    expect(ligne.textContent).toContain('GAMMA BASE')
+    expect(ligne.textContent).toContain('au forfait')
+    // La limite du 20/11 est depassee au 27/11.
+    expect(ligne.className).toContain('rig-table__ligne--alerte')
+    expect(container.querySelector('.rig-tcw__exemple')).toBeNull()
+    fireEvent.change(container.querySelectorAll('input[type="date"]')[1]!, { target: { value: '2026-12-31' } })
+    await vi.waitFor(() => expect(pont.appels).toHaveBeenCalledWith('EcranCloture.Affaires', '', '2026-12-31'))
+    // La date filtre au serveur : la ligne lue n'est pas retiree sur sa date d'audience (vide en base).
+    expect(container.querySelector('tbody tr')!.textContent).toContain('GAMMA BASE')
+  })
+
+  it('en panne : le motif, aucune ligne d exemple', async () => {
+    installerFauxPont({
+      'EcranCloture.Affaires': () => ({ mode: 'erreur', message: 'La base du greffe 3801 ne répond pas.', lignes: [], total: 0, aujourdhui: '2026-11-27' }),
+    })
+    render(<EcranCloture ouvrirDossier={vi.fn()} />)
+    await screen.findByText(/La base du greffe 3801 ne répond pas/)
+    expect(screen.queryByText('SARL BOULANGERIE DUVAL')).toBeNull()
+    expect(screen.getByText('Aucune affaire ne repond a ces criteres.')).toBeTruthy()
+  })
+
+  it('sans serveur : les affaires d exemple sont marquees « exemple »', async () => {
+    installerFauxPont({ 'EcranCloture.Affaires': () => ({ mode: 'demo', message: null, lignes: [], total: 0, aujourdhui: '2026-09-09' }) })
+    const { container } = render(<EcranCloture ouvrirDossier={vi.fn()} />)
+    await screen.findByText('SARL BOULANGERIE DUVAL')
+    expect(container.querySelector('.rig-tcw__exemple')!.textContent).toBe('exemple')
   })
 })

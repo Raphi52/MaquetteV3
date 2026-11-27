@@ -17,6 +17,8 @@
 
   <ItemGroup>
     <Compile Include="Program.cs" />
+    <!-- Le banc du lot 20 (plan « RIG v3 100 % fonctionnel ») : un fichier a lui, appele a la fin de Program.cs. -->
+    <Compile Include="Lot20.cs" />
     <ProjectReference Include="../../RigV3Desktop.csproj" />
     <ProjectReference Include="../../Serveur/RigV3.Serveur.csproj" />
     <ProjectReference Include="../../Base/RigV3.Migrations.csproj" />

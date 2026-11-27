@@ -29,12 +29,20 @@ namespace RigV3.Serveur.Socle.EcransMain;
 /// NON REPRIS : la seconde requete des annonces d'evenements SUPPRIMES (GetBodacSentAndDelete, OPE_RECH_BOD.cs:259-298) ; les
 /// criteres de l'ecran (type, dates, bordereau, facture, numero) filtrent les annonces lues, sur place, comme avant.
 /// </summary>
+// fix-ok: pas un correctif -- le lot 20 du plan-676a4b19 AJOUTE la recherche de la palette (ChercherAsync) en trois pas :
+//   requete coupee en morceaux (Annonces + Periode + Ordre, meme texte qu'avant), recherche, lecture des lignes partagee ;
+//   la lecture de l'ecran est inchangee, prouvee par la section 1c d'EcransMainBaseCheck.
 public static class LectureBodacc
 {
     /// <summary>Le debut de la periode de recherche de RIG v2 (OPE_RECH_BOD.cs:63).</summary>
     internal static readonly LectureReglage DateDebut = new("BODACC_JUD_DATE", "", "OPE_RECH_BOD.cs:63-65");
 
-    private const string Requete = """
+    /// <summary>
+    /// Les annonces de LigneBodaccJud.SQLToSendOrAlreadySent (:298-327) : sans les supprimees, le premier etablissement d'une
+    /// PC ou d'une prevention numerotee. Suivent la periode (<see cref="Periode"/>) ou les mots cherches
+    /// (<see cref="ChercherAsync"/>), puis l'ordre de RIG v2 (<see cref="Ordre"/>).
+    /// </summary>
+    private const string Annonces = """
         SELECT TOP (@plafond)
                b.BDCCR_NUMERO_ANNONCE, COALESCE(pc.PRCLL_NUM_PC, pv.PREVE_NUM_PRV) AS NumPc, b.BDCCR_TYPE_ANNONCE,
                ev.EVNPR_CODE_EVE_PRO, ev.EVNPR_DATE, b.BDCCR_DATE_ENVOI, b.BDCCR_NUM_BORDEREAU, b.BDCCR_NUM_PARUTION,
@@ -52,9 +60,33 @@ public static class LectureBodacc
         WHERE b.BDCCR_ETAT_BODACC <> '9'
           AND ((ISNULL(epc.ETBPC_NUM_ORDRE, 1) = 1 AND pc.PRCLL_NUM_PC IS NOT NULL)
                OR (ISNULL(eprv.ETBPC_NUM_ORDRE, 1) = 1 AND pv.PREVE_NUM_PRV IS NOT NULL))
-          AND b.BDCCR_DATE_ENVOI >= @du AND b.BDCCR_DATE_ENVOI < @lendemainAu
-        ORDER BY b.BDCCR_DATE_ENVOI, ev.EVNPR_CODE_EVE_PRO, ev.EVNPR_DATE
+
         """;
+
+    /// <summary>La periode de recherche de l'ecran BODACC, sur la date d'envoi (OPE_RECH_BOD.cs:229-230).</summary>
+    private const string Periode = """
+          AND b.BDCCR_DATE_ENVOI >= @du AND b.BDCCR_DATE_ENVOI < @lendemainAu
+
+        """;
+
+    /// <summary>L'ordre de RIG v2 : date d'envoi, code de l'evenement, date de l'evenement (LigneBodaccJud.cs:323-327).</summary>
+    private const string Ordre = "ORDER BY b.BDCCR_DATE_ENVOI, ev.EVNPR_CODE_EVE_PRO, ev.EVNPR_DATE";
+
+    private const string Requete = Annonces + Periode + Ordre;
+
+    /// <summary>
+    /// Ce dans quoi chaque mot cherche doit se trouver : les champs que compare la palette (annonceRepond,
+    /// web/src/composants/Palette.tsx) -- numero d'annonce, type (au mot de <see cref="TypeAnnonce"/>), texte, dossier, numero
+    /// de PC ou de prevention --, sans casse ni accents (COLLATE ..._CI_AI), comme son pliage.
+    /// </summary>
+    private const string ChampsCherches = """
+        CONCAT(b.BDCCR_NUMERO_ANNONCE, ' ',
+               CASE b.BDCCR_TYPE_ANNONCE WHEN 'C' THEN 'Création' WHEN 'M' THEN 'Rectification' ELSE 'Annulation' END, ' ',
+               b.BDCCR_TEXTE_BODACC, ' ', ds.NumeroGestion, ' ', COALESCE(pc.PRCLL_NUM_PC, pv.PREVE_NUM_PRV)) COLLATE Latin1_General_CI_AI
+        """;
+
+    /// <summary>Au plus autant de mots cherches ; les suivants n'affinent plus.</summary>
+    internal const int MotsMax = 6;
 
     /// <summary>Les annonces de la periode de RIG v2, au jour <paramref name="aujourdhui"/>.</summary>
     public static async Task<AnnoncesBodaccLues> LireAsync(SqlConnection baseGreffe, DateTime aujourdhui, CancellationToken ct)
@@ -62,12 +94,45 @@ public static class LectureBodacc
         var au = aujourdhui.Date;
         var du = DateTime.TryParse(await DateDebut.LireTexteAsync(baseGreffe, ct), CultureInfo.GetCultureInfo("fr-FR"), DateTimeStyles.None, out var reglage)
             ? reglage.Date : new DateTime(au.Year, 1, 1);
+        var (lignes, total) = await LireLignesAsync(baseGreffe, Requete, ct,
+            new SqlParameter("@plafond", SqlDbType.Int) { Value = RoutesEcransMain.Plafond },
+            new SqlParameter("@du", SqlDbType.DateTime) { Value = du },
+            new SqlParameter("@lendemainAu", SqlDbType.DateTime) { Value = au.AddDays(1) });
+        return new AnnoncesBodaccLues(lignes, total, du, au);
+    }
+
+    /// <summary>
+    /// La recherche de la palette Ctrl K et de la page Recherche (plan « RIG v3 100 % fonctionnel », lot 20) : les annonces
+    /// de l'ecran, SANS sa periode -- RIG v2 ne pose la periode que si une date est saisie (« if (DateDu != null) »,
+    /// OPE_RECH_BOD.cs:231-235) --, dont chaque mot tape se retrouve dans <see cref="ChampsCherches"/>. Moins de trois
+    /// caracteres (espaces exclus) : rien, comme la palette (annonceRepond). Au plus <paramref name="plafond"/>, dans l'ordre
+    /// de RIG v2, et le total en base.
+    /// </summary>
+    public static async Task<AnnoncesBodaccTrouvees> ChercherAsync(SqlConnection baseGreffe, string? texte, CancellationToken ct,
+                                                                  int plafond = RoutesBodaccRecherche.Plafond)
+    {
+        // Les mots de la palette (motsDe) : deux caracteres au moins ; trois caracteres en tout, espaces exclus.
+        var tous = (texte ?? "").Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries);
+        var mots = tous.Where(m => m.Length >= 2).Take(MotsMax).ToArray();
+        if (string.Concat(tous).Length < 3 || mots.Length == 0) return new AnnoncesBodaccTrouvees([], 0);
+        var filtre = string.Concat(mots.Select((_, i) => $"  AND {ChampsCherches} LIKE @mot{i} ESCAPE '\\'\n"));
+        var parametres = new List<SqlParameter> { new("@plafond", SqlDbType.Int) { Value = plafond } };
+        parametres.AddRange(mots.Select((m, i) => new SqlParameter($"@mot{i}", SqlDbType.NVarChar, 200) { Value = "%" + Echapper(m) + "%" }));
+        var (lignes, total) = await LireLignesAsync(baseGreffe, Annonces + filtre + Ordre, ct, [.. parametres]);
+        return new AnnoncesBodaccTrouvees(lignes, total);
+    }
+
+    /// <summary>Un mot tape, pris a la lettre dans un LIKE : %, _, [ et \ ne sont pas des jokers.</summary>
+    private static string Echapper(string mot)
+        => mot.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_").Replace("[", "\\[");
+
+    /// <summary>Les annonces que rend <paramref name="requete"/>, aux colonnes de <see cref="Annonces"/>, et leur total.</summary>
+    private static async Task<(AnnonceBodaccLue[] Lignes, int Total)> LireLignesAsync(SqlConnection baseGreffe, string requete,
+                                                                                      CancellationToken ct, params SqlParameter[] parametres)
+    {
         var lignes = new List<AnnonceBodaccLue>();
         var total = 0;
-        await using (var lu = await LectureV2.LireAsync(baseGreffe, Requete, ct,
-                         new SqlParameter("@plafond", SqlDbType.Int) { Value = RoutesEcransMain.Plafond },
-                         new SqlParameter("@du", SqlDbType.DateTime) { Value = du },
-                         new SqlParameter("@lendemainAu", SqlDbType.DateTime) { Value = au.AddDays(1) }))
+        await using (var lu = await LectureV2.LireAsync(baseGreffe, requete, ct, parametres))
         {
             while (await lu.ReadAsync(ct))
             {
@@ -82,7 +147,7 @@ public static class LectureBodacc
                     Chaine(lu, "BDCCR_TEXTE_BODACC"), Chaine(lu, "NumeroGestion"), lu["Transmission"] as DateTime?));
             }
         }
-        return new AnnoncesBodaccLues([.. lignes], total, du, au);
+        return ([.. lignes], total);
     }
 
     /// <summary>Le type d'annonce comme RIG v2 l'ecrit (TypeAnnonce, ILigneGenXML_IPubliciteJudiciaire.cs:73-83).</summary>

@@ -37,7 +37,10 @@
 //                              edition repliee et decisions en pied.
 // Les libelles sont ceux de Libelles.resx ; les regles sont dans
 // Metier/TraitementCommandes.cs, controlees par tests/CommandesWebCheck.
-// Aucune base n'est branchee : un jeu neuf a chaque ouverture.
+// Sans serveur, aucune base n'est branchee : un jeu neuf a chaque ouverture, marque « exemple ».
+// BRANCHE SUR LA BASE (plan « RIG v3 100 % fonctionnel », lot 20, 27/11/2026) : les commandes viennent de v2.COMMANDE_WEB
+// (Pont/EcranCommandesWebBase.cs, Serveur/Socle/EcransMain/LectureCommandesWeb.cs) ; les gestes qui ecrivent (decider,
+// saisir au guichet, corriger l'adresse) refusent et disent pourquoi ; en panne, le motif et aucune commande.
 //
 // Porte depuis Components/Ecrans/EcranCommandesWeb.razor (lot 2, 18/11/2026) :
 // meme balisage, memes classes CSS. ECRAN A SESSION (src/session.tsx) : l'etat
@@ -49,6 +52,7 @@ import { PoigneeColonne } from '../composants/PoigneeColonne'
 import { appeler } from '../pont'
 import { EcranVisible } from '../plan/visibilite'
 import { Saisie, useSession, type Geste, type PontDeSession } from '../session'
+import { ProvenanceEcran, type ModeLecture } from '../provenance'
 import type { ContexteDossierVue } from '../plan/types'
 import { toucheDeRecherche } from '../plan/clavier'
 
@@ -204,6 +208,10 @@ export interface VueCommandesWeb {
   lignes: LigneCw[]
   panneau: PanneauCw | null
   coordonnees: CoordonneesCw | null
+  /** D'ou viennent les commandes (Pont/LectureEcranMain.cs) ; absent d'un pont d'avant le lot 20. */
+  mode?: ModeLecture
+  /** Le motif d'une panne (mode autre que « serveur » et « demo »). */
+  provenance?: string | null
 }
 
 const pont: PontDeSession<VueCommandesWeb> = {
@@ -1037,6 +1045,9 @@ export function EcranCommandesWeb({ dossier = null }: ProprietesEcranCommandesWe
           </div>
         </section>
       )}
+
+      {/* D'ou viennent les commandes (lot 20) : sous la recherche, la pilule reste en haut. */}
+      <ProvenanceEcran mode={vue.mode} message={vue.provenance} quoi="Commandes" />
 
       {/* Une tuile chiffree par etat : elle FILTRE la liste ; la tuile active porte l'anneau d'or. */}
       <div className="rig-tcw__tuiles" aria-label="Commandes par statut">

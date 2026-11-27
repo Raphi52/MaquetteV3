@@ -1569,6 +1569,9 @@ Exiger((await EcranComptabilisation.JourneesAsync(client, GreffeAbsent)) is { Mo
     "pont Comptabilisation, greffe absent : le motif, AUCUNE journee");
 await Sql("UPDATE v2.FACTURE SET FACTU_DATE_COMPTABILISATION = NULL WHERE FACTU_DATE_COMPTABILISATION = '19000101';");
 
+// ============================================================ 20. LOT 20 : recherche BODACC, Cloture, Archivage, Coffre-fort, Commandes web, Mon accueil (Lot20.cs)
+await new BancLot20((sql, p) => Sql(sql, p), Exiger, greffe.Connexion, client, http, json, Greffe, GreffeAbsent, jour).JouerAsync();
+
 Console.WriteLine();
 if (echecs.Count == 0) { Console.WriteLine("Ecrans faits main branches sur la base : VERT."); return 0; }
 Console.WriteLine(echecs.Count + " echec(s) : " + string.Join(" | ", echecs));

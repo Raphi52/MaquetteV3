@@ -9,7 +9,37 @@
 // balisage, memes classes CSS. L'ecran ne lisait rien dans Metier/ : ses
 // reglages et ses imprimantes de demonstration l'ont suivi ici.
 
-import { useState } from 'react'
+//
+// BRANCHE SUR LA BASE (plan « RIG v3 100 % fonctionnel », lot 20, 27/11/2026) : les reglages viennent du pont
+// (Pont/EcranParametresAccueilBase.cs). En base, ce sont ceux que L'AGENT a enregistres dans RIG v2 (PARAMETRE_UTILISATEUR,
+// cles ConsoleAccueil_* : Serveur/Socle/EcransMain/LectureParametresAccueil.cs), avec les gardes de profil de RIG v2
+// (animations : administrateur ; molette et date libre : Amitel, FORM_SKIN_ACCUEIL_PARAM.cs:552-575). Ils ne sont PAS
+// enregistres, et l'ecran le dit (SansEnregistrement) : ce sont des reglages du poste WinForms de RIG v2, que la V3
+// n'applique pas. Non lus : « plein ecran » (hors PARAMETRE_UTILISATEUR), les imprimantes PaperCut (service externe), la
+// colonne et le sens du tri (des index de RIG v2). Sans serveur, les reglages d'exemple ci-dessous, marques.
+
+import { useEffect, useState } from 'react'
+import { appeler } from '../pont'
+import { ProvenanceEcran, type ModeLecture } from '../provenance'
+
+/** Ce que rend le pont (Pont/EcranParametresAccueilBase.cs, VueParametresAccueil). */
+export interface VueParametresAccueil {
+  mode: ModeLecture
+  message: string | null
+  /** Les reglages RIG v2 de l'agent, par cle ConsoleAccueil_* : seulement ceux qu'il a enregistres. */
+  valeurs: Record<string, string>
+  estAdministrateur: boolean
+  estAmitel: boolean
+  /** Faux : l'agent n'a pas de compte RIG v2, rien a relire. */
+  agentV2: boolean
+}
+
+/** Pourquoi un reglage change a l'ecran n'est pas enregistre, branche a la base. */
+export const SansEnregistrement = "Non enregistré : RIG v2 range ces réglages de son poste dans PARAMETRE_UTILISATEUR à la " +
+  "fermeture de l'onglet (FORM_SKIN_ACCUEIL_PARAM.cs:97-103, :620-648) ; la V3 ne les applique pas et ne les écrit pas."
+
+/** Une case de RIG v2 (« True » / « False ») ; null quand l'agent ne l'a jamais enregistree. */
+const caseV2 = (v: string | undefined): boolean | null => (v === undefined ? null : v.toLowerCase() === 'true')
 
 interface Imprimante {
   nom: string
@@ -40,6 +70,34 @@ export function EcranParametresAccueil() {
   const [colonneTri, setColonneTri] = useState('Date de creation')
   const [sensTri, setSensTri] = useState('Descendant')
 
+  // La vue du pont : null tant qu'il n'a pas repondu. En base, les reglages lus remplacent ceux de l'exemple.
+  const [vue, setVue] = useState<VueParametresAccueil | null>(null)
+  useEffect(() => {
+    let perime = false
+    void appeler<VueParametresAccueil>('EcranParametresAccueil.Reglages').then((v) => {
+      if (perime) return
+      setVue(v)
+      if (v.mode !== 'serveur') return
+      const lu = v.valeurs
+      const poser = (cle: string, fixer: (b: boolean) => void) => { const b = caseV2(lu[cle]); if (b !== null) fixer(b) }
+      poser('ConsoleAccueil_AllowAnimations', setAnimations)
+      poser('ConsoleAccueil_AutofocusOnClickIconEtpOpe', setAutofocusBouton)
+      poser('ConsoleAccueil_Colorier1LigneSur2', setUneLigneSurDeux)
+      poser('ConsoleAccueil_DateSaisieLibreCpp', setDateSaisieLibre)
+      poser('ConsoleAccueil_InterdireMoletteComboCpp', setMoletteInterdite)
+      // L'intervalle de RIG v2 est en millisecondes (5000 = 5 s) ; l'ecran le montre en secondes.
+      const ms = Number(lu.ConsoleAccueil_IntervalSlideshowAlertes)
+      if (lu.ConsoleAccueil_IntervalSlideshowAlertes !== undefined && Number.isFinite(ms)) setIntervalAlertes(String(ms / 1000))
+      if (lu.ConsoleAccueil_Form_MaxWidth !== undefined) setLargeurMax(lu.ConsoleAccueil_Form_MaxWidth)
+      if (lu.ConsoleAccueil_Form_MaxHeight !== undefined) setHauteurMax(lu.ConsoleAccueil_Form_MaxHeight)
+    })
+    return () => { perime = true }
+  }, [])
+  const enBase = vue?.mode === 'serveur'
+  // Les gardes de profil de RIG v2 : sans serveur, tout est montre (l'exemple).
+  const voitAnimations = !enBase || vue.estAdministrateur
+  const voitAmitel = !enBase || vue.estAmitel
+
   function basculerImprimante(n: number) {
     setImprimantes((avant) => avant.map((imp, i) => (i === n ? { ...imp, cochee: !imp.cochee } : imp)))
   }
@@ -48,12 +106,22 @@ export function EcranParametresAccueil() {
     <div className="rig-proc__corps">
 
       <aside className="rig-criteres">
+        <ProvenanceEcran mode={vue?.mode} message={vue?.message} quoi="Reglages" />
+        {enBase && (
+          <p className="rig-eg-note" role="note">
+            {vue.agentV2 ? `Vos réglages RIG v2 (${Object.keys(vue.valeurs).length} enregistré(s) ; les autres gardent la valeur de l'écran). `
+              : "Vous n'avez pas de compte RIG v2 : aucun réglage à relire. "}
+            {SansEnregistrement}
+          </p>
+        )}
         <div className="rig-kicker" style={{ marginBottom: 'var(--rig-esp-3)' }}>General</div>
 
-        <button className={`rig-bascule${animations ? ' rig-bascule--actif' : ''}`}
-                onClick={() => setAnimations(!animations)}>
-          <span className="rig-bascule__temoin"></span><span>Animations</span>
-        </button>
+        {voitAnimations && (
+          <button className={`rig-bascule${animations ? ' rig-bascule--actif' : ''}`}
+                  onClick={() => setAnimations(!animations)}>
+            <span className="rig-bascule__temoin"></span><span>Animations</span>
+          </button>
+        )}
         <button className={`rig-bascule${pleinEcran ? ' rig-bascule--actif' : ''}`}
                 onClick={() => setPleinEcran(!pleinEcran)}>
           <span className="rig-bascule__temoin"></span><span>Ouvrir en plein ecran</span>
@@ -92,7 +160,7 @@ export function EcranParametresAccueil() {
       <section className="rig-resultats-proc">
         <div className="rig-resultats-proc__entete">
           <div className="rig-kicker">Grilles et tableaux</div>
-          <span className="rig-resultats-proc__compte">{imprimantes.filter((i) => i.cochee).length} imprimante(s) cochee(s)</span>
+          <span className="rig-resultats-proc__compte">{enBase ? 'Imprimantes non lues' : `${imprimantes.filter((i) => i.cochee).length} imprimante(s) cochee(s)`}</span>
         </div>
 
         <div className="rig-criteres__bloc" style={{ padding: 'var(--rig-esp-3)' }}>
@@ -100,14 +168,18 @@ export function EcranParametresAccueil() {
                   onClick={() => setUneLigneSurDeux(!uneLigneSurDeux)}>
             <span className="rig-bascule__temoin"></span><span>Colorier une ligne sur deux</span>
           </button>
-          <button className={`rig-bascule${dateSaisieLibre ? ' rig-bascule--actif' : ''}`}
-                  onClick={() => setDateSaisieLibre(!dateSaisieLibre)}>
-            <span className="rig-bascule__temoin"></span><span>Date en saisie libre</span>
-          </button>
-          <button className={`rig-bascule${moletteInterdite ? ' rig-bascule--actif' : ''}`}
-                  onClick={() => setMoletteInterdite(!moletteInterdite)}>
-            <span className="rig-bascule__temoin"></span><span>Interdire la molette dans les listes deroulantes</span>
-          </button>
+          {voitAmitel && (
+            <>
+              <button className={`rig-bascule${dateSaisieLibre ? ' rig-bascule--actif' : ''}`}
+                      onClick={() => setDateSaisieLibre(!dateSaisieLibre)}>
+                <span className="rig-bascule__temoin"></span><span>Date en saisie libre</span>
+              </button>
+              <button className={`rig-bascule${moletteInterdite ? ' rig-bascule--actif' : ''}`}
+                      onClick={() => setMoletteInterdite(!moletteInterdite)}>
+                <span className="rig-bascule__temoin"></span><span>Interdire la molette dans les listes deroulantes</span>
+              </button>
+            </>
+          )}
 
           <div className="rig-criteres__paire">
             <label className="rig-saisie-champ">
@@ -131,7 +203,12 @@ export function EcranParametresAccueil() {
 
         <div className="rig-criteres__bloc" style={{ padding: 'var(--rig-esp-3)' }}>
           <div className="rig-kicker">Imprimantes autorisees</div>
-          {imprimantes.map((imp, n) => (
+          {enBase && (
+            <p className="rig-eg-note" role="note">
+              Non lues : la liste des imprimantes vient de PaperCut, un service externe que la V3 n'appelle pas.
+            </p>
+          )}
+          {!enBase && imprimantes.map((imp, n) => (
             <button key={imp.nom} className={`rig-bascule${imp.cochee ? ' rig-bascule--actif' : ''}`}
                     onClick={() => basculerImprimante(n)}>
               <span className="rig-bascule__temoin"></span>

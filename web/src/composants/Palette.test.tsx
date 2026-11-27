@@ -1,9 +1,11 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { cleanup, fireEvent, render, screen } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 import { ATTENTE_BARRE, Palette } from './Palette'
 import type { ActionPaletteVue, PaletteVue, TravailPaletteVue } from '../plan/types'
+import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
+import { DelaiRecherche } from '../ecrans/annoncesBodacc'
 
-afterEach(cleanup)
+afterEach(() => { cleanup(); retirerFauxPont() })
 
 const moi = { signature: 'R. VILAIN', initiales: 'RV', nom: 'Raphael' }
 const benier = { signature: 'C. BENIER', initiales: 'CB', nom: 'C. BENIER' }
@@ -79,14 +81,38 @@ describe('Palette Ctrl K (/draft « Page Recherche », propositions 3 et 6)', ()
     expect(document.activeElement).toBe(p.champ())
   })
 
-  it('avec une saisie : le plus urgent d abord, puis les pieces, les annonces et hors du greffe', () => {
+  it('avec une saisie : le plus urgent d abord, puis les pieces, les annonces et hors du greffe', async () => {
     const p = rendre(vue({ texte: 'redressement transnord' }))
     expect(p.titres()).toEqual(['Le plus urgent d abord2', 'Dans le texte des pieces1', 'Hors du greffe1'])
+    cleanup()
+    // Sans serveur, le pont rend « demo » : la palette cherche les annonces d'exemple de l'ecran BODACC, marquees.
+    const pont = installerFauxPont({ 'EcranBodacc.Chercher': () => ({ mode: 'demo', message: null, annonces: [], total: 0 }) })
     const p2 = rendre(vue({ texte: 'redressement', travail: [], horsGreffe: [], pieces: [] }))
-    // Les annonces de l'ecran BODACC se cherchent aussi.
-    expect(p2.titres()).toEqual(['Annonces BODACC1'])
+    await waitFor(() => expect(p2.titres()).toEqual(['Annonces BODACC1']))
     expect(p2.choisie()).toContain('A2026-1190')
     expect(p2.choisie()).toContain('Ouverture de redressement')
+    expect(p2.container.querySelector('.rig-palette__ligne--choisie .rig-tcw__exemple')!.textContent).toBe('exemple')
+    expect(pont.appels).toHaveBeenCalledWith('EcranBodacc.Chercher', 'redressement')
+  })
+
+  it('branchee au serveur : les annonces BODACC de la base, sans « exemple » ; jamais l exemple a la place (lot 20)', async () => {
+    const base = {
+      numAnnonce: '7', numPc: '2001RJ0004', typeAnnonce: 'Création', codeEvePro: '1RJ', dateEvePro: '2001-03-02', prevueEnvoi: '2001-03-05',
+      envoi: '2001-03-05', numParution: '', parution: null, numBord: 'B1', numFact: '', texte: 'Jugement d ouverture de redressement judiciaire',
+      dossier: '2001B00012', transmission: null,
+    }
+    installerFauxPont({ 'EcranBodacc.Chercher': () => ({ mode: 'serveur', message: null, annonces: [base], total: 1 }) })
+    const p = rendre(vue({ texte: 'redressement', travail: [], horsGreffe: [], pieces: [] }))
+    await waitFor(() => expect(p.titres()).toEqual(['Annonces BODACC1']))
+    expect(p.choisie()).toContain('Jugement d ouverture de redressement judiciaire')
+    expect(p.choisie()).not.toContain('A2026-1190')
+    expect(p.container.querySelector('.rig-tcw__exemple')).toBeNull()
+    cleanup()
+    // Base injoignable : aucune annonce, pas l'exemple.
+    installerFauxPont({ 'EcranBodacc.Chercher': () => ({ mode: 'erreur', message: 'La base ne répond pas.', annonces: [], total: 0 }) })
+    const panne = rendre(vue({ texte: 'redressement', travail: [], horsGreffe: [], pieces: [] }))
+    await new Promise((r) => setTimeout(r, DelaiRecherche + 50))
+    expect(panne.titres()).toEqual([])
   })
 
   it('la ligne de travail montre son filet, son etat, qui s en occupe, et surligne ce qui est tape', () => {
