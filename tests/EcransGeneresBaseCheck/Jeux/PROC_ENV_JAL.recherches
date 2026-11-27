@@ -1,0 +1,67 @@
+# Recherches d'« Envoi JAL / BODACC » (LecteurEnvoiJal.ChercherAsync), lot 11 du plan-676a4b19, sur PROC_ENV_JAL.sql. Les criteres
+# sont les champs de la recherche V2 (OPE_RECH_ANNONCES.cs:331-372) ; une date vide vaut celle que la V2 pre-remplit (J-10 a
+# aujourd'hui sur le banc). Chaque refus a son jumeau accepte.
+#
+# Le numero de bordereau (le texte de recherche) remplace les dates : les publicites du bordereau (GetJalsToRemove, :533-560).
+texte: B11J01
+lignes:
+PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J-5} · à BANC11J · envoyée le {J-4} · bordereau B11J01, annulable · procédure extérieure | Procédures collectives | EnCours | []
+---
+# Le meme, par le critere « Numero de bordereau » : B11J02, transmis.
+critere: Numéro de bordereau = B11J02
+lignes:
+PRV 1990V14201 · XLIEN PRV ALPHA | BANC11JAL du {J-15} · envoi prévu le {J-5} · à BANC11J · envoyée le {J-4} · bordereau B11J02 transmis | Préventions | Validee | []
+---
+# Refus : le numero de bordereau se compare EGAL (« PBLCT_NUM_BORDEREAU = », :537), pas en debut -- jumeau B11J01 (bloc 1).
+texte: B11J0
+lignes:
+---
+# Le journal destinataire, egal (:461-463), dans la periode par defaut.
+critere: Destinataire (JAL) = BANC11K
+lignes:
+PRV 1990V14201 · XLIEN PRV ALPHA | BANC11JAL du {J-15} · envoi prévu le {J-3} · à BANC11K | Préventions | AFaire | []
+---
+# Refus : un journal qui n'est que le debut d'un code -- jumeau BANC11K (bloc 4).
+critere: Destinataire (JAL) = BANC11
+lignes:
+---
+# Le numero d'une prevention (PREVE_NUM_PRV, :504-506) : sa publicite a envoyer, puis celle deja envoyee.
+critere: Numéro de PC ou PRV = 1990V14201
+lignes:
+PRV 1990V14201 · XLIEN PRV ALPHA | BANC11JAL du {J-15} · envoi prévu le {J-3} · à BANC11K | Préventions | AFaire | []
+PRV 1990V14201 · XLIEN PRV ALPHA | BANC11JAL du {J-15} · envoi prévu le {J-5} · à BANC11J · envoyée le {J-4} · bordereau B11J02 transmis | Préventions | Validee | []
+---
+# Le numero d'une PC (PRCLL_NUM_PC, :465-467), evenement supprime compris (GetJalsEPSupprime, :424-426).
+critere: Numéro de PC ou PRV = 1990P14103
+lignes:
+PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J-2} · à BANC11J · procédure extérieure | Procédures collectives | AFaire | []
+PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J-10} · à BANC11J · procédure extérieure | Procédures collectives | AFaire | []
+PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J+0} · à BANC11J · procédure extérieure | Procédures collectives | AFaire | []
+PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J-5} · à BANC11J · envoyée le {J-4} · bordereau B11J01, annulable · procédure extérieure | Procédures collectives | EnCours | []
+PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J-6} · à BANC11J · envoyée le {J-5} · procédure extérieure | Procédures collectives | Validee | []
+PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J-7} · à BANC11J · envoyée le {J-6} · procédure extérieure · évènement de procédure supprimé | Procédures collectives | Validee | []
+---
+# Une periode saisie remplace celle que la V2 pre-remplit : de 2000 a 2099, toutes les publicites de la PC, celles hors de la
+# periode par defaut comprises (J-30, demain, J+40) ; les evenements supprimes par date d'envoi (J-30 puis J-7).
+critere: Date de début = 01/01/2000
+critere: Date de fin = 31/12/2099
+critere: Numéro de PC ou PRV = 1990P14103
+lignes:
+PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J-2} · à BANC11J · procédure extérieure | Procédures collectives | AFaire | []
+PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J-30} · à BANC11J · procédure extérieure | Procédures collectives | AFaire | []
+PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J+1} · à BANC11J · procédure extérieure | Procédures collectives | AFaire | []
+PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J-10} · à BANC11J · procédure extérieure | Procédures collectives | AFaire | []
+PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J+0} · à BANC11J · procédure extérieure | Procédures collectives | AFaire | []
+PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J+40} · à BANC11J · procédure extérieure | Procédures collectives | AFaire | []
+PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J+40} · à BANC11J · procédure extérieure | Procédures collectives | AFaire | []
+PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J-5} · à BANC11J · envoyée le {J-4} · bordereau B11J01, annulable · procédure extérieure | Procédures collectives | EnCours | []
+PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J-6} · à BANC11J · envoyée le {J-5} · procédure extérieure | Procédures collectives | Validee | []
+PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J-30} · à BANC11J · envoyée le {J-29} · procédure extérieure · évènement de procédure supprimé | Procédures collectives | Validee | []
+PC 1990P14103 · CHM GAMMA | BANC11JAL du {J-20} · envoi prévu le {J-7} · à BANC11J · envoyée le {J-6} · procédure extérieure · évènement de procédure supprimé | Procédures collectives | Validee | []
+---
+# Refus : une fin avant le debut, que la V2 refuse (« La date de fin ne peut pas etre superieur a la date de debut », :146) --
+# jumeau la periode 2000-2099 (bloc precedent).
+critere: Date de début = 31/12/2099
+critere: Date de fin = 01/01/2000
+critere: Numéro de PC ou PRV = 1990P14103
+lignes:

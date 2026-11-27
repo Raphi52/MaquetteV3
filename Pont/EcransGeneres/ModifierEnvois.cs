@@ -536,18 +536,25 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_ENV_JAL", Titre = "Envoi JAL / BODACC", Sujet = "annonces légales",
-            Forme = FormeEcran.File,
-            Recherche = "Rechercher une annonce, un bordereau, une facture…",
-            Criteres = ["Période d'envoi", "Destinataire (JAL)", "Numéro de bordereau"],
+            // Forme Opération, pas File (lot 11) : la V2 cherche d'abord (date de début obligatoire, OPE_RECH_ANNONCES.cs:331-341),
+            // puis coche des annonces et génère ; une File n'envoie pas de critère au serveur. Le menu l'ouvre en mode JAL
+            // (PROC_ENV_JAL.cs:52-69). Lecteur : LecteurEnvoiJal.cs (lot 11), à envoyer puis déjà envoyées. « Générer le bordereau »
+            // n'a pas d'écrivain : en EDI (JAL_ENVOIE_EDI = 1 dans RIG_DEV) il écrit le bordereau AVEC le fichier XML de
+            // GenererJAL_XmlEDI (OPE_A_ENVOYER.cs:356, :1071-1279), en Word un document assemblé depuis la GED (:493-597) : ni l'un
+            // ni l'autre n'est repris, le geste reste en démonstration. « Supprimer le bordereau » (OPE_DEJA_ENVOYER.cs:297-376) est
+            // un second geste, qu'une Opération (un seul geste) ne porte pas.
+            Forme = FormeEcran.Operation,
+            Recherche = "Numéro de bordereau…",
+            Criteres = ["Date de début", "Date de fin", "Destinataire (JAL)", "Numéro de PC ou PRV", "Numéro de bordereau"],
             Valider = "Générer le bordereau",
             Rang = 2,
             Etats = EtatsEcran.Trois("À envoyer", "Bordereau généré", "Envoyée"),
             Groupes = ["Procédures collectives", "Préventions"],
             Sections =
             [
-                Marche("Période", "Dates pré-remplies d'après le paramétrage du greffe (JAL ou BODACC). Une recherche par numéro de bordereau ou de facture remplace les dates.", true,
-                    "Date de début", "Date de fin"),
-                Marche("Sélection", "Les annonces à envoyer, filtrées par procédure collective ou par prévention. L'ordre d'affichage suit le paramétrage du greffe.", true,
+                // La période est dans les critères : vides, ils valent les dates que la V2 pré-remplit (JAL_DATE_DEBUT_ENVOI, puis
+                // aujourd'hui) ; un numéro de bordereau remplace les dates (OPE_RECH_ANNONCES.cs:196, :533-560).
+                Marche("Sélection", "Les annonces à envoyer de la période, par procédure collective ou par prévention, dans l'ordre du paramétrage du greffe (JAL_ORDER_BY).", true,
                     "Annonces cochées"),
                 Marche("Génération", "Génère le bordereau et le fichier d'envoi. Annuler la génération est refusé si le bordereau a déjà été transmis.", true,
                     "Bordereau"),
@@ -557,12 +564,12 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
             Lignes =
             [
                 Ligne("Alpha Services SARL", "Procédure PC 2026P00301 · publicité du 02/03/2026", "Procédures collectives", "AFaire"),
-                Ligne("Bêta Industrie SAS", "Procédure PC 2026P00302 · publicité sélectionnée", "Procédures collectives", "EnCours", 1),
-                Ligne("Gamma Conseil SARL", "Procédure PC 2026P00303 · bordereau 2026-BDX-01 généré", "Procédures collectives", "EnCours", 0, 1, 2),
-                Ligne("Delta Transports SAS", "Procédure PC 2026P00304 · envoyée le 04/03/2026", "Procédures collectives", "Validee", 0, 1, 2, 3),
+                Ligne("Bêta Industrie SAS", "Procédure PC 2026P00302 · publicité sélectionnée", "Procédures collectives", "EnCours"),
+                Ligne("Gamma Conseil SARL", "Procédure PC 2026P00303 · bordereau 2026-BDX-01 généré", "Procédures collectives", "EnCours"),
+                Ligne("Delta Transports SAS", "Procédure PC 2026P00304 · envoyée le 04/03/2026", "Procédures collectives", "Validee"),
                 Ligne("Epsilon Habitat SARL", "Prévention PRV 2026R00401 · publicité à envoyer", "Préventions", "AFaire"),
-                Ligne("Zêta Commerce SAS", "Prévention PRV 2026R00402 · sélectionnée", "Préventions", "EnCours", 1),
-                Ligne("Êta Boulangerie SARL", "Prévention PRV 2026R00403 · envoyée le 06/03/2026", "Préventions", "Validee", 0, 1, 2),
+                Ligne("Zêta Commerce SAS", "Prévention PRV 2026R00402 · sélectionnée", "Préventions", "EnCours"),
+                Ligne("Êta Boulangerie SARL", "Prévention PRV 2026R00403 · envoyée le 06/03/2026", "Préventions", "Validee"),
                 Ligne("Thêta Import SAS", "Prévention PRV 2026R00404 · à envoyer", "Préventions", "AFaire"),
             ],
         },
