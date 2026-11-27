@@ -1054,6 +1054,103 @@ Exiger((await EcranVerrous.VerrouillesAsync(null, null, "R. VILAIN", false, jour
 Exiger((await EcranVerrous.VerrouillesAsync(client, GreffeAbsent, "R. VILAIN", false, jourVerrous)) is { Mode: "erreur", Lignes.Length: 0, Message: not null },
     "pont Verrous, greffe absent : le motif, AUCUNE ligne");
 
+// ============================================================ 11. REDACTION D'UNE DECISION (LectureRedaction.cs, lot 10)
+// « Rédaction d'une décision » (PROC_REDA), branchee au lot 10 du plan : les decisions des instances des series JRCT, JRPC, JRREF
+// (PROC_REDA.InitParam), sans date d'abord puis « date ou date prevue » decroissante puis id decroissant (PROC_REDA.cs:106-110) ;
+// les listes par leur libelle (le code sans libelle) ; le titre des appels (AppelAffaire.TitreSimplifieREDA, :162-172) ; le
+// nombre de documents VIDIGED_DJ ; les mesures (MESURE.MSINS_ID_DCJDC, titrees comme DecisionJudiciaire.cs:167-174). Aucune
+// decision avant cette section : toutes sont du jeu. Identifiants du lot 10 : 2 000 000 a 2 099 999.
+await Sql("""
+    CREATE TABLE v2.DECISION_JUDICIAIRE (DCJDC_ID_DCJDC int NOT NULL PRIMARY KEY, DCJDC_ID_INSTN int NOT NULL, DCJDC_TYPE_DECISION varchar(10) NULL,
+        DCJDC_SENS_GENERAL varchar(5) NULL, DCJDC_RESSORT varchar(1) NULL, DCJDC_AVANT_DIRE_DROIT varchar(1) NULL, DCJDC_CONTRADICTOIRE varchar(1) NULL,
+        DCJDC_EXECUTION_PROVISOIRE varchar(1) NOT NULL DEFAULT ('0'), DCJDC_DATE datetime NULL, DCJDC_DATE_PREVUE datetime NULL,
+        DCJDC_DECISION_PUBLIQUE bit NOT NULL DEFAULT (0), DCJDC_DEBAT_PUBLIC bit NOT NULL DEFAULT (0),
+        DCJDC_ID_APPAF_DELIBERER int NULL, DCJDC_ID_APPAF_PRONONCER int NULL);
+    CREATE TABLE v2.TYPE_DECISION (R_TYPEDECISI_VALEUR varchar(10) NOT NULL PRIMARY KEY, R_TYPEDECISI_LIBELLE_ECRAN varchar(100) NOT NULL,
+        R_TYPEDECISI_TYPE_MESURE_LIE varchar(5) NULL);
+    CREATE TABLE v2.SENS_GENERAL (R_SENSGENERA_VALEUR varchar(5) NOT NULL PRIMARY KEY, R_SENSGENERA_LIBELLE_ECRAN varchar(35) NOT NULL);
+    CREATE TABLE v2.RESSORT (R_RESSORT_VALEUR varchar(5) NOT NULL PRIMARY KEY, R_RESSORT_LIBELLE_ECRAN varchar(35) NOT NULL);
+    CREATE TABLE v2.AVANT_DIRE_DROIT (R_AVANTDIRED_VALEUR varchar(5) NOT NULL PRIMARY KEY, R_AVANTDIRED_LIBELLE_ECRAN varchar(35) NOT NULL);
+    CREATE TABLE v2.CONTRADICTOIRE (R_CONTRADICT_VALEUR varchar(5) NOT NULL PRIMARY KEY, R_CONTRADICT_LIBELLE_ECRAN varchar(35) NOT NULL);
+    CREATE TABLE v2.EXECUTION_PROVISOIRE (R_EXECUTIONP_VALEUR varchar(1) NOT NULL PRIMARY KEY, R_EXECUTIONP_LIBELLE_ECRAN varchar(35) NOT NULL);
+    CREATE TABLE v2.VIDIGED_DJ (VGDDJ_ID_VGDDJ int NOT NULL PRIMARY KEY, VGDDJ_ID_DCJDC int NULL);
+    CREATE TABLE v2.MESURE (MSINS_ID_MSINS int NOT NULL PRIMARY KEY, MSINS_ID_DCJDC int NULL, MSINS_NUM_MESURE varchar(11) NULL, MSINS_NUM_ORDRE int NULL);
+    """);
+// Instances : 2000101 JRCT, 2000102 JRREF, 2000103 JRPC (acceptees) ; jumeaux refuses : 2000104 JROP, 2000105 JRPR (prevention,
+// mode « PR » non repris). Decisions de 2000101 : 2000202 sans date (en tete), 2000203 date prevue seule (01/04), 2000204 et
+// 2000201 meme date (06/03 : la plus grande d'abord) ; puis 2000205 (2025), 2000208 (2024). 2000206 et 2000207 : refusees.
+await Sql("""
+    INSERT INTO v2.CODE_AFFAIRE (R_CODEAFFAIR_VALEUR, R_CODEAFFAIR_TYPE_NUM_ROLE) VALUES ('CT10', 'JRCT'), ('RF10', 'JRREF'), ('PC10', 'JRPC'),
+        ('OP10', 'JROP'), ('PR10', 'JRPR');
+    INSERT INTO v2.INSTANCE (INSTN_ID_INSTN, INSTN_NUM_ROLE, INSTN_NOM_COURANT, INSTN_CODE_AFFAIRE) VALUES
+        (2000101, '2026J10101', 'REDA ALPHA - ouverture', 'CT10'), (2000102, '2025R10102', 'REDA BETA - refere', 'RF10'),
+        (2000103, '2024J10103', 'REDA GAMMA - PC', 'PC10'), (2000104, '2026J10104', 'REDA OPPOSITION', 'OP10'),
+        (2000105, '2026P10105', 'REDA PREVENTION', 'PR10');
+    INSERT INTO v2.TYPE_DECISION VALUES ('TD10E', 'Jugement avec expertise', 'EXP'), ('TD10S', 'Jugement simple', NULL);
+    INSERT INTO v2.SENS_GENERAL VALUES ('F10', 'Favorable du banc');
+    INSERT INTO v2.RESSORT VALUES ('1', 'Premier ressort du banc');
+    INSERT INTO v2.AVANT_DIRE_DROIT VALUES ('0', 'Non (banc)');
+    INSERT INTO v2.CONTRADICTOIRE VALUES ('1', 'Contradictoire (banc)');
+    INSERT INTO v2.EXECUTION_PROVISOIRE VALUES ('1', 'De droit (banc)');
+    INSERT INTO v2.AUDIENCE_CABINET (AUDNC_ID_ADNC, AUDNC_AUDIENCE, AUDNC_TYPE_AUD_CAB, AUDNC_DATE, AUDNC_HEURE, AUDNC_PUBLIQUE, AUDNC_CHAMBRE,
+        AUDNC_NON_DISPONIBLE_WEB) VALUES (2000401, 1, 'AUD', '19900220', '14:00', 1, '2', 0), (2000402, 1, 'AUD', '19900101', NULL, 1, NULL, 0);
+    INSERT INTO v2.APPEL_AFFAIRE (APPAF_ID_APPAF, APPAF_ID_ADNC) VALUES (2000301, 2000401), (2000302, NULL), (2000303, 2000402);
+    INSERT INTO v2.DECISION_JUDICIAIRE (DCJDC_ID_DCJDC, DCJDC_ID_INSTN, DCJDC_TYPE_DECISION, DCJDC_SENS_GENERAL, DCJDC_RESSORT, DCJDC_AVANT_DIRE_DROIT,
+        DCJDC_CONTRADICTOIRE, DCJDC_EXECUTION_PROVISOIRE, DCJDC_DATE, DCJDC_DATE_PREVUE, DCJDC_DECISION_PUBLIQUE, DCJDC_DEBAT_PUBLIC,
+        DCJDC_ID_APPAF_DELIBERER, DCJDC_ID_APPAF_PRONONCER) VALUES
+        (2000201, 2000101, 'TD10E', 'F10', '1', '0', '1', '1', '20260306', '20260305', 0, 1, 2000301, NULL),
+        (2000202, 2000101, NULL, NULL, NULL, NULL, NULL, '0', NULL, NULL, 0, 0, NULL, NULL),
+        (2000203, 2000101, 'TD10S', NULL, NULL, NULL, NULL, '0', NULL, '20260401', 0, 0, NULL, NULL),
+        (2000204, 2000101, 'TD10S', NULL, '9', NULL, NULL, '0', '20260306', NULL, 1, 0, NULL, 2000302),
+        (2000205, 2000102, 'TD10S', NULL, NULL, NULL, NULL, '0', '20250101', NULL, 0, 0, NULL, 2000303),
+        (2000206, 2000104, 'TD10S', NULL, NULL, NULL, NULL, '0', '20260310', NULL, 0, 0, NULL, NULL),
+        (2000207, 2000105, 'TD10S', NULL, NULL, NULL, NULL, '0', '20260310', NULL, 0, 0, NULL, NULL),
+        (2000208, 2000103, 'TD10S', NULL, NULL, NULL, NULL, '0', '20240601', NULL, 0, 0, NULL, NULL);
+    INSERT INTO v2.VIDIGED_DJ VALUES (2000501, 2000201), (2000502, 2000201), (2000503, 2000205), (2000504, NULL);
+    INSERT INTO v2.MESURE VALUES (2000601, 2000201, '26EXP00114', 2), (2000602, 2000201, NULL, 1), (2000603, 2000206, '26EXP00999', 1);
+    """);
+await using (var cn = new SqlConnection(greffe.Connexion))
+{
+    await cn.OpenAsync();
+    var reda = await LectureRedaction.LireAsync(cn, CancellationToken.None);
+    Exiger(reda.Lignes.Select(d => d.Id).SequenceEqual([2000202, 2000203, 2000204, 2000201, 2000205, 2000208]) && reda.Total == 6,
+        "redaction : series JRCT, JRREF, JRPC (JROP et JRPR ecartees) ; sans date d'abord, puis date ou date prevue decroissante, puis id "
+        + $"decroissant ({string.Join(",", reda.Lignes.Select(d => d.Id))}, total {reda.Total})");
+    var alpha = reda.Lignes.Single(d => d.Id == 2000201);
+    Exiger(alpha is { Role: "2026J10101", Affaire: "REDA ALPHA - ouverture", TypeDecision: "Jugement avec expertise", SensGeneral: "Favorable du banc",
+                      Ressort: "Premier ressort du banc", AvantDireDroit: "Non (banc)", Contradictoire: "Contradictoire (banc)",
+                      ExecutionProvisoire: "De droit (banc)", DebatsPublics: true, DecisionPublique: false, MesureInstruction: true, Documents: 2,
+                      MiseEnDelibere: "20/02/1990 14:00 - Chambre 2", Prononce: "" }
+           && alpha.Date == new DateTime(2026, 3, 6) && alpha.DatePrevue == new DateTime(2026, 3, 5)
+           && alpha.Mesures.SequenceEqual(["Expertise en attente de numérotation...", "Expertise n°26EXP00114"]),
+        $"redaction : listes par leur libelle, cases, mesure liee au type, 2 documents en GED, appel delibere titre (date, heure, chambre), "
+        + $"mesures par numero d'ordre ({alpha})");
+    var sansAudience = reda.Lignes.Single(d => d.Id == 2000204);
+    var sansRien = reda.Lignes.Single(d => d.Id == 2000202);
+    Exiger(sansAudience is { Prononce: LectureRedaction.AppelSansAudience, MiseEnDelibere: "", Ressort: "9", MesureInstruction: false, Documents: 0, Mesures.Length: 0 }
+           && reda.Lignes.Single(d => d.Id == 2000205) is { Prononce: "01/01/1990", Documents: 1 }
+           && sansRien is { TypeDecision: "", Ressort: "", ExecutionProvisoire: "0", MiseEnDelibere: "", Prononce: "" },
+        "redaction : appel sans audience -> le titre de RIG v2 ; audience sans heure ni chambre -> la date seule ; code sans libelle -> le code ; "
+        + "sans appel -> vide");
+    var redaDeux = await LectureRedaction.LireAsync(cn, CancellationToken.None, plafond: 2);
+    Exiger(redaDeux.Lignes.Length == 2 && redaDeux.Total == 6, $"redaction : plafond 2 -> deux decisions, total 6 ({redaDeux.Lignes.Length}, {redaDeux.Total})");
+}
+var redaRoute = await http.GetFromJsonAsync<DecisionsRedactionLues>(RoutesEcransMain.Pour(RoutesRedaction.Decisions, Greffe), json);
+Exiger(redaRoute is { Total: 6 } && redaRoute.Lignes.Any(d => d.Id == 2000201), "route de la redaction : les decisions de la lecture");
+Exiger((await http.GetAsync(RoutesEcransMain.Pour(RoutesRedaction.Decisions, GreffeAbsent))).StatusCode == HttpStatusCode.NotFound,
+    "route de la redaction : greffe absent -> 404, sans repli");
+var redaPont = await EcranRedaction.DecisionsAsync(client, Greffe);
+var exemple = EcranRedaction.Exemple();
+Exiger(redaPont.Mode == "serveur" && redaPont.Decisions.Length == 6
+       && redaPont.Decisions.Single(d => d.Id == 2000201) is { Numero: "2026J10101", Delibere: true, Date: "06/03/2026", DatePrevue: "05/03/2026" }
+       && redaPont.Decisions.Single(d => d.Id == 2000204) is { Delibere: false, Date: "06/03/2026", DatePrevue: "" }
+       && !redaPont.Decisions.Any(d => exemple.Decisions.Any(e => e.Numero == d.Numero)),
+    "pont Redaction branche : les decisions de la base (deliberee tant qu'aucun appel prononce, dates jj/mm/aaaa), aucune de la demonstration");
+Exiger((await EcranRedaction.DecisionsAsync(null, null)) is { Mode: "demo", Decisions.Length: 4 },
+    "pont Redaction sans serveur : la demonstration, mode « demo »");
+Exiger((await EcranRedaction.DecisionsAsync(client, GreffeAbsent)) is { Mode: "erreur", Decisions.Length: 0, Message: not null },
+    "pont Redaction, greffe absent : le motif, AUCUNE decision");
+
 Console.WriteLine();
 if (echecs.Count == 0) { Console.WriteLine("Ecrans faits main branches sur la base : VERT."); return 0; }
 Console.WriteLine(echecs.Count + " echec(s) : " + string.Join(" | ", echecs));
