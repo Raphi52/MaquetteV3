@@ -436,6 +436,12 @@ public sealed class DomaineFonctionsRetrouvees : IDomaineEcrans
 
         // Pas de fiche : Outils\Impression\PROC_IMP_WIN (« Paramétrage des imprimantes greffe » : lots 1 et 2,
         // bacs, devmodes) et PROC_ImprimanteWindows (pilotes, imprimantes absentes du serveur ou de la base).
+        // Lot 16 (27/11/2026) : RESTE EN EXEMPLE, cause nommee -- les imprimantes, leurs bacs et leurs reglages nommes sont
+        // les tables IMPRIMANTE_WINDOWS, IMPRIMANTE_BAC, IMPRIMANTE_DEVMOD et RIG_IMPRIMANTE_WINDOWS de COMMUN_RIG (classes
+        // RigTools\SQL\COMMON\*.cs ; connexion CodeGreffeBaseCommmunRig, OPE_IMP_MANQUANTE.cs:147), absente de la base du
+        // greffe ; les pilotes viennent du serveur Windows (PrinterManagement, OPE_IMP_MANQUANTE.cs:47). Seuls les lots 1 et 2
+        // sont dans la base du greffe : IMPRIMANTE_PS (ImprimanteLot1.cs:97) et IMPRIMANTE_EDITION (ImprimanteLot2.cs:262,
+        // lue en V3 par EcrivainFileEditions.cs:131) -- de quoi lire la seule marche « Lots d'édition », pas la liste.
         new DescripteurEcran
         {
             Code = "PROC_IMP_WIN", Titre = "Imprimantes du greffe", Sujet = "imprimantes",
@@ -462,12 +468,12 @@ public sealed class DomaineFonctionsRetrouvees : IDomaineEcrans
             ],
             Lignes =
             [
-                Ligne("Accueil-RDC", "Pilote à jour · bacs 1 et 2", "Lot 1", "Validee", 0, 1, 3),
-                Ligne("Greffe-1er", "Bac 2 sans papier défini", "Lot 1", "EnCours", 0),
-                Ligne("Audiences", "Recto verso · agrafage", "Lot 2", "Validee", 0, 1, 2, 3),
-                Ligne("Service RCS", "Nouvelle imprimante du serveur", "Lot 2", "AFaire"),
-                Ligne("Direction", "Pilote différent du serveur", "Autres imprimantes", "EnCours", 0, 1),
-                Ligne("Ancienne-Archives", "Retirée du serveur", "Autres imprimantes", "EnAttente", 0, 1),
+                Ligne("Accueil-RDC", "Pilote à jour · bacs 1 et 2 · exemple : tables d'imprimantes de COMMUN_RIG, absentes de la base du greffe", "Lot 1", "Validee", 0, 1, 3),
+                Ligne("Greffe-1er", "Bac 2 sans papier défini · exemple : tables d'imprimantes de COMMUN_RIG, absentes de la base du greffe", "Lot 1", "EnCours", 0),
+                Ligne("Audiences", "Recto verso · agrafage · exemple : tables d'imprimantes de COMMUN_RIG, absentes de la base du greffe", "Lot 2", "Validee", 0, 1, 2, 3),
+                Ligne("Service RCS", "Nouvelle imprimante du serveur · exemple : tables d'imprimantes de COMMUN_RIG, absentes de la base du greffe", "Lot 2", "AFaire"),
+                Ligne("Direction", "Pilote différent du serveur · exemple : tables d'imprimantes de COMMUN_RIG, absentes de la base du greffe", "Autres imprimantes", "EnCours", 0, 1),
+                Ligne("Ancienne-Archives", "Retirée du serveur · exemple : tables d'imprimantes de COMMUN_RIG, absentes de la base du greffe", "Autres imprimantes", "EnAttente", 0, 1),
             ],
         },
     ];

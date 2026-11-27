@@ -38,9 +38,9 @@ INSERT INTO v2.CASIER_JUDICIAIRE_FNIG (CFNIG_ID_CFNIG, CFNIG_DATE_JUGEMENT, CFNI
     -- modification envoyee, en erreur sans message : Rejetee, « envoi refusé »
     (300307, DATEADD(DAY, -15, @aujourdhui), NULL, 'FNIGBANC', 'Gilles', NULL, 'Erreur', '', 'Modification'),
     -- lot 16 : ajout envoye dont l'interdiction debute APRES sa fin (controle 4 d'EcrivainDemandesFnig) : Validee, sa fin affichee
-    (300308, DATEADD(DAY, -12, @aujourdhui), DATEADD(DAY, -20, @aujourdhui), 'FNIGBANC', 'Hugo', DATEADD(DAY, -1, @aujourdhui), 'Envoye', NULL, 'Ajout'),
+    (2600308, DATEADD(DAY, -12, @aujourdhui), DATEADD(DAY, -20, @aujourdhui), 'FNIGBANC', 'Hugo', DATEADD(DAY, -1, @aujourdhui), 'Envoye', NULL, 'Ajout'),
     -- lot 16 : la meme chose pour une demande d'une autre juridiction (sans casier du greffe) : Validee
-    (300309, DATEADD(DAY, -12, @aujourdhui), DATEADD(DAY, -20, @aujourdhui), 'FNIGBANC', 'Inès', DATEADD(DAY, -1, @aujourdhui), 'Envoye', NULL, 'Ajout');
+    (2600309, DATEADD(DAY, -12, @aujourdhui), DATEADD(DAY, -20, @aujourdhui), 'FNIGBANC', 'Inès', DATEADD(DAY, -1, @aujourdhui), 'Envoye', NULL, 'Ajout');
 
 -- Lot 16 : ce que les gestes lisent et copient (PROC_FNIG.gestes), sans effet sur la liste (le lecteur ne le lit pas).
 --   300301 : rattachee a un casier du greffe ; debut = jugement (borne acceptee de « debut avant le jugement »), debut avant la
@@ -48,9 +48,9 @@ INSERT INTO v2.CASIER_JUDICIAIRE_FNIG (CFNIG_ID_CFNIG, CFNIG_DATE_JUGEMENT, CFNI
 --   300302 : debut la VEILLE du jugement -> « Désactiver » refuse (jumeau accepte : 300301).
 --   300303 : naissance avant le jugement -> « Renvoyer » accepte.
 --   300307 : naissance APRES le jugement -> « Renvoyer » refuse (jumeau accepte : 300303).
---   300308 : rattachee a un casier, debut apres la fin -> « Désactiver » refuse (jumeau accepte : 300301, debut avant la fin).
---   300309 : SANS casier (autre juridiction : la V2 n'affiche pas la fin, OPE_EDITION_JUGEMENT.cs:99), debut apres la fin ->
---            « Désactiver » accepte (jumeau refuse : 300308).
+--   2600308 : rattachee a un casier, debut apres la fin -> « Désactiver » refuse (jumeau accepte : 300301, debut avant la fin).
+--   2600309 : SANS casier (autre juridiction : la V2 n'affiche pas la fin, OPE_EDITION_JUGEMENT.cs:99), debut apres la fin ->
+--            « Désactiver » accepte (jumeau refuse : 2600308).
 UPDATE v2.CASIER_JUDICIAIRE_FNIG SET CFNIG_ID_CSRJD = 300391, CFNIG_DATE_CREATION = DATEADD(DAY, -30, @aujourdhui),
     CFNIG_DATE_DEBUT_INTERDICTION = DATEADD(DAY, -30, @aujourdhui), CFNIG_DATE_NAISSANCE = '19700501', CFNIG_ID_FNIG = 'FNIG0300301',
     CFNIG_UTILISATEUR = 'banc.origine : ORIGINE Agent', CFNIG_ID_UTLST = 2000902, CFNIG_SANCTION = 'Interdiction de gerer'
@@ -61,8 +61,8 @@ UPDATE v2.CASIER_JUDICIAIRE_FNIG SET CFNIG_ID_CSRJD = 300393, CFNIG_DATE_NAISSAN
 UPDATE v2.CASIER_JUDICIAIRE_FNIG SET CFNIG_ID_CSRJD = 300397, CFNIG_DATE_NAISSANCE = DATEADD(DAY, -10, @aujourdhui)
 WHERE CFNIG_ID_CFNIG = 300307;
 UPDATE v2.CASIER_JUDICIAIRE_FNIG SET CFNIG_ID_CSRJD = 300398, CFNIG_DATE_DEBUT_INTERDICTION = DATEADD(DAY, -10, @aujourdhui)
-WHERE CFNIG_ID_CFNIG = 300308;
-UPDATE v2.CASIER_JUDICIAIRE_FNIG SET CFNIG_DATE_DEBUT_INTERDICTION = DATEADD(DAY, -10, @aujourdhui) WHERE CFNIG_ID_CFNIG = 300309;
+WHERE CFNIG_ID_CFNIG = 2600308;
+UPDATE v2.CASIER_JUDICIAIRE_FNIG SET CFNIG_DATE_DEBUT_INTERDICTION = DATEADD(DAY, -10, @aujourdhui) WHERE CFNIG_ID_CFNIG = 2600309;
 -- L'agent du banc porte un utilisateur RIG v2, l'auteur d'une desactivation (OPE_EDITION.cs:237-240), comme dans PROC_RELCLI.sql.
 UPDATE soc.Compte SET IdV2 = 2000901 WHERE CompteWindows = 'banc.ecrans' AND IdV2 IS NULL;
 
