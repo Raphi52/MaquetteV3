@@ -75,6 +75,18 @@ internal static class CreationV2
                 ["DMNED_IS_NON_SUPPRESSIBLE"] = false, ["DMNED_HAS_NUMLR"] = false, ["DMNED_MASQUER_COFFRE_FORT"] = false,
             },
             ["v2.GED_RIG"] = new Dictionary<string, object> { ["GDRG_VIDIGED_X"] = 0 },
+            // Lot 14 (27/11/2026, « Valider » de Non-inscrits) : les DEFAULT de ces deux tables dans le SSDT de RIG v2
+            // (Source\BaseDeDonnées\RigDatabase\dbo\Tables\ETABLISSEMENT.sql:23-76, NON_INSCRIT.sql:27-44), que la base V3 de dev garde
+            // sans leur defaut (mesure : « Cannot insert the value NULL into column 'ETBLS_AMBULANT' », erreur 500 du geste).
+            ["v2.ETABLISSEMENT"] = new Dictionary<string, object>
+            {
+                ["ETBLS_ACTIVITE_IDEM"] = false, ["ETBLS_COMMERCIAL"] = true, ["ETBLS_SUPPRIME"] = false, ["ETBLS_1ER_OUVERT_EN_FRANCE"] = false,
+                ["ETBLS_AMBULANT"] = false, ["ETBLS_ATTENTE_PIECE"] = false,
+            },
+            ["v2.NON_INSCRIT"] = new Dictionary<string, object>
+            {
+                ["NINSC_PRINCIPAL"] = true, ["NINSC_PM"] = false, ["NINSC_INSCRIT_REGISTRE_METIER"] = false, ["NINSC_NI_SECONDAIRE"] = false,
+            },
         };
 
     /// <summary>

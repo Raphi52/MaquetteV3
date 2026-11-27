@@ -36,6 +36,9 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// obligatoire) ; l'indexation des mots directeurs apres validation (MotsDirecteurs.IndexerNonInscrit, l. 181).
 /// TRACE : famille « dossier », « a cree », le non-inscrit et son numero.
 /// </summary>
+// fix-ok: mesure le 27/11/2026 a l'ecran (bureau cache, base de dev) -- « Valider » rendait 500 : « Cannot insert the value NULL into column
+// 'ETBLS_AMBULANT' » (journal serveur-dev-5114.log). La base V3 garde ETABLISSEMENT sans les DEFAULT de RIG_DEV ; le banc, qui cree ses
+// tables, ne le voyait pas. Les insertions passent par CreationV2.InsererAsync (DefautsRigDev complete) ; PROC_CNI.gestes controle ces colonnes.
 internal sealed class EcrivainNonInscrits : IEcrivainEcran
 {
     internal const string EtapeIdentite = "Type et identité", EtapeNaissance = "Naissance", EtapeAdresse = "Adresse";
@@ -152,7 +155,7 @@ internal sealed class EcrivainNonInscrits : IEcrivainEcran
             ["Patronyme"] = Vide(patronyme), ["Prenom"] = Vide(prenoms), ["FormeJuridique"] = Vide(forme), ["EtatInfo"] = "1",
             ["FicheSommaire"] = false, ["NomUsage"] = Vide(nomUsage),
         }, ct);
-        var nonInscrit = await geste.InsererAsync("v2.NON_INSCRIT", "NINSC_ID_NINSC", new Dictionary<string, object?>
+        var nonInscrit = await InsererAsync(geste, "v2.NON_INSCRIT", "NINSC_ID_NINSC", new Dictionary<string, object?>
         {
             ["NINSC_ID_RPRTR"] = entreprise, ["NINSC_NUM_SIREN"] = Vide(siren), ["NINSC_CIVILITE"] = civilite.Valeur,
             ["NINSC_PATRONYME"] = Vide(patronyme), ["NINSC_PRENOMS"] = Vide(prenoms), ["NINSC_NOM_USAGE"] = Vide(nomUsage),
@@ -163,7 +166,8 @@ internal sealed class EcrivainNonInscrits : IEcrivainEcran
             ["NINSC_DATE_MAJ"] = geste.Maintenant, ["NINSC_PM"] = !pp, ["NINSC_NI_SECONDAIRE"] = false,
         }, ct);
         foreach (var (typeAdresse, commercial) in type is "JUD" or "PCOL" ? new[] { ("NQ", false), ("NQS", true) } : [("NQ", false)])
-            await geste.InsererAsync("v2.ETABLISSEMENT", "ETBLS_ID_ETBLS", new Dictionary<string, object?>
+            // Par CreationV2.InsererAsync : les DEFAULT de RIG_DEV que la base V3 a perdus (AMBULANT, ATTENTE_PIECE) sont completes.
+            await InsererAsync(geste, "v2.ETABLISSEMENT", "ETBLS_ID_ETBLS", new Dictionary<string, object?>
             {
                 ["ETBLS_ID_NINSC"] = nonInscrit, ["ETBLS_ID_ADRBS"] = adresse, ["ETBLS_NUM_ORDRE"] = 1, ["ETBLS_TYPE_ADRESSE"] = typeAdresse,
                 ["ETBLS_ACTIVITE_IDEM"] = false, ["ETBLS_ETAT_INFO"] = "1", ["ETBLS_COMMERCIAL"] = commercial, ["ETBLS_SUPPRIME"] = false,
