@@ -538,11 +538,11 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
             Code = "PROC_ENV_JAL", Titre = "Envoi JAL / BODACC", Sujet = "annonces légales",
             // Forme Opération, pas File (lot 11) : la V2 cherche d'abord (date de début obligatoire, OPE_RECH_ANNONCES.cs:331-341),
             // puis coche des annonces et génère ; une File n'envoie pas de critère au serveur. Le menu l'ouvre en mode JAL
-            // (PROC_ENV_JAL.cs:52-69). Lecteur : LecteurEnvoiJal.cs (lot 11), à envoyer puis déjà envoyées. « Générer le bordereau »
-            // n'a pas d'écrivain : en EDI (JAL_ENVOIE_EDI = 1 dans RIG_DEV) il écrit le bordereau AVEC le fichier XML de
-            // GenererJAL_XmlEDI (OPE_A_ENVOYER.cs:356, :1071-1279), en Word un document assemblé depuis la GED (:493-597) : ni l'un
-            // ni l'autre n'est repris, le geste reste en démonstration. « Supprimer le bordereau » (OPE_DEJA_ENVOYER.cs:297-376) est
-            // un second geste, qu'une Opération (un seul geste) ne porte pas.
+            // (PROC_ENV_JAL.cs:52-69). Lecteur : LecteurEnvoiJal.cs (lot 11), à envoyer puis déjà envoyées. « Générer le bordereau » :
+            // EcrivainEnvoiJal.cs, le mode EDI de la V2 (JAL_ENVOIE_EDI = 1 dans RIG_DEV) en un geste -- Générer puis Envoyer
+            // (OPE_A_ENVOYER.cs:189-334, :1071-1170) : bordereau RBOE, publicités envoyées ; le fichier XML n'est pas produit (simulé,
+            // dit à l'écran). Le document Word hors EDI (:493-597) n'est pas repris. « Supprimer le bordereau »
+            // (OPE_DEJA_ENVOYER.cs:297-376) est un second geste, qu'une Opération (un seul geste) ne porte pas.
             Forme = FormeEcran.Operation,
             Recherche = "Numéro de bordereau…",
             Criteres = ["Date de début", "Date de fin", "Destinataire (JAL)", "Numéro de PC ou PRV", "Numéro de bordereau"],
@@ -552,14 +552,14 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
             Groupes = ["Procédures collectives", "Préventions"],
             Sections =
             [
-                // La période est dans les critères : vides, ils valent les dates que la V2 pré-remplit (JAL_DATE_DEBUT_ENVOI, puis
-                // aujourd'hui) ; un numéro de bordereau remplace les dates (OPE_RECH_ANNONCES.cs:196, :533-560).
-                Marche("Sélection", "Les annonces à envoyer de la période, par procédure collective ou par prévention, dans l'ordre du paramétrage du greffe (JAL_ORDER_BY).", true,
-                    "Annonces cochées"),
-                Marche("Génération", "Génère le bordereau et le fichier d'envoi. Annuler la génération est refusé si le bordereau a déjà été transmis.", true,
-                    "Bordereau"),
-                Marche("Envoi électronique", "Envoi EDI ou BODACC après génération. Une fois transmis, le bordereau ne s'annule plus.", false,
-                    "Transmission"),
+                // La période de la recherche est dans les critères ; celle du BORDEREAU (BRDRJ_DATE_MIN / MAX, et les publicités
+                // générées : GetPubtoEdit, LigneJal.cs:298) se saisit ici, car une Opération n'envoie que ses sections au geste.
+                // fix-ok: mesuré dans web/src/ecrans/formes/FormeOperation.tsx:57-59 -- le geste Confirmer porte `remplies` (les
+                // champs des sections) et jamais les critères de recherche : sans cette section, l'écrivain ignorait la période.
+                // Vides : les dates que la V2 pré-remplit (JAL_DATE_DEBUT_ENVOI, puis aujourd'hui, OPE_RECH_ANNONCES.cs:275-293).
+                Marche("Période du bordereau", "Les annonces générées sont celles des évènements cochés, encore à envoyer, dont l'envoi est prévu dans cette période (la fin est comprise à 0 h, comme RIG v2). Vide : la période que RIG v2 pré-remplit.", false,
+                    Champ.Date("Date de début"), Champ.Date("Date de fin")),
+                Marche("Envoi électronique", "Un seul journal par envoi. Le bordereau est numéroté et les annonces passent à l'état envoyé ; le fichier XML EDI n'est pas produit par RIG v3 et rien n'est transmis (simulé).", false),
             ],
             Lignes =
             [
@@ -650,6 +650,10 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_LISTEEXCEL", Titre = "Export Excel", Sujet = "listes d'instances",
+            // Lecteur : LecteurListesExcel.cs (lot 11) -- les types de liste d'instances du greffe, leurs colonnes et leurs listes
+            // paramétrées (PARAMETRAGE_LISTE_XLS*). Ni comptage ni export : la V2 exécute le SQL stocké dans PARAMETRAGE_LISTE
+            // (ExcelInstance.cs:39-63) et EXECUTE_EXCEL ouvre un classeur non enregistré (aucun dossier choisi) ; « Lancer l'export
+            // Excel » reste en démonstration.
             Forme = FormeEcran.Etat,
             Parametres = ["Type de liste", Champ.Periode("Période"), "Code d'acte", "Nature d'affaire"],
             Colonnes = ["Liste", Champ.Nombre("Nombre de lignes")],

@@ -53,8 +53,8 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///   code), la date d'envoi electronique, le bordereau ; la procedure exterieure (PRCLL_EXTERIEUR, en rouge dans la V2) et
 ///   l'evenement supprime (en violet) le disent (JalRigDataGridView.cs:331-373, proc_env_jal.md §5).
 /// NON REPRIS (nomme) : les lignes non cochables et leurs couleurs autres (annonce d'origine en cours de parution, debiteurs
-///   multiples, texte JAL absent en EDI : JalRigDataGridView.cs:312-355), le nombre de documents generes (NB_DOCS_GENERES). Les
-///   gestes : aucun ecrivain, voir le descripteur (Pont/EcransGeneres/ModifierEnvois.cs).
+///   multiples, texte JAL absent en EDI : JalRigDataGridView.cs:312-355), le nombre de documents generes (NB_DOCS_GENERES).
+/// L'ID d'une ligne : la publicite (PBLCT_ID_PBLCT), que « Generer le bordereau » vise (EcrivainEnvoiJal.cs).
 /// </summary>
 internal sealed class LecteurEnvoiJal : IRechercheEcran
 {
@@ -214,6 +214,11 @@ internal sealed class LecteurEnvoiJal : IRechercheEcran
             bordereau.Length == 0 ? null : !existe ? $"bordereau {bordereau}" : transmis ? $"bordereau {bordereau} transmis" : $"bordereau {bordereau}, annulable",
             Convert.ToInt32(r["EXTERIEUR"], CultureInfo.InvariantCulture) != 0 ? "procédure extérieure" : null,
             partie == 2 ? "évènement de procédure supprimé" : null);
-        return new LigneLue(nom, precisions, prevention ? Preventions : Pc, etat, []);
+        // fix-ok: une ligne sans Id ne porte aucun geste ecrit (LigneLue.Id, Contrats/EcransGeneres/LignesEcran.cs:95-99) : sans lui,
+        // « Generer le bordereau » partait sans publicite et le serveur repondait « Vous devez selectionner au moins une ligne ».
+        return new LigneLue(nom, precisions, prevention ? Preventions : Pc, etat, [])
+        {
+            Id = Convert.ToInt32(r["PBLCT_ID_PBLCT"], CultureInfo.InvariantCulture).ToString(CultureInfo.InvariantCulture),
+        };
     }
 }

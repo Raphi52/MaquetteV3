@@ -1,0 +1,14 @@
+# « Export Excel » (LecteurListesExcel) sur le jeu PROC_LISTEEXCEL.sql : une ligne par type de liste d'instances declare
+# (PARAMETRAGE_LISTE_XLS_TYPE_LISTE), dans l'ordre INS, IDJ, IEF, IEP, SDJ, GIE, AFF (OPE_RECHERCHE.cs:77-84), chacun suivi de ses
+# listes parametrees (PARAMETRAGE_LISTE_XLS_LISTE), par identifiant. Ecartes : le type PC et sa liste BANC11PC, d'un autre ecran --
+# jumeaux INS et BANC11DEF. Tout est « A compter » : le comptage n'est pas repris (en tete du lecteur).
+# INS : 2 colonnes ordonnees sur 3 SELECT (le FROM et la ligne LISTE ne sont pas des colonnes), deux listes, BANC11DEF par defaut.
+Liste des instances | 2 colonnes par défaut sur 3 · 2 listes paramétrées · liste par défaut : Liste du banc 11 | Instances | AFaire | []
+Liste du banc 11 | liste paramétrée BANC11DEF · Liste des instances · 2 colonnes · liste par défaut | Instances | AFaire | []
+# BANC11B n'a pas de libelle : son code le nomme ; aucune colonne.
+BANC11B | liste paramétrée BANC11B · Liste des instances · aucune colonne | Instances | AFaire | []
+Liste des instances par date DJ | 1 colonne par défaut sur 1 · aucune liste paramétrée | Instances | AFaire | []
+# GIE : aucun champ.
+Liste citations/affaires signifiées | aucune colonne paramétrée · aucune liste paramétrée | Groupements | AFaire | []
+# AFF : sa ligne LISTE nomme « RIEN », qui n'est aucune liste : pas de liste par defaut (GetListeParDefaut, INNER JOIN).
+Liste affaires en cours | aucune colonne paramétrée · aucune liste paramétrée | Affaires et citations | AFaire | []
