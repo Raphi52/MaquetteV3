@@ -148,8 +148,13 @@ export function EcranStatistiques() {
         {vue && <ProvenanceEcran mode={vue.mode} message={vue.message} quoi="Statistiques" />}
         {vue?.refus && <p className="rig-eg-note" role="alert">{vue.refus}</p>}
 
+        {/* Plusieurs tableaux : UN defilement pour tous. Chaque .rig-table-cadre (rig-accueil.css:1633, flex 1 1 auto,
+            overflow auto) retrecirait sinon a quelques lignes, chacun avec sa barre. fix-ok: mesure le 27/11/2026 sur le bureau
+            cache (capture y1, volet interne de 2000) -- « Statistiques judiciaires » montrait 4 lignes sur 10 et les clotures 1
+            sur 4, alors que le serveur rendait les 10 et les 4 (39 + 13 + 1 + 1 = 54, le total du volet web). */}
+        <div style={{ overflow: 'auto', flex: '1 1 auto', minHeight: 0 }}>
         {vue?.tableaux.map((t, i) => (
-          <div key={`${t.titre}-${i}`} className="rig-table-cadre" style={{ marginBottom: 'var(--rig-esp-4)' }}>
+          <div key={`${t.titre}-${i}`} className="rig-table-cadre" style={{ flex: '0 0 auto', overflow: 'visible', marginBottom: 'var(--rig-esp-4)' }}>
             <div className="rig-kicker">{t.titre}</div>
             {t.cause && <p className="rig-eg-note" role="note">{t.cause}</p>}
             <table className="rig-table">
@@ -172,6 +177,7 @@ export function EcranStatistiques() {
             </table>
           </div>
         ))}
+        </div>
       </section>
     </div>
   )

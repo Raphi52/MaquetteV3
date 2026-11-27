@@ -421,8 +421,10 @@ public static partial class LectureStatistiques
                     ? new LigneStatistique(code.Texte("LIBELLE"), [$"non calculé : {cause}"])
                     : new LigneStatistique(code.Texte("LIBELLE"), [.. nombres.Select(Entier), Entier(code.Entier("QUANTITE"))]));
             }
+            // fix-ok: avertissement CS8604 mesure a la construction du serveur 5209 (27/11/2026) -- « codes » est non nul ici
+            // (causeCodes est nul), le compilateur ne le deduit pas.
             if (lignesClotures.Count > 0)
-                lignesClotures.Add(new LigneStatistique("Total", [.. Enumerable.Repeat("", ColonnesTranches.Length), Entier(codes.Sum(x => x.Entier("QUANTITE")))]));
+                lignesClotures.Add(new LigneStatistique("Total", [.. Enumerable.Repeat("", ColonnesTranches.Length), Entier(codes!.Sum(x => x.Entier("QUANTITE")))]));
             clotures = new TableauStatistique("Clôtures", ["Code de clôture", .. ColonnesTranches, "Quantité"], [.. lignesClotures]);
         }
         return [web, totaux, clotures];
