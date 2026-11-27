@@ -155,6 +155,8 @@ export interface NonOppositionCw {
   quantiteActive: boolean
   certificatDOpposition: boolean
   controle: ControleCw | null
+  /** Pourquoi le controle n'est pas montre : aucun type coche, ou en base (Pont/EcranCommandesWeb.cs, SansControle). */
+  sansControle?: string | null
 }
 export interface CertificatCw { valeur: string; libelle: string; quantite: number; actif: boolean; bloque: boolean; motif: string | null }
 export interface CertificatsCw { dateTravail: string; lignes: CertificatCw[]; basculeFaillite: boolean; certificatDeFaillite: boolean }
@@ -493,7 +495,7 @@ function ZoneNonOpposition({ n, geste }: { n: NonOppositionCw; geste: Geste }) {
       <section className="rig-tcw__zone">
         <div className="rig-tcw__zone-tete"><span className="rig-tcw__section">Contrôle de délivrance</span></div>
         {controle === null ? (
-          <div className="rig-tcw__ligne-statut rig-tcw__ligne-statut--attente">Cochez un type de certificat pour lancer le contrôle de délivrance.</div>
+          <div className="rig-tcw__ligne-statut rig-tcw__ligne-statut--attente">{n.sansControle}</div>
         ) : (
           <>
             <div className="rig-tcw__mesures">

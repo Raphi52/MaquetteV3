@@ -1,0 +1,8 @@
+# « Dates de travail » (LecteurDatesTravail) : DATE_TRAVAIL actives (DTTRV_ACTIF = 1, DateTravail.cs:48), par code ; L14I (inactive)
+# ecartee, jumeau de L14P. Groupe : WINS et DATW -> « RCS et endettement » (OPE_DATE_TRAVAIL.cs:50), sinon « Autres dates ».
+# Etat (DoVerifier, l. 50-70) : DATW, date de travail future -> AFaire ; WINS, fraicheur future -> EnCours ; L14F, futur mais hors
+# WINS / DATW -> Validee (jumeau). Cellules : Code, Libellé, Date de travail, Date de fraîcheur, les deux cases, Ancienne date.
+RCS | code DATW · travail 31/12/2099 · fraîcheur non renseignée | RCS et endettement | AFaire | []
+DATE BANC FUTURE | code L14F · travail 30/06/2099 · fraîcheur 01/07/2099 · automatique | Autres dates | Validee | [] | valeurs: L14F ; DATE BANC FUTURE ; 2099-06-30 ; 2099-07-01 ; oui ;  ; 2026-01-01
+DATE BANC PASSEE | code L14P · travail 05/01/2026 · fraîcheur non renseignée | Autres dates | Validee | []
+Inscriptions | code WINS · travail 10/02/2026 · fraîcheur 01/01/2099 | RCS et endettement | EnCours | []

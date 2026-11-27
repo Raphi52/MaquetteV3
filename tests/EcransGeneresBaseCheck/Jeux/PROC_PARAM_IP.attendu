@@ -1,0 +1,7 @@
+# « Codes chefs IP » (LecteurCodesChefsIp) : le reglage IP_CODE_CHEF (soc.Reglage) « RFL14;IPL14A;IPL14Z;IPL14C », dans son ordre ;
+# IPL14Z, introuvable dans CODE_CHEF, n'est pas montre (ETP_PARAM_IP.cs:20) ; IPL14B, dans CODE_CHEF mais pas range, non plus.
+# Groupe : un code qui commence par IP -> « Codes IP proposables » (OPE_PARAM_IP.cs:26) ; RFL14 -> « Autres codes ». Etat : Validee.
+# Cellules : Code chef, Libellé, Ordre (le rang dans la liste montree).
+RFL14 | REFERE BANC · rang 1 | Autres codes | Validee | [] | valeurs: RFL14 ; REFERE BANC ; 1
+IPL14A | INJONCTION BANC A · rang 2 | Codes IP proposables | Validee | [] | valeurs: IPL14A ; INJONCTION BANC A ; 2
+IPL14C | INJONCTION BANC C · rang 3 | Codes IP proposables | Validee | []

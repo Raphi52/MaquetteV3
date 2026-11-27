@@ -1,0 +1,15 @@
+# « Cabinets » : le critere « Juge » (nom ou abrege du juge) ; JDE14 ecarte JUN14 (jumeau).
+critere: Juge = JDE14
+lignes:
+CABINET BANC DEUX · 03/02/2020 à 09:30 | TYPE BANC CODE EXIGE · juge JDE14 | Passés | Validee | []
+---
+# Le critere « Date d'audience » : le jour exact.
+critere: Date d'audience = 06/01/2020
+lignes:
+TYPE BANC LIBRE · 06/01/2020 à 14:00 | TYPE BANC LIBRE · juge à renseigner | Passés | EnCours | []
+---
+# Le critere « Type de cabinet » (code ou libelle).
+critere: Type de cabinet = CODE EXIGE
+lignes:
+CABINET BANC UN · 10/03/2099 à 09:00 | TYPE BANC CODE EXIGE · juge JUN14 · greffier G17A | À venir | Validee | []
+CABINET BANC DEUX · 03/02/2020 à 09:30 | TYPE BANC CODE EXIGE · juge JDE14 | Passés | Validee | []

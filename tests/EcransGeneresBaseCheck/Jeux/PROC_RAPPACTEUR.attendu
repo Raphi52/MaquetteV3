@@ -7,7 +7,10 @@
 # CNBF, AFaire) ; actif -> AFaire ; inactif -> EnCours (2400104, JUGEOFF, JUGEX -- jumeaux : les actifs).
 # Nom : l'abrege d'edition de la civilite puis le nom (dbo.GetCiviliteNomPrenom) ; PM et ND jamais devant le nom (SELARL LIQUIDA) ;
 # un nom vide prend l'abrege (ZZ15).
+# PROC_SUPP_ACTEUR_JUD.sql (lot 14) ajoute les juges J14K, J14X, J14R et les mandataires PC M14K, M14R : la V2 les liste aussi.
 COLLEGE | sans abrégé · actif | Juges | AFaire | []
+Mme GARDE Karine | abrégé J14K · actif | Juges | AFaire | []
+M. INACTIF Xavier | abrégé J14X · inactif | Juges | EnCours | []
 M. JUGEA Paul | abrégé J17A · actif | Juges | AFaire | []
 Mme JUGEB Anne | abrégé J17B · actif | Juges | AFaire | []
 M. JUGEBANC Paul | sans abrégé · actif | Juges | AFaire | []
@@ -30,6 +33,7 @@ M. JUGETROIS Luc | abrégé JTR14 · actif | Juges | AFaire | []
 M. JUGEUN Jean | abrégé JUN14 · actif | Juges | AFaire | []
 M. JUGEX | abrégé J17X · inactif | Juges | EnCours | []
 PARTI Max | sans abrégé · actif | Juges | AFaire | []
+M. REMPLACE Jules | abrégé J14R · actif | Juges | AFaire | []
 Mme SUPPLEANT Ida | sans abrégé · actif | Juges | AFaire | []
 TITULAIRE Luc | sans abrégé · actif | Juges | AFaire | []
 ZZ15 | abrégé ZZ15 · actif | Mandataires | AFaire | []
@@ -61,6 +65,8 @@ Me FINI | sans abrégé · actif | Mandataires PC | AFaire | []
 Me LIQPREMIER | sans abrégé · actif | Mandataires PC | AFaire | []
 Me LIQUI Paul | sans abrégé · actif | Mandataires PC | AFaire | []
 Me MANDA | sans abrégé · actif | Mandataires PC | AFaire | []
+Me MANDA GARDE Selarl | abrégé M14K · actif | Mandataires PC | AFaire | []
+Me MANDA REMPLACE Selarl | abrégé M14R · actif | Mandataires PC | AFaire | []
 Me MANDAFINI | sans abrégé · actif | Mandataires PC | AFaire | []
 Me MANDAUN Selarl | sans abrégé · actif | Mandataires PC | AFaire | []
 Me MDJRANG1 | sans abrégé · actif | Mandataires PC | AFaire | []
