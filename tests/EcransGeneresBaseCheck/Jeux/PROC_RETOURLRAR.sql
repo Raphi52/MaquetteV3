@@ -37,3 +37,38 @@ INSERT INTO v2.LRAR_INFOS (LRARI_NUM_LRAR, LRARI_TYPE, LRARI_TYPE_DATE, LRARI_DA
     ('1A1200009', 'LRAR', '', DATEADD(DAY, -1, @aujourdhui), NULL),
     -- modalite sans parametrage (INCONNU de eTypeReceptionLrar) : retours anormaux, son code dans les precisions
     ('1A1200010', 'LRAR', 'INCONNU', DATEADD(DAY, -6, @aujourdhui), NULL);
+
+-- LOT 11 du plan « RIG v3 100 % fonctionnel » (plan-676a4b19) : des plis a SCANNER (sans retour), pour la recherche par code-barre
+-- et le geste « Enregistrer le retour ». Plis 1A21101xx, editions 21101xx, emis le 20/03/2001 (dates fixes). Les demandes d'edition
+-- entrent aussi dans la « File des editions » (PROC_POOLEDITION.attendu, sans date de creation). La colonne DMNED_LOT (vide a la
+-- remise en emission) est ajoutee si ce jeu la trouve absente, au type de RIG_DEV.
+IF COL_LENGTH('v2.DEMANDE_EDITION', 'DMNED_NUM_LRAR') IS NULL ALTER TABLE v2.DEMANDE_EDITION ADD DMNED_NUM_LRAR varchar(13) NULL;
+IF COL_LENGTH('v2.DEMANDE_EDITION', 'DMNED_NUM_GROUPE') IS NULL ALTER TABLE v2.DEMANDE_EDITION ADD DMNED_NUM_GROUPE varchar(40) NULL;
+IF COL_LENGTH('v2.DEMANDE_EDITION', 'DMNED_LOT') IS NULL ALTER TABLE v2.DEMANDE_EDITION ADD DMNED_LOT varchar(255) NULL;
+EXEC sp_executesql N'
+INSERT INTO v2.LRAR_INFOS (LRARI_NUM_LRAR, LRARI_TYPE, LRARI_TYPE_DATE, LRARI_DATE_RECEPTION) VALUES
+    -- pas encore revenu, emis par une convocation : le retour se saisit (bloc 5 du .gestes)
+    (''1A2110101'', ''LRAR'', NULL, NULL),
+    -- pas encore revenu, dans une file differee : « Pli non envoye » le remet en emission (bloc 6)
+    (''1A2110102'', ''LRAR'', NULL, NULL),
+    -- pas encore revenu, mais aucune demande d''edition ne l''a emis : la V2 ne le reconnait pas -- jumeau 1A2110101
+    (''1A2110103'', ''LRAR'', NULL, NULL),
+    -- lettre electronique, son retour vient de La Poste : ni cherchee ni saisie ici -- jumeau 1A2110101
+    (''1A2110105'', ''CIPREMIUM_LRAR'', NULL, NULL);
+-- Les demandes d''edition, en table temporaire : copiees ensuite avec les quatre cases NOT NULL sans defaut que PROC_REGJUD.sql pose
+-- comme dans la base V3 (DMNED_HAS_NUMLRAR...) a 0, la valeur par defaut de RIG_DEV, si elles sont la (PROC_RELANCELOT.sql).
+SELECT * INTO #Editions FROM (VALUES
+    (2110101, ''E'', ''Convocation du banc 11'', ''RETOUR ALPHA SARL'', CONVERT(datetime, ''20010320 10:00''), ''1A2110101'', CAST(NULL AS varchar(255))),
+    (2110102, ''C'', ''Convocation du banc 11'', ''RETOUR BETA SAS'', CONVERT(datetime, ''20010320 11:00''), ''1A2110102'', ''LRAR''),
+    (2110105, ''E'', ''Lettre electronique du banc 11'', ''RETOUR GAMMA SARL'', CONVERT(datetime, ''20010320 12:00''), ''1A2110105'', NULL),
+    -- l''edition qui a emis 1A1200004 (incomplet, sans date) : sa date se corrige (bloc 7)
+    (2110104, ''E'', ''Convocation du banc 11'', ''RETOUR DELTA SAS'', CONVERT(datetime, ''20010320 09:00''), ''1A1200004'', NULL))
+    AS e (Id, Phase, Libelle, Destinataire, PreEmission, Lrar, Lot);
+IF COL_LENGTH(''v2.DEMANDE_EDITION'', ''DMNED_MASQUER_COFFRE_FORT'') IS NOT NULL
+    EXEC (''INSERT INTO v2.DEMANDE_EDITION (DMNED_ID_DMNED, DMNED_PHASE_TRAITEMENT, DMNED_LIBELLE_DOCUMENT, DMNED_DESIGNATION_DESTINATAIRE,
+            DMNED_DATE_PRE_EMISSION, DMNED_NUM_LRAR, DMNED_LOT, DMNED_HAS_NUMLRAR, DMNED_IS_NON_SUPPRESSIBLE, DMNED_HAS_NUMLR, DMNED_MASQUER_COFFRE_FORT)
+          SELECT Id, Phase, Libelle, Destinataire, PreEmission, Lrar, Lot, 0, 0, 0, 0 FROM #Editions'');
+ELSE
+    INSERT INTO v2.DEMANDE_EDITION (DMNED_ID_DMNED, DMNED_PHASE_TRAITEMENT, DMNED_LIBELLE_DOCUMENT, DMNED_DESIGNATION_DESTINATAIRE,
+                                    DMNED_DATE_PRE_EMISSION, DMNED_NUM_LRAR, DMNED_LOT)
+    SELECT Id, Phase, Libelle, Destinataire, PreEmission, Lrar, Lot FROM #Editions;';

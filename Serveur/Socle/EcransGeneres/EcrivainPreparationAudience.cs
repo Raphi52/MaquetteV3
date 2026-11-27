@@ -171,7 +171,9 @@ internal sealed class EcrivainPreparationAudience : IEcrivainEcran
 
     private static async Task<Audience?> LireAudienceAsync(GesteEnCours geste, string id, CancellationToken ct)
     {
-        if (!int.TryParse(id, NumberStyles.None, CultureInfo.InvariantCulture, out var n)) return null;
+        // Une ligne cherchee en mode P porte le suffixe du mode (LecteurPreparationAudience.SuffixePc) : c'est la meme audience.
+        LecteurPreparationAudience.ModePc(id, out var audience);
+        if (!int.TryParse(audience, NumberStyles.None, CultureInfo.InvariantCulture, out var n)) return null;
         await using var r = await geste.LireAsync($$"""
             SELECT a.AUDNC_ID_ADNC, {{AudiencesV2.Libelle}} AS Libelle, CONVERT(bit, ISNULL(a.AUDNC_AUDIENCE, 1)) AS EstAudience,
                    CONVERT(bit, ISNULL(a.AUDNC_NUM_APPEL_ATTRIB, 0)) AS Attribues, a.AUDNC_HEURE, a.AUDNC_TYPE_CLASSEMENT_ADMIS,

@@ -14,3 +14,9 @@ Cour d'appel | B3NOADR · Procureur · adresse à compléter | Parquet et juridi
 Parquet du tribunal judiciaire | B3PARQ · Procureur · coffre-fort COFFRE_PARQUET depuis le {J-100} | Parquet et juridictions | Validee | [0,1,2]
 Urssaf | B3URSSAF · Enquête prévention | Administrations | Validee | [0]
 Chambre de commerce | B3VIDE · Chambre de Commerce · adresse à compléter | Organismes | AFaire | []
+# Les huissiers (type H, sans libelle d'ENTITE : « Organismes ») du jeu PROC_GCONV.sql (lot 7), destinataires des editions de la
+# citation : lus ici aussi, sans critere.
+SCP HUISSIER COFFRE | H17COF · H · courriel · coffre-fort COFFRE_H17 | Organismes | Validee | [0,2]
+SCP HUISSIER FUTUR | H17FUT · H · coffre-fort COFFRE_FUT depuis le {A+1} | Organismes | Validee | [0,2]
+SCP HUISSIER INACTIF | H17INA · H · coffre-fort COFFRE_INA | Organismes | EnAttente | [0,2]
+SCP HUISSIER SIMPLE | H17SIM · H | Organismes | Validee | [0]

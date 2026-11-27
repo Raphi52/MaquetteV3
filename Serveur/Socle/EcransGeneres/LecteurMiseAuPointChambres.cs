@@ -12,16 +12,22 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// d'affaire coches (parametre IdAppelsAffaires, proc_mpcs.md:22) quand TOUTES leurs instances ont une procedure collective
 /// (INSTN_ID_PRCLL) et qu'aucune n'est traitee (OPE_LIST_APPEL_AFFAIRE.cs:1409-1412, DetermineProcessusSelonTypeInstance ; une PC
 /// seule : PROC_MPC, :1420-1425). Le role est donc celui du retour d'audience (LecteurRetourAudience.cs : la fenetre
-/// INTERV_AUD_DATE_*_RETAUD, « Date de l'audience », « Chambre »), restreint a ces affaires. ORDRE : audience, numero d'appel, role.
+/// INTERV_AUD_DATE_*_RETAUD, « Date de l'audience », « Chambre »), restreint a ces affaires, avec la colonne « Compo. » de cette
+/// grille (LecteurRetourAudience.Composition) : la composition que « Valider la décision » pose s'y relit. ORDRE : audience, numero
+/// d'appel, role.
 /// Une ligne, un etat « À juger » (AFaire).
 ///
 /// LE GESTE : « Valider la décision » en lot (résultat et décision judiciaire), EcrivainMiseAuPointChambres.cs. Le nouvel etat de
 /// la PC (loi, modalites, forfait, OPE_NOUV_ETAT_PC...) ne se saisit qu'en affaire unique dans RIG v2 : une PC seule se met a
 /// jour par « Procédures collectives » (PROC_MPC).
 /// </summary>
-internal sealed class LecteurMiseAuPointChambres : IRechercheEcran
+internal sealed class LecteurMiseAuPointChambres : IRechercheEcran, IFicheEcran
 {
     public string Procedure => "PROC_MPCS";
+
+    /// <summary>La fiche de l'affaire depliee (FichesAudienceV2.cs : ses sections, ses sources V2, ce qu'elle ne lit pas).</summary>
+    public Task<FicheEcran?> LireFicheAsync(SqlConnection baseGreffe, string id, DateTime maintenant, CancellationToken ct)
+        => FichesAudienceV2.MiseAuPointAsync(baseGreffe, Procedure, id, ct);
 
     /// <summary>Le groupe du descripteur (Surveiller.cs), au mot pres.</summary>
     internal const string Groupe = "Procédures collectives à l'audience";
@@ -33,7 +39,7 @@ internal sealed class LecteurMiseAuPointChambres : IRechercheEcran
     private static readonly string Requete = $$"""
         SELECT TOP (@plafond) aa.APPAF_ID_APPAF AS Id, i.INSTN_NUM_ROLE AS Role, i.INSTN_NOM_COURANT AS NomCourant,
                aa.APPAF_NUM_APPEL AS NumAppel, aa.APPAF_TYPE_CLASSEMENT AS TypeClassement, pc.PRCLL_NUM_PC AS NumeroPc,
-               {{AudiencesV2.Libelle}} AS Audience, COUNT(*) OVER () AS Total
+               {{AudiencesV2.Libelle}} AS Audience, {{LecteurRetourAudience.Composition}} AS Compo, COUNT(*) OVER () AS Total
         FROM v2.AUDIENCE_CABINET AS a
         JOIN v2.APPEL_AFFAIRE AS aa ON aa.APPAF_ID_ADNC = a.AUDNC_ID_ADNC
         JOIN v2.INSTANCE AS i ON i.INSTN_ID_INSTN = aa.APPAF_ID_INSTN
@@ -61,6 +67,8 @@ internal sealed class LecteurMiseAuPointChambres : IRechercheEcran
         return await LectureEcran.LireAsync(baseGreffe, Requete.Replace("/*filtre*/", filtre), Ligne, ct, [.. parametres]);
     }
 
+    // fix-ok: mesure du 27/11/2026 (copie de dev) -- la composition posee par « Valider la décision » ne se relisait sur aucune
+    // ligne : la colonne « Compo. » de la grille de RIG v2 (OPE_LIST_APPEL_AFFAIRE.cs:583) manquait (en-tete, requete, ligne).
     private static LigneLue Ligne(SqlDataReader r)
     {
         var role = FormeLigne.Texte(r, "Role");
@@ -68,7 +76,8 @@ internal sealed class LecteurMiseAuPointChambres : IRechercheEcran
             $"Rôle {role}",
             LecteurRetourAudience.NumeroAppel(FormeLigne.Texte(r, "NumAppel"), FormeLigne.Texte(r, "TypeClassement")) is { Length: > 0 } n ? $"appel n° {n}" : null,
             FormeLigne.Texte(r, "NumeroPc") is { Length: > 0 } pc ? $"PC {pc}" : null,
-            FormeLigne.Texte(r, "Audience"));
+            FormeLigne.Texte(r, "Audience"),
+            LecteurRetourAudience.TexteComposition(r));
         var nom = FormeLigne.Texte(r, "NomCourant") is { Length: > 0 } nc ? nc : $"Instance n° {role}";
         return new LigneLue(nom, precisions, Groupe, "AFaire", []) { Id = FormeLigne.Texte(r, "Id") };
     }

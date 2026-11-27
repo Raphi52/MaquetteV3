@@ -1,0 +1,48 @@
+# « Bordereaux LR » (EcrivainBordereauxLr) : « Éditer le bordereau » (VALIDER de RIG v2) sur la ligne a editer de la periode, une
+# par type ; l'objet (type, bornes, utilisateur) est dans l'Id de la ligne (AEditer, LecteurBordereauxLr.cs). Plis : PROC_BORDLR.sql.
+
+# Refus : une ligne de bordereau deja edite n'est pas un bordereau a editer -- rien a editer (PROC_BORDLR.DoVerifier, :60-61).
+# Jumeau accepte : bloc 4.
+geste: Agir Éditer le bordereau
+ids: D-1200301
+resultat: refuse
+message: Validation inutile vous n'avez rien a éditer. Cliquez sur le bouton Quitter.
+---
+# Refus : le 17/03/2001 n'a aucun pli (NbOccurence = 0). Jumeau accepte : bloc 4, le 15/03.
+geste: Agir Éditer le bordereau
+ids: A|LRAR|20010317000000000|20010317235959998|
+resultat: refuse
+message: Validation inutile vous n'avez rien a éditer. Cliquez sur le bouton Quitter.
+---
+# Refus : un debut apres la fin ne compte rien. Jumeau accepte : bloc 4, le meme jour dans l'ordre.
+geste: Agir Éditer le bordereau
+ids: A|LRAR|20010316000000000|20010315235959998|
+resultat: refuse
+message: Validation inutile vous n'avez rien a éditer. Cliquez sur le bouton Quitter.
+---
+# « Éditer le bordereau » avec AR, le 15/03/2001 : une demande d'edition « Bordereau LRAR-1 » (BORD_LRAR, maquette BORDLRAR_LOT2,
+# FUSION_CRYSTAL), phase C dans la file des editions, sans demande V2 (la trace est le journal des gestes), le SQL du bordereau dans
+# son XML de generation. Relue en tete des bordereaux edites.
+geste: Agir Éditer le bordereau
+ids: A|LRAR|20010315000000000|20010315235959998|
+resultat: fait
+message: Bordereau LRAR-1 (3 plis, du 15/03/2001 au 15/03/2001) : placé dans la file des éditions. Impression simulée : le service d'édition de RIG v2 imprime le bordereau, RIG v3 ne l'appelle pas.
+lignes:
+Bordereau LRAR-1 | créé le {J+0} · par banc.ecrans · édition en file (phase « C » de l'ancien RIG) | Avec accusé de réception | EnCours | [] | valeurs: Bordereau LRAR-1 ;  ; banc.ecrans ;  ; édition en file (phase « C » de l'ancien RIG)
+Bordereau 26001200302 | commencé le {J-1} · par lesniewski · à valider | Avec accusé de réception | AFaire | []
+Bordereau 26001200307 | validé le {J-3} · par GESA · aucune édition retrouvée, avec ou sans AR inconnu | Avec accusé de réception | EnCours | []
+Bordereau 26001200301 | validé le {J-3} · par GESA · aucune édition retrouvée, avec ou sans AR inconnu | Avec accusé de réception | EnCours | []
+Bordereau 26001200303 | commencé le {J-10} · à valider | Avec accusé de réception | AFaire | []
+Bordereau 26001200306 | validé le {J-20} · par GPOURADIER · aucune édition retrouvée, avec ou sans AR inconnu | Avec accusé de réception | EnCours | []
+controle: SELECT DMNED_CODE_MAQUETTE + ' / ' + DMNED_TYPE_GENERATION + ' / ' + DMNED_PHASE_TRAITEMENT + ' / ' + CASE WHEN DMNED_ID_DMND IS NULL THEN 'sans demande' ELSE 'demande' END FROM v2.DEMANDE_EDITION WHERE DMNED_LIBELLE_DOCUMENT = 'Bordereau LRAR-1' => BORDLRAR_LOT2 / FUSION_CRYSTAL / C / sans demande
+controle: SELECT CASE WHEN DMNED_PARAMETRE_GENERATION LIKE '%Where LRARI_TYPE =''LRAR''  AND DMNED_DATE_PRE_EMISSION %convert(DateTime2, ''2001-03-15 00:00:00'', 121) AND DMNED_DATE_PRE_EMISSION %convert(DateTime2, ''2001-03-15 23:59:59.998'', 121) AND DMNED_UTILISATEUR IS NOT NULL ORDER BY dmned_id_dmned%' THEN 'requete du bordereau' ELSE DMNED_PARAMETRE_GENERATION END FROM v2.DEMANDE_EDITION WHERE DMNED_LIBELLE_DOCUMENT = 'Bordereau LRAR-1' => requete du bordereau
+---
+# « Éditer le bordereau » sans AR, le meme jour, pour GESA : « Bordereau LR-1 » (BORD_LR), 1 pli. La numerotation LRN n'a pas
+# demarre (aucun compteur LRN a 1 dans ce banc) : la saisie sans AR est ouverte. Le refus LRN (CHRONO_DEBUT = 1) n'a pas de bloc :
+# un jeu ne peut pas changer le compteur entre deux blocs.
+geste: Agir Éditer le bordereau
+ids: A|LR|20010315000000000|20010315235959998|GESA
+resultat: fait
+message: Bordereau LR-1 (1 pli, du 15/03/2001 au 15/03/2001) : placé dans la file des éditions. Impression simulée : le service d'édition de RIG v2 imprime le bordereau, RIG v3 ne l'appelle pas.
+controle: SELECT DMNED_LIBELLE_DOCUMENT + ' / ' + DMNED_CODE_MAQUETTE FROM v2.DEMANDE_EDITION WHERE DMNED_LIBELLE_DOCUMENT = 'Bordereau LR-1' => Bordereau LR-1 / BORDLRAR_LOT2
+controle: SELECT CASE WHEN DMNED_PARAMETRE_GENERATION LIKE '%Where LRARI_TYPE =''LR''  %AND DMNED_UTILISATEUR=''GESA'' ORDER BY%' THEN 'GESA' ELSE DMNED_PARAMETRE_GENERATION END FROM v2.DEMANDE_EDITION WHERE DMNED_LIBELLE_DOCUMENT = 'Bordereau LR-1' => GESA

@@ -51,7 +51,7 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///     puis ce que l'injonction y pose) : type du reglage, sens general ACCTT / REJTT selon R_TYPEDECISI_ACCEPTE, avec piece
 ///     numerisee, GED du type, date prevue, juge, greffier, ressort / contradictoire / avant dire droit « 0 », archivage « 0 » ;
 ///   - v2.EVENEMENT_PROCEDURE : l'evenement du type de decision, survenu a la date prevue, et ceux de creation du code affaire,
-///     survenus du jour (PrepaEveDeProcedureLieALaDecision / ...AuCodeAffaire, :389-404 ; EcrivainRetourAudience.EvenementSurvenuAsync) ;
+///     survenus du jour (PrepaEveDeProcedureLieALaDecision / ...AuCodeAffaire, :389-404 ; EvenementsProcedureV2.SurvenuAsync, sans futur) ;
 ///   - v2.DILIGENCE_RCS_PARAMETRE, v2.RELANCE_RCS, v2.DILIGENCE_RCS : la relance d'injonction sur la diligence (CreerRelanceInjonctionDCA,
 ///     Exercice.cs:350-369 ; CreerRelanceInjonctionDBE, DossierRCS.cs:1821-1838) : parametres de la diligence d'apres les reglages
 ///     (CreateDiligenceRcsParametreInjonction, DiligenceRcsParametre.cs:31-45), relance numero suivant, auteur « 4 », intervenant
@@ -399,7 +399,7 @@ internal static class InjonctionsIsurv
                 new SqlParameter("@h", heure), new SqlParameter("@id", int.Parse(appel.IdObjet!, CultureInfo.InvariantCulture)));
 
         // La decision d'injonction.
-        var decision = (await EcrivainMiseAuPointChambres.CreerDecisionAsync(geste, idInstance, role, c.Type.Valeur, c.Saisie.DatePrevue, null, ct))[0];
+        var decision = (await EcrivainMiseAuPointChambres.CreerDecisionAsync(geste, idInstance, role, c.Type.Valeur, c.Saisie.DatePrevue, null, ct)).Traces[0];
         var idDecision = int.Parse(decision.IdObjet!, CultureInfo.InvariantCulture);
         await geste.EcrireAsync("""
             UPDATE v2.DECISION_JUDICIAIRE SET DCJDC_ID_JUG = @juge, DCJDC_ID_GRASS = @greffier, DCJDC_SENS_GENERAL = @sens, DCJDC_AVEC_PIECE_NUMERISE = 1,
@@ -415,13 +415,13 @@ internal static class InjonctionsIsurv
         var evenements = new List<string>();
         if (c.Type.CodeEvePro is { } eveDecision)
         {
-            await EcrivainRetourAudience.EvenementSurvenuAsync(geste, idInstance, eveDecision, c.Saisie.DatePrevue, ct);
+            await EvenementsProcedureV2.SurvenuAsync(geste, idInstance, eveDecision, c.Saisie.DatePrevue, avecFutur: false, ct);
             evenements.Add(eveDecision);
         }
         foreach (var eve in (c.EvenementsCreation ?? "").Split(';', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
             if (await RelancesRsurv.Scalaire(geste, "SELECT COUNT(*) FROM v2.CODE_EVE_PRO WHERE R_CODEEVEPRO_VALEUR = @c", ct, new SqlParameter("@c", eve)) is int n && n > 0)
             {
-                await EcrivainRetourAudience.EvenementSurvenuAsync(geste, idInstance, eve, jour, ct);
+                await EvenementsProcedureV2.SurvenuAsync(geste, idInstance, eve, jour, avecFutur: false, ct);
                 evenements.Add(eve);
             }
 

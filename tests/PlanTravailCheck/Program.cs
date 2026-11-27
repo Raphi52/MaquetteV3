@@ -243,7 +243,7 @@ internal static class Programme
 
         Envoyer(3, "EcranVerrous.Verrouilles", "R. VILAIN", false);
         Exiger(Reponse(3).GetProperty("valeur").GetProperty("lignes").GetArrayLength()
-               == EcranVerrous.Verrouilles("R. VILAIN", false).Lignes.Length,
+               == EcranVerrous.Exemple("R. VILAIN", false).Lignes.Length,
             "pont : une methode [JSInvokable] d'ecran est jointe par son identifiant, arguments convertis du JSON");
 
         Envoyer(4, "Ecran.Inconnu");

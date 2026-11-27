@@ -1,0 +1,89 @@
+# « Retours LRAR » (EcrivainRetoursLrar) : « Enregistrer le retour » (la reception de RIG v2, OPE_RETOURLRAR_RECEPTION.cs) sur les plis
+# coches, avec la modalite et la date de la section « Retour ». Plis : PROC_RETOURLRAR.sql.
+
+# Refus : aucun pli (l. 155). Jumeau accepte : bloc 5.
+geste: Confirmer Enregistrer le retour
+ids:
+valeur: Retour › Modalité de retour = Réception
+valeur: Retour › Date de réception = 2001-03-25
+resultat: refuse
+message: Veuillez saisir le numéro du recommandé
+---
+# Refus : ni date ni case « Date non renseignee » (FT 14369, l. 107-110). Jumeau accepte : bloc 5 (la date), bloc 6 (la case).
+geste: Confirmer Enregistrer le retour
+ids: 1A2110101
+valeur: Retour › Modalité de retour = Réception
+resultat: refuse
+message: Si vous n'avez pas de date renseignée, il faut cocher la case 'Date non renseignée'.
+---
+# Refus : aucune demande d'edition n'a emis 1A2110103 (l. 133). Jumeau accepte : bloc 5, 1A2110101 et sa convocation.
+geste: Confirmer Enregistrer le retour
+ids: 1A2110103
+valeur: Retour › Modalité de retour = Réception
+valeur: Retour › Date de réception = 2001-03-25
+resultat: refuse
+message: Ce code à barre n'est pas reconnu dans base de données du greffe.
+---
+# Refus : une lettre electronique (CIPREMIUM_LRAR) n'est pas un pli papier de cet ecran (l. 487, 498, 511). Jumeau accepte : bloc 5.
+geste: Confirmer Enregistrer le retour
+ids: 1A2110105
+valeur: Retour › Modalité de retour = Réception
+valeur: Retour › Date de réception = 2001-03-25
+resultat: refuse
+message: Ce code à barre n'est pas reconnu dans base de données du greffe.
+---
+# Reception de 1A2110101 le 25/03/2001 (TraitementReception, l. 790-842) : LRARI_TYPE_DATE et LRARI_DATE_RECEPTION ecrits ; le pli
+# entre dans la liste des retours saisis, a sa date (la plus ancienne : en dernier). RECEPTION est « a gerer » : rien n'est remis en
+# emission.
+geste: Confirmer Enregistrer le retour
+ids: 1A2110101
+valeur: Retour › Modalité de retour = Réception
+valeur: Retour › Date de réception = 2001-03-25
+resultat: fait
+message: Pli 1A2110101 : Reçu le 25/03/2001.
+lignes:
+Pli 1A1200004 | Incomplet reçu · date non précisée sur l'imprimé | NPAI, refusés ou incomplets | EnCours | []
+Pli 1A1200001 | Reçu le {J-1} | Reçus | Validee | []
+Pli 1A1200002 | NPAI reçu le {J-2} · renvoyé sous le n° 1A1200011 | NPAI, refusés ou incomplets | Validee | []
+Pli 1A1200003 | Refusé reçu le {J-3} | NPAI, refusés ou incomplets | Validee | []
+Pli 1A1200005 | Non réclamé reçu le {J-4} | Non réclamés | Validee | []
+Pli 1A1200006 | Non envoyé le {J-5} · demandes d'édition remises en file d'émission · LR sans accusé de réception | Non envoyés | Validee | []
+Pli 1A1200010 | modalité « INCONNU » de l'ancien RIG · le {J-6} | NPAI, refusés ou incomplets | Validee | []
+Pli 1A170600015 | Reçu le 09/07/2001 | Reçus | Validee | []
+Pli 1A170600013 | NPAI reçu le 09/07/2001 | NPAI, refusés ou incomplets | Validee | []
+Pli 1A2110101 | Reçu le 25/03/2001 | Reçus | Validee | []
+fiche: 1A2110101
+Retour › Modalité de retour = Réception
+Retour › Date de réception = 2001-03-25
+controle: SELECT LRARI_TYPE_DATE + ' / ' + CONVERT(varchar(10), LRARI_DATE_RECEPTION, 103) FROM v2.LRAR_INFOS WHERE LRARI_NUM_LRAR = '1A2110101' => RECEPTION / 25/03/2001
+---
+# « Pli non envoye », date non renseignee, sur 1A2110102 : PAS_ENVOYE n'est pas « a gerer » (PRMLI_A_GERER = 0) -- sa demande
+# d'edition repart en emission (l. 825-835) : pre-emission au 01/01/1900, phase E, sans lot ni groupe.
+geste: Confirmer Enregistrer le retour
+ids: 1A2110102
+valeur: Retour › Modalité de retour = Pli non envoyé
+valeur: Retour › Date non renseignée = oui
+resultat: fait
+message: Pli 1A2110102 : Non envoyé · date non précisée sur l'imprimé. 1 demande d'édition remise en file d'émission.
+controle: SELECT LRARI_TYPE_DATE + ' / ' + ISNULL(CONVERT(varchar(10), LRARI_DATE_RECEPTION, 103), 'sans date') FROM v2.LRAR_INFOS WHERE LRARI_NUM_LRAR = '1A2110102' => PAS_ENVOYE / sans date
+controle: SELECT DMNED_PHASE_TRAITEMENT + ' / ' + CONVERT(varchar(10), DMNED_DATE_PRE_EMISSION, 103) + ' / ' + ISNULL(DMNED_LOT, 'sans lot') FROM v2.DEMANDE_EDITION WHERE DMNED_ID_DMNED = 2110102 => E / 01/01/1900 / sans lot
+---
+# Un retour deja saisi sans date (1A1200004, incomplet) se corrige : la V2 demande d'ecraser, la confirmation de l'operation en tient
+# lieu, puis « Date reception mise a jour » (ChangementDateReception, l. 899-984). INCOMPLET etait « a gerer » : aucun courriel.
+geste: Confirmer Enregistrer le retour
+ids: 1A1200004
+valeur: Retour › Modalité de retour = Réception
+valeur: Retour › Date de réception = 2001-03-26
+resultat: fait
+message: Pli 1A1200004 : date réception mise à jour (Reçu le 26/03/2001).
+controle: SELECT LRARI_TYPE_DATE + ' / ' + CONVERT(varchar(10), LRARI_DATE_RECEPTION, 103) FROM v2.LRAR_INFOS WHERE LRARI_NUM_LRAR = '1A1200004' => RECEPTION / 26/03/2001
+---
+# Corriger un retour « pas a gerer » (1A2110102, non envoye) : la V2 previent la hotline judiciaire par courriel (l. 930-950) -- un
+# envoi externe, NON fait par RIG v3, et dit (simule).
+geste: Confirmer Enregistrer le retour
+ids: 1A2110102
+valeur: Retour › Modalité de retour = Réception
+valeur: Retour › Date de réception = 2001-03-27
+resultat: fait
+message: Pli 1A2110102 : date réception mise à jour (Reçu le 27/03/2001). Courriel de changement à la hotline judiciaire : non envoyé (simulé, RIG v3 n'envoie rien hors du poste).
+controle: SELECT LRARI_TYPE_DATE + ' / ' + CONVERT(varchar(10), LRARI_DATE_RECEPTION, 103) FROM v2.LRAR_INFOS WHERE LRARI_NUM_LRAR = '1A2110102' => RECEPTION / 27/03/2001

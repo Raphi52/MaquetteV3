@@ -10,7 +10,9 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// SOURCE (ancien RIG) : PROC_RETAUD (proc_retaud.md, le Detail OPE fait foi ; code Source\RIG\DLL\Processus\PROC_RETAUD\).
 ///   - LE ROLE : la requete de la grille, OPE_LIST_APPEL_AFFAIRE.cs:561-592 -- AUDIENCE_CABINET JOIN APPEL_AFFAIRE (APPAF_ID_ADNC)
 ///     JOIN INSTANCE (APPAF_ID_INSTN) JOIN TYPE_CLASSEMENT (APPAF_TYPE_CLASSEMENT) ; colonnes reprises : n° de role, n° d'appel,
-///     resultat (APPAF_CODE_PLUMITIF), prochain appel (le premier appel de l'instance a une audience posterieure). Les parties
+///     resultat (APPAF_CODE_PLUMITIF), prochain appel (le premier appel de l'instance a une audience posterieure), composition (la
+///     colonne « Compo. » : le numero d'ordre de la composition de l'appel, CMPST_NUM_ORDRE de APPAF_ID_CMAUD, montree pour une
+///     audience seulement : OPE_LIST_APPEL_AFFAIRE.cs:343-346, :543, :583, :787-791). Les parties
 ///     (demandeur, defendeur) ne sont pas reprises : la ligne porte le nom courant de l'instance, qui les nomme ;
 ///   - L'AUDIENCE : RIG v2 ouvre la recherche d'audience bornee a [jour - 14 ; jour] (PARAMETRAGE INTERV_AUD_DATE_MIN_RETAUD /
 ///     _MAX_RETAUD ; INTERV_CAB_* pour un cabinet ; OPE_INFORMATIONS_AUDIENCE.cs:107-114, AudiencesV2.FenetreAsync) : sans
@@ -24,9 +26,13 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///   - REGLE D'ETAT : non traite = « À saisir » (AFaire) ; traite = « Résultat saisi » (Validee) ; publicite en attente =
 ///     « Publicité en attente » (EnAttente).
 /// </summary>
-internal sealed class LecteurRetourAudience : IRechercheEcran
+internal sealed class LecteurRetourAudience : IRechercheEcran, IFicheEcran
 {
     public string Procedure => "PROC_RETAUD";
+
+    /// <summary>La fiche de l'affaire depliee (FichesAudienceV2.cs : ses sections, ses sources V2, ce qu'elle ne lit pas).</summary>
+    public Task<FicheEcran?> LireFicheAsync(SqlConnection baseGreffe, string id, DateTime maintenant, CancellationToken ct)
+        => FichesAudienceV2.RetourAsync(baseGreffe, Procedure, id, ct);
 
     /// <summary>Les groupes du descripteur (Surveiller.cs), au mot pres.</summary>
     internal const string ATraiter = "Affaires à traiter", PrononcesATraiter = "Prononcés à traiter", Traitees = "Affaires traitées",
@@ -44,6 +50,7 @@ internal sealed class LecteurRetourAudience : IRechercheEcran
                (SELECT TOP (1) a2.AUDNC_DATE FROM v2.APPEL_AFFAIRE AS aa2
                 JOIN v2.AUDIENCE_CABINET AS a2 ON a2.AUDNC_ID_ADNC = aa2.APPAF_ID_ADNC AND a2.AUDNC_DATE > a.AUDNC_DATE
                 WHERE aa2.APPAF_ID_INSTN = i.INSTN_ID_INSTN ORDER BY a2.AUDNC_DATE) AS ProchainAppel,
+               {{Composition}} AS Compo,
                CASE WHEN EXISTS (SELECT 1 FROM v2.EVENEMENT_PROCEDURE_EN_ATTENTE AS e
                                  WHERE e.EVNPA_ID_APPAF_DELIBERER = aa.APPAF_ID_APPAF OR e.EVNPA_ID_APPAF_PRONONCER = aa.APPAF_ID_APPAF)
                     THEN 1 ELSE 0 END AS Publicite,
@@ -56,6 +63,19 @@ internal sealed class LecteurRetourAudience : IRechercheEcran
         WHERE /*filtre*/
         ORDER BY a.AUDNC_DATE, a.AUDNC_HEURE, a.AUDNC_ID_ADNC, aa.APPAF_NUM_APPEL, i.INSTN_NUM_ROLE, aa.APPAF_ID_APPAF
         """;
+
+    // fix-ok: mesure du 27/11/2026 (copie de dev, serveur 5221) -- apres « Valider la décision » avec « Composition » = 3 sur
+    // 2000F00104, aucune ligne relue (PROC_MPCS, PROC_RETAUD) ne montrait la composition posee : la grille de RIG v2 a une colonne
+    // « Compo. » (OPE_LIST_APPEL_AFFAIRE.cs:343-346, :583, :787-791) que ce lecteur n'avait pas reprise. Une seule cause, plusieurs
+    // remplacements (en-tete, requete, ligne).
+    /// <summary>La colonne « Compo. » de la grille de RIG v2 (OPE_LIST_APPEL_AFFAIRE.cs:583) : le numero d'ordre de la composition
+    /// de l'appel, pour une audience seulement (la colonne est masquee pour un cabinet, :543). Lue aussi par la mise au point des
+    /// chambres, dont les lignes sont celles de la meme grille.</summary>
+    internal const string Composition =
+        "CASE WHEN a.AUDNC_AUDIENCE = 1 THEN (SELECT TOP (1) cmp.CMPST_NUM_ORDRE FROM v2.COMPOSITION AS cmp WHERE cmp.CMPST_ID_CMAUD = aa.APPAF_ID_CMAUD) END";
+
+    /// <summary>« composition n° 2 » quand l'appel en a une (la colonne <see cref="Composition"/>, lue sous le nom Compo).</summary>
+    internal static string? TexteComposition(SqlDataReader r) => r["Compo"] is DBNull ? null : $"composition n° {r["Compo"]}";
 
     public Task<LignesLues> LireAsync(SqlConnection baseGreffe, DateTime aujourdhui, int plafond, CancellationToken ct)
         => ChercherAsync(baseGreffe, new RechercheEcran(null, new Dictionary<string, string>()), aujourdhui, plafond, ct);
@@ -89,7 +109,8 @@ internal sealed class LecteurRetourAudience : IRechercheEcran
             NumeroAppel(FormeLigne.Texte(r, "NumAppel"), FormeLigne.Texte(r, "TypeClassement")) is { Length: > 0 } n ? $"appel n° {n}" : null,
             FormeLigne.Texte(r, "Audience"),
             traite ? $"résultat {resultat}" : "résultat à saisir",
-            prochain is not null ? $"prochain appel le {FormeLigne.Date(prochain)}" : null);
+            prochain is not null ? $"prochain appel le {FormeLigne.Date(prochain)}" : null,
+            TexteComposition(r));
         var groupe = publicite ? Publicites : traite ? Traitees : r["Prononce"] is true ? PrononcesATraiter : ATraiter;
         var etat = publicite ? "EnAttente" : traite ? "Validee" : "AFaire";
         var nom = FormeLigne.Texte(r, "NomCourant") is { Length: > 0 } nc ? nc : $"Instance n° {role}";
