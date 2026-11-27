@@ -117,7 +117,9 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             Code = "PROC_SUPP_ACTEUR_JUD", Titre = "Remplacer un acteur", Sujet = "acteurs à remplacer",
             Forme = FormeEcran.Operation,
             Recherche = "Rechercher un acteur à remplacer…",
-            Criteres = ["Type d'acteur", "Acteur remplacé", "Remplaçant"],
+            // Les acteurs lies (HaveLiaisonEntite : la V2 n'ouvre cet ecran que pour eux, OPE_EDITION_GGREFFIER.cs:113-114) et les
+            // remplacements faits (ACTEUR_SUPP). Lignes et apercu : LecteurRemplacementActeur.cs ; reprise : EcrivainRemplacementActeur.cs.
+            Criteres = ["Type d'acteur", "Acteur remplacé"],
             // Bouton final cite par la fiche v2 : bouton Valider (proc_supp_acteur_jud.md, Detail OPE)
             Valider = "Valider",
             Rang = 7,
@@ -125,27 +127,23 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             Groupes = ["Magistrats et greffe", "Mandataires PC", "Intervenants PC"],
             Sections =
             [
-                new MarcheEcran("Type d'acteur", "Juge, parquetier, greffier assermenté, mandataire PC, intervenant PC ou expert : le type fixe les contrôles.", true,
-                    ["Type d'acteur"]),
-                new MarcheEcran("Acteur remplacé", "L'acteur à remplacer est pris dans la liste de son type. Le contrôle d'existence vérifie qu'il existe bien pour ce type.", true,
-                    ["Acteur remplacé"]),
-                new MarcheEcran("Remplaçant", "Le remplaçant doit être différent de l'acteur remplacé : sinon le message « même acteur » est affiché.", true,
+                new MarcheEcran("Acteur remplacé", "Cochez UN acteur : juge, parquetier, greffier assermenté, mandataire PC ou intervenant PC. L'expert a son propre écran.", true,
+                    ["Type d'acteur", "Acteur remplacé"]),
+                new MarcheEcran("Liaisons reprises", "Ouvrez la ligne : la liste des entités liées et les affaires touchées passeront au remplaçant, dans une seule transaction, puis l'acteur sera supprimé. Une trace datée est gardée.", false,
+                    [Champ.Tableau("Liaisons"), Champ.Tableau("Affaires touchées")]),
+                new MarcheEcran("Remplaçant", "Le numéro ou l'abrégé d'un acteur ACTIF du même type, différent de l'acteur remplacé.", true,
                     ["Remplaçant"]),
-                new MarcheEcran("Liaisons reprises", "Instances, décisions, audiences et composition passent au remplaçant, en une seule transaction. Une erreur annule toute la reprise.", false,
-                    ["Instances", "Décisions", "Audiences", "Composition"]),
-                new MarcheEcran("Clôture", "La demande RIG est clôturée après la reprise. Sans reprise complète, rien n'est écrit.", true,
-                    ["Clôture de la demande"]),
             ],
             Lignes =
             [
-                new LigneEcran("Juge Alpha → Juge Bêta", "Magistrats et greffe · reprise close", "Magistrats et greffe", "Validee", [0, 1, 2, 3, 4]),
-                new LigneEcran("Parquetier Gamma → Parquetier Delta", "Magistrats et greffe · reprise à lancer", "Magistrats et greffe", "EnCours", [0, 1]),
-                new LigneEcran("Greffier Épsilon", "Magistrats et greffe · remplaçant à choisir", "Magistrats et greffe", "EnCours", [0, 1]),
-                new LigneEcran("Greffier Zêta", "Magistrats et greffe · à saisir", "Magistrats et greffe", "AFaire", []),
-                new LigneEcran("Mandataire PC Êta → Thêta", "Mandataires PC · reprise close", "Mandataires PC", "Validee", [0, 1, 2, 4]),
-                new LigneEcran("Mandataire PC Iota", "Mandataires PC · remplaçant à choisir", "Mandataires PC", "EnCours", [0, 1]),
-                new LigneEcran("Mandataire PC Kappa", "Mandataires PC · à saisir", "Mandataires PC", "AFaire", []),
-                new LigneEcran("Intervenant Lambda → Mu", "Intervenants PC · même acteur à corriger", "Intervenants PC", "EnCours", [0, 1]),
+                // Hors Saisie, Faites reste vide (decision du lot 1).
+                new LigneEcran("ALPHA Jean (JAL)", "Juge · actif", "Magistrats et greffe", "AFaire", []),
+                new LigneEcran("GAMMA Luc (PGA)", "Parquetier · inactif", "Magistrats et greffe", "AFaire", []),
+                new LigneEcran("EPSILON Anne (GEP)", "Greffier assermenté · actif", "Magistrats et greffe", "AFaire", []),
+                new LigneEcran("BETA Paul (JBE) → DELTA Marc (JDE)", "Juge · remplacé le 12/03/2026", "Magistrats et greffe", "Validee", []),
+                new LigneEcran("SELARL Iota (MIO)", "Mandataire PC · actif", "Mandataires PC", "AFaire", []),
+                new LigneEcran("SCP Kappa (MKA) → SELARL Thêta (MTH)", "Mandataire PC · remplacé le 02/02/2026", "Mandataires PC", "Validee", []),
+                new LigneEcran("LAMBDA Conseil (ILA)", "Intervenant PC · actif", "Intervenants PC", "AFaire", []),
             ],
         },
 

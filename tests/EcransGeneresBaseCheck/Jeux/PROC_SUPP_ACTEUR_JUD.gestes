@@ -1,0 +1,77 @@
+# « Remplacer un acteur » (EcrivainRemplacementActeur), forme Operation : « Confirmer » sur UN acteur coche, le remplacant saisi dans la
+# section « Remplaçant » (OPE_SUPP_ACTEUR_JUD : DoVerifier, l. 115-176 ; _Valider, l. 443-473 ; _UpdateLink, l. 796-1036). Messages de la
+# V2 au mot pres. Lignes : PROC_SUPP_ACTEUR_JUD.sql.
+
+# Refus : aucun remplacant choisi (l. 118-119). Jumeau accepte : bloc 6.
+geste: Confirmer
+ids: JUGE-2400501
+resultat: refuse
+message: Vous n'avez pas sélectionné de juge
+---
+# Refus : le remplacant est l'acteur remplace (l. 120-121). Jumeau accepte : bloc 6.
+geste: Confirmer
+ids: JUGE-2400501
+valeur: Remplaçant › Remplaçant = J14R
+resultat: refuse
+message: Vous ne pouvez pas sélectionner le même juge que celui que vous allez supprimer
+---
+# Refus : un juge inactif -- la liste de la V2 ne le propose pas (CboUtilisableEnSaisie, Juge.cs:715). Jumeau accepte : bloc 6 (actif).
+geste: Confirmer
+ids: JUGE-2400501
+valeur: Remplaçant › Remplaçant = J14X
+resultat: refuse
+message: INACTIF Xavier (J14X) est inactif : la liste de RIG v2 ne propose que des acteurs actifs.
+---
+# Refus : aucun juge ne porte cet abrege (la V2 n'a pas de message pour le juge : sa liste ne propose que des juges existants).
+# Jumeau accepte : bloc 6.
+geste: Confirmer
+ids: JUGE-2400501
+valeur: Remplaçant › Remplaçant = J14Z
+resultat: refuse
+message: « Remplaçant » : aucun juge ne porte le numéro ou l'abrégé « J14Z ».
+---
+# Refus : deux acteurs coches -- la V2 remplace l'acteur que l'on supprime, un a la fois (PROC_SUPP_ACTEUR_JUD.cs:32-37). Jumeau : bloc 6.
+geste: Confirmer
+ids: JUGE-2400501,INTERVENANT_PC_REPER-2400511
+valeur: Remplaçant › Remplaçant = J14K
+resultat: refuse
+message: Un seul acteur à la fois : RIG v2 remplace l'acteur que l'on supprime.
+---
+# Le juge J14R est remplace par J14K : ses deux « juges d'instance » lui passent, la trace ACTEUR_SUPP est ecrite (table JUGE, ids,
+# requete de la V2), puis J14R est supprime (_UpdateLink, l. 796-1036).
+geste: Confirmer
+ids: JUGE-2400501
+valeur: Remplaçant › Remplaçant = J14K
+resultat: fait
+message: REMPLACE Jules (J14R) est remplacé par GARDE Karine (J14K) : Juge instance (2) lui sont reportés.
+controle: SELECT CONCAT((SELECT COUNT(*) FROM v2.INSTANCE_JUGE WHERE JUGIN_ID_JUG = 2400502), '/', (SELECT COUNT(*) FROM v2.JUGE WHERE JUG_ID_JUG = 2400501), '/', (SELECT COUNT(*) FROM v2.ACTEUR_SUPP WHERE ACTSUP_TABLE_SUPP = 'JUGE' AND ACTSUP_ID_SUPP = 2400501 AND ACTSUP_ID_REMPL = 2400502 AND ACTSUP_REQUETE LIKE 'update INSTANCE_JUGE set JUGIN_ID_JUG = 2400502 where JUGIN_ID_JUGIN in (2400551, 2400552)%')) => 2/0/1
+---
+# Refus : l'intervenant PC choisi n'existe pas -- le message de la V2 pour un remplacant disparu (l. 169-173). Jumeau accepte : bloc 8.
+geste: Confirmer
+ids: INTERVENANT_PC_REPER-2400511
+valeur: Remplaçant › Remplaçant = I14Z
+resultat: refuse
+message: L'intervenant PC que vous avez choisi n'existe plus, il a été supprimé
+---
+# L'intervenant PC I14R est remplace par I14K (INTERVENANT_PC.INTRP_ID_INTRPR, l. 701-711).
+geste: Confirmer
+ids: INTERVENANT_PC_REPER-2400511
+valeur: Remplaçant › Remplaçant = I14K
+resultat: fait
+message: INTERV REMPLACE (I14R) est remplacé par INTERV GARDE (I14K) : Intervenant PC (1) lui sont reportés.
+controle: SELECT CAST(INTRP_ID_INTRPR AS varchar(12)) FROM v2.INTERVENANT_PC WHERE INTRP_ID_INTRP = 2400561 => 2400512
+---
+# Le mandataire PC M14R est remplace par M14K (DEMAT_CFEC.CFEC_ID_MANDATAIRE_PC, l. 740-750).
+geste: Confirmer
+ids: MANDATAIRE_PC-2400531
+valeur: Remplaçant › Remplaçant = M14K
+resultat: fait
+message: MANDA REMPLACE Selarl (M14R) est remplacé par MANDA GARDE Selarl (M14K) : Démat CFEC (1) lui sont reportés.
+controle: SELECT CAST(CFEC_ID_MANDATAIRE_PC AS varchar(12)) FROM v2.DEMAT_CFEC WHERE CFEC_ID_CFEC = 2400571 => 2400532
+---
+# Refus : une ligne de remplacement deja fait ne se rejoue pas. Jumeau accepte : bloc 6 (un acteur lie).
+geste: Confirmer
+ids: S-2400591
+valeur: Remplaçant › Remplaçant = J14K
+resultat: refuse
+message: « S-2400591 » n'est pas un acteur à remplacer (un remplacement déjà fait ne se rejoue pas).

@@ -1,0 +1,53 @@
+# fix-ok: mesure au banc le 27/11/2026 -- ces lignes sont celles que le banc a lues et que j'ai verifiees une a une contre la regle ; la console les rendait en cp850 et perdait la fleche Â« → Â» du remplacement, restituee ici.
+# « Remplacer un acteur » (LecteurRemplacementActeur) : les acteurs des cinq types de la V2 qui ont AU MOINS UNE liaison
+# (HaveLiaisonEntite : la V2 n'ouvre cet ecran que pour eux, OPE_EDITION_GGREFFIER.cs:113-114), puis les remplacements faits (ACTEUR_SUPP).
+# Les juges, greffiers, parquetiers et mandataires PC lies viennent des jeux joues avant (PROC_CHM, PROC_COMPO, PROC_COURRIERM, PROC_DBE_INJ,
+# PROC_GCONV, PROC_LISTE_DELIBERES, PROC_PREAUD, PROC_RETAUD, PROC_SIGNJUD, PROC_SURVIP, PROC_TAXESETTOURS, PROC_CABINET...) : meme tables,
+# et la V2 les traite tous. Un jeu qui ajoute un acteur lie l'ajoute ici.
+# Ecartes, jumeaux de REMPLACE Jules (J14R, lie par deux juges d'instance) : GARDE Karine (J14K) et INACTIF Xavier (J14X), sans liaison ;
+# MANDA GARDE (M14K) et INTERV GARDE (I14K), sans liaison. JUGEDEUX (JDE14) est lie par le cabinet 2400405 de PROC_CABINET.sql.
+# Ordre : groupe (Magistrats et greffe, Mandataires PC, Intervenants PC), les acteurs a remplacer (AFaire) par nom, puis les remplacements
+# faits (Validee, du plus recent au plus ancien). Nom : « NOM Prénom (abrégé) ».
+COLLEGE | Juge · actif | Magistrats et greffe | AFaire | []
+GREFFAUTRE Ines (GAUTRE) | Greffier assermenté · actif | Magistrats et greffe | AFaire | []
+GREFFIERA (G17A) | Greffier assermenté · actif | Magistrats et greffe | AFaire | []
+GREFFIERZ (G17Z) | Greffier assermenté · actif | Magistrats et greffe | AFaire | []
+GREFFINJ Ines (GRI18) | Greffier assermenté · actif | Magistrats et greffe | AFaire | []
+GREFFSIGN Marc (GSIGN) | Greffier assermenté · actif | Magistrats et greffe | AFaire | []
+JUGEA Paul (J17A) | Juge · actif | Magistrats et greffe | AFaire | []
+JUGEB Anne (J17B) | Juge · actif | Magistrats et greffe | AFaire | []
+JUGEBANC Paul | Juge · actif | Magistrats et greffe | AFaire | []
+JUGEBIS Lea (JGB18) | Juge · actif | Magistrats et greffe | AFaire | []
+JUGEC (J17C) | Juge · actif | Magistrats et greffe | AFaire | []
+JUGECOMPO Luc | Juge · actif | Magistrats et greffe | AFaire | []
+JUGEDELIB Anne | Juge · actif | Magistrats et greffe | AFaire | []
+JUGEDEUX Paule (JDE14) | Juge · actif | Magistrats et greffe | AFaire | []
+JUGEINJ Marc (JGI18) | Juge · actif | Magistrats et greffe | AFaire | []
+JUGEPC Ana | Juge · actif | Magistrats et greffe | AFaire | []
+JUGEPREP Eve | Juge · actif | Magistrats et greffe | AFaire | []
+JUGESANSMAIL Lea (JSANS) | Juge · actif | Magistrats et greffe | AFaire | []
+JUGESIGN Paul (JSIGN) | Juge · actif | Magistrats et greffe | AFaire | []
+JUGETROIS Luc (JTR14) | Juge · actif | Magistrats et greffe | AFaire | []
+JUGEUN Jean (JUN14) | Juge · actif | Magistrats et greffe | AFaire | []
+PARQUETA (P17A) | Parquetier · actif | Magistrats et greffe | AFaire | []
+PARTI Max | Juge · actif | Magistrats et greffe | AFaire | []
+REMPLACE Jules (J14R) | Juge · actif | Magistrats et greffe | AFaire | []
+SUPPLEANT Ida | Juge · actif | Magistrats et greffe | AFaire | []
+TITULAIRE Luc | Juge · actif | Magistrats et greffe | AFaire | []
+ANCIEN Juge (J14A) → GARDE Karine (J14K) | Juge · remplacé le 15/01/2026 | Magistrats et greffe | Validee | []
+ADMIN SCP | Mandataire PC · actif | Mandataires PC | AFaire | []
+ADMINISTRA | Mandataire PC · actif | Mandataires PC | AFaire | []
+ALPHA MANDATAIRE SELARL (MA17) | Mandataire PC · actif | Mandataires PC | AFaire | []
+BETA ADMINISTRATEUR SCP (AD17) | Mandataire PC · actif | Mandataires PC | AFaire | []
+FINI | Mandataire PC · actif | Mandataires PC | AFaire | []
+LIQPREMIER | Mandataire PC · actif | Mandataires PC | AFaire | []
+LIQUI Paul | Mandataire PC · actif | Mandataires PC | AFaire | []
+MANDA | Mandataire PC · actif | Mandataires PC | AFaire | []
+MANDA REMPLACE Selarl (M14R) | Mandataire PC · actif | Mandataires PC | AFaire | []
+MANDAFINI | Mandataire PC · actif | Mandataires PC | AFaire | []
+MANDAUN Selarl | Mandataire PC · actif | Mandataires PC | AFaire | []
+MDJRANG1 | Mandataire PC · actif | Mandataires PC | AFaire | []
+MDJRANG2 | Mandataire PC · actif | Mandataires PC | AFaire | []
+SELARL LIQUIDA | Mandataire PC · actif | Mandataires PC | AFaire | []
+SOLO | Mandataire PC · actif | Mandataires PC | AFaire | []
+INTERV REMPLACE (I14R) | Intervenant PC · actif | Intervenants PC | AFaire | []
