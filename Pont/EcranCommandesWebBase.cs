@@ -63,6 +63,16 @@ public sealed partial class SessionCommandesWeb
         "Rien n'est enregistré : dans NéoRIG, traiter une commande web écrit son état ET édite les certificats, la facture et la " +
         "réponse à Infogreffe (service externe). La V3 n'a pas encore ces éditions : elle ne modifie pas la commande.";
 
+    /// <summary>L'etape « Type de certificat de non-opposition » et le cadre du controle, tant qu'aucun type n'est coche.</summary>
+    public const string SansTypeCoche = "Cochez un type de certificat pour lancer le contrôle de délivrance.";
+
+    /// <summary>L'etape « Type de certificat de non-opposition » en base : le controle de delivrance (NeoRIG,
+    /// DelivranceNonOpposition.Evaluer) cherche l'entreprise du SIREN ; joue sur les entites de demonstration, il
+    /// rejetait a tort (« aucune entreprise ne correspond au SIREN… »). Il n'est donc pas joue, et l'etape le dit.</summary>
+    public const string SansControleDelivrance =
+        "Contrôle de délivrance non joué : il cherche l'entreprise du SIREN de la commande, et la recherche du débiteur " +
+        "dans la base du greffe n'est pas encore reprise.";
+
     /// <summary>Le rapprochement en base : aucune entite d'exemple, et pourquoi.</summary>
     internal static readonly ResultatRapprochement SansRapprochement = new([],
         "La recherche du débiteur dans la base du greffe n'est pas encore reprise : aucun dossier n'est proposé.");

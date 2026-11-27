@@ -286,6 +286,22 @@ describe('EcranCommandesWeb', () => {
     expect(document.activeElement).not.toBe(champ)
   })
 
+  it('non-opposition : sans controle, le cadre « Controle de delivrance » dit la raison du pont (en base, type pourtant coche)', async () => {
+    // Lot 20 : il disait toujours « Cochez un type de certificat », meme un type coche, quand le pont (en base) ne joue pas le controle.
+    const raison = 'Contrôle de délivrance non joué : il cherche l\'entreprise du SIREN de la commande.'
+    session({ ...vueDeBase(), panneau: { ...panneau(), type: 'Non-opposition', certificats: null,
+      nonOpposition: { sousTypes: [{ valeur: 'ReductionCapital', libelle: 'CNO-RC — Réduction de capital', inerte: false, coche: true }],
+                       quantite: 1, quantiteActive: true, certificatDOpposition: false, controle: null, sansControle: raison },
+      etapes: [
+        { nom: 'Dossier concerné', faite: false, resume: '', manque: 'Sélectionnez le dossier concerné pour rattacher le certificat.' },
+        { nom: 'Type de certificat de non-opposition', faite: false, resume: '', manque: raison },
+        { nom: 'Édition', faite: true, resume: '2 document(s)', manque: null },
+      ] } })
+    render(<EcranCommandesWeb />)
+    expect((await screen.findByText(raison)).className).toBe('rig-tcw__ligne-statut rig-tcw__ligne-statut--attente')
+    expect(screen.queryByText('Cochez un type de certificat pour lancer le contrôle de délivrance.')).toBeNull()
+  })
+
   it('decisions en pied dans l\'ordre de la maquette ; Valider bloque porte son motif et compte les marches', async () => {
     session({ ...vueDeBase(), panneau: panneau() })
     const { container } = render(<EcranCommandesWeb />)

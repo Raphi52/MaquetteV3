@@ -81,8 +81,10 @@ public sealed record TypesCw(string DateTravail, bool ToutCoche, ItemTypeCw[] It
 
 public sealed record SousTypeCw(string Valeur, string Libelle, bool Inerte, bool Coche);
 public sealed record ControleCw(string DerniereFormalite, string Delai, int Seuil, string Issue, string? Motif);
+/// <param name="SansControle">Pourquoi <paramref name="Controle"/> est absent : aucun type coche, ou en base
+/// (<see cref="SessionCommandesWeb.SansControleDelivrance"/>) ; nul quand le controle est montre.</param>
 public sealed record NonOppositionCw(SousTypeCw[] SousTypes, int Quantite, bool QuantiteActive,
-                                     bool CertificatDOpposition, ControleCw? Controle);
+                                     bool CertificatDOpposition, ControleCw? Controle, string? SansControle = null);
 
 public sealed record CertificatCw(string Valeur, string Libelle, int Quantite, bool Actif, bool Bloque, string? Motif);
 public sealed record CertificatsCw(string DateTravail, CertificatCw[] Lignes, bool BasculeFaillite, bool CertificatDeFaillite);
@@ -517,7 +519,7 @@ public sealed partial class SessionCommandesWeb
     /// marche ou l'agent le corrige, avec son motif mot pour mot. La premiere marche non
     /// faite donne donc le motif de <see cref="BlocageValider"/> (tests/CommandesWebCheck).
     /// </summary>
-    private static Marche[] Marches(CommandeRecue c, ChoixCommande choix, IReadOnlyList<DocumentEdite> docs)
+    private Marche[] Marches(CommandeRecue c, ChoixCommande choix, IReadOnlyList<DocumentEdite> docs)
     {
         var groupe = TraitementCommandes.Groupe(c.Famille);
         var retenue = TraitementCommandes.Entite(c.CibleRetenue);
@@ -551,10 +553,13 @@ public sealed partial class SessionCommandesWeb
         return [dossier, choisi, new Marche("Édition", rienADelivrer, TraitementCommandes.BarreEdition(docs))];
     }
 
-    private static string? ManqueNonOpposition(CommandeRecue c, ChoixCommande choix)
+    private string? ManqueNonOpposition(CommandeRecue c, ChoixCommande choix)
     {
         if (choix.CertificatDOpposition) return null;
-        if (choix.SousTypes.Count == 0) return "Cochez un type de certificat pour lancer le contrôle de délivrance.";
+        if (choix.SousTypes.Count == 0) return SansTypeCoche;
+        // En base, le controle chercherait l'entreprise dans la demonstration (TraitementCommandes.Entites, a sa date de
+        // travail) : son rejet serait faux. Meme garde que VueNonOpposition, qui n'affiche pas le controle.
+        if (EnBase) return SansControleDelivrance;
         var controle = TraitementCommandes.ControlerNonOpposition(c);
         return controle.Issue == IssueDelivrance.Rejet ? controle.Motif : null;
     }
@@ -1017,7 +1022,7 @@ public sealed partial class SessionCommandesWeb
             rapprochement, types, nonOpposition, certificats, pied, etapes, ChoixDeplie);
     }
 
-    private static Marche[] MarchesDe(CommandeRecue c, ChoixCommande choix) => Marches(c, choix, DocumentsEnCours(c, choix));
+    private Marche[] MarchesDe(CommandeRecue c, ChoixCommande choix) => Marches(c, choix, DocumentsEnCours(c, choix));
 
     /// <summary>Ce que lisait le RenderFragment ZoneRapprochement du .razor.</summary>
     private RapprochementCw VueRapprochement(CommandeRecue c, bool debiteur)
@@ -1127,14 +1132,16 @@ public sealed partial class SessionCommandesWeb
     /// <summary>Ce que lisait le RenderFragment ZoneNonOpposition du .razor.</summary>
     private NonOppositionCw VueNonOpposition(CommandeRecue c)
     {
-        // En base, le controle chercherait le dossier dans la demonstration (TraitementCommandes.Entites) : il ne s'affiche pas.
-        var controle = SousTypes.Count > 0 && !EnBase ? TraitementCommandes.ControlerNonOpposition(c) : null;
+        // En base, le controle chercherait le dossier dans la demonstration (TraitementCommandes.Entites) : il ne s'affiche pas,
+        // et le cadre dit pourquoi (la meme phrase que l'etape, ManqueNonOpposition).
+        var sansControle = SousTypes.Count == 0 ? SansTypeCoche : EnBase ? SansControleDelivrance : null;
+        var controle = sansControle is null ? TraitementCommandes.ControlerNonOpposition(c) : null;
         var sousTypes = Enum.GetValues<SousTypeCno>().Select(st => new SousTypeCw(st.ToString(), TraitementCommandes.Libelle(st),
             st == SousTypeCno.InjonctionDePayer, SousTypes.Contains(st))).ToArray();
         var vueControle = controle is null ? null : new ControleCw(
             controle.DerniereFormalite?.ToString("dd/MM/yyyy") ?? "—", TraitementCommandes.Delai(controle),
             controle.Seuil, controle.Issue.ToString(), controle.Motif);
-        return new NonOppositionCw(sousTypes, QuantiteCno, !CertificatDOpposition, CertificatDOpposition, vueControle);
+        return new NonOppositionCw(sousTypes, QuantiteCno, !CertificatDOpposition, CertificatDOpposition, vueControle, sansControle);
     }
 
     /// <summary>Ce que lisait le RenderFragment ZoneCertificats du .razor.</summary>

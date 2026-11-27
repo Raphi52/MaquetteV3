@@ -3,8 +3,10 @@
 // Chacun reproduit un appel C# precis des .razor d'origine, nomme ci-dessous,
 // pour que l'ecran React filtre et affiche EXACTEMENT ce que Blazor affichait.
 
-/** `d.ToString("dd/MM/yyyy")` d'une date tenue au format d'un <input type="date"> (aaaa-mm-jj). */
+/** `d.ToString("dd/MM/yyyy")` d'une date tenue au format d'un <input type="date"> (aaaa-mm-jj). Une date absente
+ *  (« » : une procedure lue en base n'a pas d'audience avant l'enrolement) reste vide, comme une date nulle en C#. */
 export function dateCourte(iso: string): string {
+  if (iso === '') return ''
   const [annee, mois, jour] = iso.split('-')
   return `${jour}/${mois}/${annee}`
 }

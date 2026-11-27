@@ -100,4 +100,25 @@ describe('EcranActualites', () => {
     await screen.findByText('Aucune actualite. La premiere publiee s\'affichera sur l\'accueil de tous les postes.')
     expect(pont.appels).toHaveBeenLastCalledWith('EcranActualites.Agir', 's1', 'Retirer', 0)
   })
+
+  // Lot 20 (plan « RIG v3 100 % fonctionnel ») : RIG v2 tient ses actualites dans la base commune (COMMUN_RIG.NEWS_RIG),
+  // absente de la base V3 du greffe. L'ecran le dit, et marque « exemple » les deux actualites de depart (Pont/EcranActualites.cs).
+  it('dit ou RIG v2 tient ses actualites et marque « exemple » les actualites de depart, pas celles redigees', async () => {
+    const source = 'RIG v2 lit et saisit ses actualités dans la base commune (tables COMMUN_RIG.NEWS_RIG et NEWS_RIG_GREFFE) : absente.'
+    installerFauxPont({
+      'EcranActualites.Ouvrir': () => vue({
+        sourceV2: source,
+        liste: [
+          { ...vue().liste[0]!, exemple: true },
+          { filet: 'act-info', libelle: 'Info', titre: 'Fermeture jeudi', message: '', auteur: 'Greffe', horodatage: '18/09 09:10', retire: '25/09', exemple: false },
+        ],
+      }),
+    })
+    const { container } = render(<EcranActualites />)
+    await screen.findByText('Fermeture jeudi')
+    expect(screen.getByRole('note').textContent).toBe(source)
+    const rangees = [...container.querySelectorAll('tbody tr')]
+    expect(rangees[0]!.querySelector('.rig-tcw__exemple')!.textContent).toBe('exemple')
+    expect(rangees[1]!.querySelector('.rig-tcw__exemple')).toBeNull()
+  })
 })

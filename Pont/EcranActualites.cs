@@ -8,16 +8,19 @@ public sealed record TypeActualiteVue(string Code, string Libelle, string Filet,
 
 /// <summary>Une ligne du tableau des actualites publiees, deja mise en forme comme Blazor l'affichait.</summary>
 /// <param name="Retire">La date de retrait « dd/MM », ou « — » pour une actualite epinglee.</param>
+/// <param name="Exemple">Une des deux actualites de depart (<see cref="DepotActualites.Exemples"/>) : un exemple, pas une
+/// actualite redigee par le greffe.</param>
 public sealed record LigneActualite(string Filet, string Libelle, string Titre, string Message,
-                                    string Auteur, string Horodatage, string Retire);
+                                    string Auteur, string Horodatage, string Retire, bool Exemple = false);
 
 /// <summary>Ce que l'ecran affiche : le formulaire, le compte rendu et la liste publiee.</summary>
 /// <param name="Jours">La duree saisie, en texte (le champ ne se reecrit que si elle change).</param>
 /// <param name="StatutRendu">Le filet du compte rendu : « ok » ou « alerte ».</param>
+/// <param name="SourceV2">Ou RIG v2 tient ses actualites, et pourquoi elles ne sont pas lues (<see cref="SessionActualites.SourceV2"/>).</param>
 public sealed record VueActualites(string Session, string Titre, string Message, string Type, string Auteur,
                                    string Jours, bool PeutPublier, TypeActualiteVue[] Types,
                                    string CompteRendu, string StatutRendu, string CheminPartage,
-                                   LigneActualite[] Liste);
+                                   LigneActualite[] Liste, string SourceV2 = "");
 
 /// <summary>
 /// Pont de l'ecran PROC_ACTUALITES (web/src/ecrans/EcranActualites.tsx) : la
@@ -59,6 +62,17 @@ public static class EcranActualites
 /// </summary>
 public sealed class SessionActualites
 {
+    /// <summary>
+    /// D'ou RIG v2 tire ses actualites, et pourquoi la V3 ne les lit pas. L'accueil de RIG v2 (tuile « Actualites »,
+    /// FORM_ACCUEIL.cs:778, _ChargerNews :2658-2662) lit NEWS_RIG et NEWS_RIG_GREFFE de la base COMMUNE : actualites non
+    /// perimees, du greffe, par date de debut (RigAccueil\News\NewsRig.cs:185-204) ; sa saisie (PROC_RigClientNewsRig,
+    /// ETP_SAISIE_NEWS.cs:157-160) ecrit dans la meme base. Cette base commune n'est pas dans la base V3 du greffe, qui ne
+    /// recoit que les tables du greffe (Outils\Anonymisation\Copie.cs:479) : la liste de l'ecran reste le fichier partage de la V3.
+    /// </summary>
+    public const string SourceV2 =
+        "RIG v2 lit et saisit ses actualités dans la base commune (tables COMMUN_RIG.NEWS_RIG et NEWS_RIG_GREFFE) : cette " +
+        "base est absente de la base V3 du greffe, elles ne sont pas lues ici. Cette liste est le fichier partagé de la V3.";
+
     private readonly DepotActualites Depot;
 
     private List<Actualite> Liste = new();
@@ -86,8 +100,14 @@ public sealed class SessionActualites
         Compte_rendu, StatutRendu, Depot.CheminPartage,
         Liste.Select(b => new LigneActualite(
                 b.Fiche.Filet, b.Fiche.Libelle, b.Titre, b.Message, b.Auteur, b.Horodatage,
-                b.Expire is null ? "—" : b.Expire.Value.ToString("dd/MM")))
-             .ToArray());
+                b.Expire is null ? "—" : b.Expire.Value.ToString("dd/MM"), IdsExemples.Contains(b.Id)))
+             .ToArray(),
+        SourceV2);
+
+    /// <summary>Les identifiants des deux actualites de depart, que l'accueil seme dans un fichier partage vierge
+    /// (Pont/Accueil.cs, ReleveActualites) : l'ecran les marque « exemple ».</summary>
+    private static readonly HashSet<string> IdsExemples =
+        DepotActualites.Exemples(DateTime.Today).Select(a => a.Id).ToHashSet(StringComparer.Ordinal);
 
     internal void Agir(string geste, JsonElement valeur)
     {
