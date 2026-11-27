@@ -1,8 +1,8 @@
 # « Facturation Expresso » (LecteurFacturationExpresso) : les parametres des ecrans de la V2, dans leur ordre, lus « PARAMETRAGE d'abord,
 # sinon GREFFE_PARAMETRE » (soc.Reglage puis soc.ParametreGreffe) ; renseigne -> Validee, vide -> AFaire (« non renseigné »). Puis la
 # banque de chaque mode ACTIF (MetierBanques) : L15CB et REG sans banque -> AFaire ; L15VI (inactif) et les modes de PROC_JCAISSE /
-# PROC_RECHENC (inactifs) sont ecartes -- jumeau L15CH.
-GRPAR_ROMPU | 0.50 · paramètre du greffe | Paramètres généraux | Validee | []
+# PROC_RECHENC (inactifs) sont ecartes -- jumeau L15CH. Les modes actifs des jeux du lot 12 (L12…, PV) y entrent.
+GRPAR_ROMPU | 1.52 · paramètre du greffe | Paramètres généraux | Validee | []
 EXPRESSO_RELANCE | 15.00 · réglage | Paramètres généraux | Validee | []
 EXPRESSO_REMBOURSEMENT | non renseigné | Paramètres généraux | AFaire | []
 GRPAR_ADRESSE_IS_PRINCIPALE | non renseigné | Paramètres généraux | AFaire | []
@@ -19,7 +19,13 @@ GRPAR_COMPTA_TRESO_USED | non renseigné | Comptabilité | AFaire | []
 GRPAR_COMPTA_BLOCAGE_AUTO | non renseigné | Comptabilité | AFaire | []
 SIREN_GREFFE | non renseigné | Comptabilité | AFaire | []
 GRPAR_COMPTA_TYPE_COMPTA | non renseigné | Comptabilité | AFaire | []
+Mode L12CB | banque du mode Carte (banc 12) · banque BQ12 | Banques et modes | Validee | []
+Mode L12ESP | banque du mode Espèces (banc 12) · banque BQ12 | Banques et modes | Validee | []
+Mode L12REGI | banque du mode Régularisation (banc 12) · aucune banque | Banques et modes | AFaire | []
+Mode L12TPE | banque du mode Terminal sans banque (banc 12) · aucune banque | Banques et modes | AFaire | []
+Mode L12VICB | banque du mode Virement INPI (banc 12) · aucune banque | Banques et modes | AFaire | []
 Mode L15CB | banque du mode Carte banc · aucune banque | Banques et modes | AFaire | []
 Mode L15CH | banque du mode Chèque banc · banque L15LCL | Banques et modes | Validee | []
 Mode L15ES | banque du mode Espèc · banque L15CIC | Banques et modes | Validee | []
+Mode PV | banque du mode Provision · aucune banque | Banques et modes | AFaire | []
 Mode REG | banque du mode Régularisation banc · aucune banque | Banques et modes | AFaire | []

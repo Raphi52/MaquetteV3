@@ -4,6 +4,7 @@
 #   2204006 (deja rejete : le rejet 2204401, meme titre, date, montant) -- 2204005.
 # Les modes de PROC_RECHENC.sql et PROC_REMBANQ.sql n'ont pas le type CH : leurs encaissements n'entrent pas ici.
 # Les six cheques de PROC_JCAISSE.sql (lot 13, mode CH) y entrent, a leur date : RIG v2 liste tous les cheques, sans periode.
+# Le cheque 2500201 de PROC_GESTMODEPAIEMENT.sql (lot 15, mode L15CH de type CH, le 15/01/2019) y entre aussi, le plus ancien.
 Encaissement n° 2300209 | Chèque · 9,00 € · encaissé le {J+1} · PAYEUR L13 DEMAIN · non comptabilisé | Chèques | AFaire | []
 Chèque n° L13CHQ1 | Chèque · 100,10 € · encaissé le {J+0} · PAYEUR L13 A · BANQUE L13 · non comptabilisé | Chèques | AFaire | []
 Encaissement n° 2300207 | Chèque · 8,00 € · encaissé le {J-1} · PAYEUR L13 VEILLE · non comptabilisé | Chèques | AFaire | []
@@ -14,4 +15,5 @@ Chèque n° J12CHQ02 | Chèque (banc 12) · 80,00 € · encaissé le {J-20} · 
 Encaissement n° 2300212 | Chèque · 99,99 € · encaissé le 08/02/2024 · PAYEUR L13 HORS · non comptabilisé | Chèques | AFaire | []
 Encaissement n° 2300205 | Chèque · 40,00 € · encaissé le 06/02/2024 · PAYEUR L13 SANS VENTIL · non comptabilisé | Chèques | AFaire | []
 Encaissement n° 2300204 | Chèque · 30,00 € · encaissé le 06/02/2024 · PAYEUR L13 SANS AFFAIRE · non comptabilisé | Chèques | AFaire | []
+Encaissement n° 2500201 | Chèque banc · 15,00 € · encaissé le 15/01/2019 · non comptabilisé | Chèques | AFaire | []
 Rejet n° 2204401 · chèque J12CHQ06 | rejeté le {J-25} · 90,00 € · PAYEUR J12F · motif : Provision insuffisante | Rejets enregistrés | Validee | []

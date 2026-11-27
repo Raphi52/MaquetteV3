@@ -129,6 +129,13 @@ internal sealed class ModuleEcransMain : IModuleServeur
                 ? Results.Ok(await LectureParametresAccueil.LireAsync(cn, moi.Id, moi.EstAdministrateur, moi.EstAmitel, ct))
                 : Results.Json(new { motif = "Agent inconnu dans la base de ce greffe." }, statusCode: StatusCodes.Status403Forbidden)))
             .RequireAuthorization(PolitiquesSocle.AgentAdmis);
+        // Lot 15 : « Edition des maquettes » (LectureMaquettesEdition.cs) ; un agent Amitel voit aussi les types avances (OPE_MAQUETTE.cs:81-84).
+        routes.MapGet(RoutesMaquettesEdition.Maquettes, (string greffe, HttpContext http, CatalogueGreffes c, ServiceDroits droits, BaseRig commune,
+                                                         CancellationToken ct)
+            => SurLaBase(c, greffe, ct, async cn => await droits.AppelantAsync(http, commune, cn, ct) is { } moi
+                ? Results.Ok(await LectureMaquettesEdition.LireAsync(cn, moi.EstAmitel, ct))
+                : Results.Json(new { motif = "Agent inconnu dans la base de ce greffe." }, statusCode: StatusCodes.Status403Forbidden)))
+            .RequireAuthorization(PolitiquesSocle.AgentAdmis);
         // Lot 14 : Acteurs, Experts, Clients et la fiche d'un client (LectureActeurs/Experts/Clients.cs).
         routes.MapGet(RoutesActeurs.Acteurs, (string greffe, CatalogueGreffes c, CancellationToken ct)
             => SurLaBase(c, greffe, ct, async cn => Results.Ok(await LectureActeurs.LireAsync(cn, ct))))

@@ -691,8 +691,9 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             Forme = FormeEcran.Fiche,
             // Lot 15 (27/11/2026) : un parametre par ligne, lu « PARAMETRAGE d'abord, sinon GREFFE_PARAMETRE » (MetierParametrage.cs:71-92,
             // repris dans soc.Reglage et soc.ParametreGreffe), puis la banque de chaque mode actif (MetierBanques.cs:38-57) :
-            // LecteurFacturationExpresso.cs. Enregistrer n'est pas branche : ces reglages s'ecrivent par le module des reglages du greffe,
-            // pas par un ecrivain d'ecran genere (v2.* et rec.* seulement) ; l'association mode / banque s'ecrit par « Modes de paiement ».
+            // LecteurFacturationExpresso.cs. Enregistrer n'est pas branche : il attend l'ecriture partagee d'un reglage (decision du chef,
+            // 27/11 : tiree par le lot 14 de PUT RoutesGreffes.Reglage, pas encore sur main) ; l'association mode / banque s'ecrit par
+            // « Modes de paiement ». La V2 ecrit tout d'un coup (PROC_PARAMEXPRESSO.cs:39-54, MetierParametrage.cs:42-58).
             Recherche = "Rechercher un paramètre de facturation…",
             Criteres = ["Paramètre", "Banque", "Mode de paiement"],
             // Bouton final cite par la fiche v2 : DoValider (PROC_PARAMEXPRESSO.cs:39-54), VERIFIER masque (FORM_PARAMEXPRESSO.cs:10)

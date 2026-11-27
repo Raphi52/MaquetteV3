@@ -1,12 +1,10 @@
 # La recherche des « Modes de paiement » : le champ cherche le code ou le libelle (LIKE) ; criteres « Code », « Libellé » (LIKE),
-# « Type » (egal). « banc » : les libelles qui le portent, CB « Carte bancaire » compris (L15ES « Espèc » ecarte : jumeau L15CB).
-texte: banc
+# « Type » (egal). « Carte ban » : les libelles qui le contiennent, CB « Carte bancaire » compris ; L12CB « Carte (banc 12) » ecarte
+# (jumeau L15CB « Carte banc »).
+texte: Carte ban
 lignes:
 Carte bancaire | code CB · type CB · banque à associer · inactif | Inactifs | EnCours | []
 Carte banc | code L15CB · type CB · banque à associer | Actifs | EnCours | []
-Chèque banc | code L15CH · type CH · banque L15LCL | Actifs | Validee | []
-Virement banc | code L15VI · type VI · banque L15LCL · inactif | Inactifs | Validee | []
-Régularisation banc | code REG · type REG · sans banque | Actifs | Validee | []
 ---
 # « Type » = VI : les virements (le type, pas le code : VIR est de type CH, ecarte).
 critere: Type = VI

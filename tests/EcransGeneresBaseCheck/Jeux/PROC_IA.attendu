@@ -3,3 +3,8 @@
 J00025040300 | régularisation INPI · reçue le 12/03/2026 · à analyser | Régularisations INPI | AFaire | []
 J00025040200 | formalité INPI · reçue le 11/03/2026 · à analyser | Formalités INPI | AFaire | []
 J00025040100 | formalité INPI · dossier 2026 B 25401 · reçue le 10/03/2026 · analysée | Formalités INPI | Validee | []
+# Les liasses des jeux du lot 12 (PROC_GINPI.sql, PROC_INPIPAY.sql) : un numero INPI, ni date (NOT NULL dans RIG_DEV, absente du banc :
+# « reçue le » n'est pas dit), ni origine (formalite) ; apres les liasses datees.
+J12INPI0006 | formalité INPI · à analyser | Formalités INPI | AFaire | []
+ENT12INPI0001 | formalité INPI · à analyser | Formalités INPI | AFaire | []
+ENT12GINPI01 | formalité INPI · à analyser | Formalités INPI | AFaire | []

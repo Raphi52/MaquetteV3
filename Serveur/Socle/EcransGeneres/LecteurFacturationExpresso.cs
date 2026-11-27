@@ -18,10 +18,13 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///     ACTIF, par valeur, groupe « Banques et modes » (MetierBanques, Metier\MetierBanques.cs:38-57 : MODE_PAIEMENT x MODE_PAIEMENT_BANQUE x BANQUE).
 /// ETAT : parametre renseigne (ou mode associe a une banque) -> Validee « Enregistré » ; sinon AFaire « À renseigner » (GetValue rend
 /// alors une chaine vide, MetierParametrage.cs:77).
-/// AUCUN GESTE BRANCHE : DoValider ecrit PARAMETRAGE et GREFFE_PARAMETRE (PROC_PARAMEXPRESSO.cs:39-54), soit soc.Reglage et
-/// soc.ParametreGreffe en V3 -- des reglages du greffe, que le module des reglages tient (Serveur\Socle\Greffes\ModuleGreffes.cs) et
-/// qu'un ecrivain d'ecran genere n'a pas le droit d'ecrire (v2.* et rec.* seulement, EcrivainEcran.cs point 3). L'association
-/// mode / banque, elle, s'ecrit par « Modes de paiement » (EcrivainModesPaiement, la meme table MODE_PAIEMENT_BANQUE).
+/// AUCUN GESTE BRANCHE (27/11/2026) : DoValider (PROC_PARAMEXPRESSO.cs:39-54) ecrit d'un coup la VALEUR des cles PARAMETRAGE modifiees
+/// (Parametrage.UpdateValeurParametrage, Metier\MetierParametrage.cs:42-47 -> soc.Reglage), les colonnes GREFFE_PARAMETRE (:49-51 ->
+/// soc.ParametreGreffe), les liens mode / banque (MetierBanques.SaveAll, :74-… -> v2.MODE_PAIEMENT_BANQUE) et une demande
+/// « Modification du paramétrage en base » close (:52-58). Decision du chef (plan-676a4b19, 27/11) : un geste ne change la Valeur d'un
+/// code soc.Reglage existant QUE par l'ecriture partagee que le lot 14 tire de PUT RoutesGreffes.Reglage (ModuleGreffes.cs) ; elle
+/// n'est pas encore sur main, et une seconde ne s'ecrit pas. GREFFE_PARAMETRE n'est pas couvert par cette decision. D'ici la, l'ecran
+/// lit seulement ; l'association mode / banque s'ecrit deja par « Modes de paiement » (EcrivainModesPaiement, meme table).
 /// </summary>
 internal sealed class LecteurFacturationExpresso : ILecteurEcran
 {

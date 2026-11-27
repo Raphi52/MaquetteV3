@@ -16,9 +16,18 @@
 // Entree choisit la maquette restee seule), vues = le critere Type de document existant, type de document en
 // pastille, pied. Les criteres, le clic sur une ligne et les tables liees ne changent pas.
 // fix-ok: ajout du socle des listes en plusieurs pas (lot 5), pas un correctif.
+//
+// BRANCHE SUR LA BASE (plan « RIG v3 100 % fonctionnel », lot 15, 27/11/2026 ; marche du lot 17) : les maquettes viennent de la base
+// du greffe (Pont/EcranMaquettesEdition.cs, Serveur/Socle/EcransMain/LectureMaquettesEdition.cs : MAQUETTE, ses parametres d'edition
+// et leurs tables liees, les types que RIG v2 montre a l'agent). Sans serveur, la demonstration ci-dessous reste, marquee « exemple » ;
+// en panne, le motif et aucune maquette. Pour une maquette de la base : « Type de document » = le format de son document
+// (MQTT_EXTENSION), « Type de maquette » = la colonne Type de RIG v2 (RIG, CRYSTAL…), aucune date (MAQUETTE n'en porte pas) ; la choisir
+// remplit le panneau avec son PREMIER parametre d'edition (RIG v2 en ouvre un par etape). L'ecran n'a aucun geste a brancher.
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
+import { appeler } from '../pont'
 import { contientSansCasse, dateCourte, distinctsTries, estBlanc } from '../criteres'
+import { ProvenanceEcran, type ModeLecture } from '../provenance'
 import { EnteteListe, ListeModerne, Pastille, PiedListe, VuesListe, type Teinte } from '../composants/ListeModerne'
 
 interface Maquette {
@@ -30,6 +39,45 @@ interface Maquette {
   /** aaaa-mm-jj */
   maj: string
   tables: string[]
+  /** Une maquette de la base : l'entete au format plieuse et ses parametres d'edition (Pont/EcranMaquettesEdition.cs). */
+  entetePlieuse?: boolean
+  parametres?: ParametreEdition[]
+}
+
+/** Un parametre d'edition de la base (PARAMETRE_EDITION, les champs d'OPE_PARAM_EDT_MAJ de RIG v2). */
+export interface ParametreEdition {
+  code: string
+  libelle: string
+  processus: string
+  nature: string
+  imprimante: string
+  typePapier: string
+  lot: string
+  lotLrar: string
+  lotIlrar: string
+  lotSubstitution: string
+  nbExemplaires: string
+  rectoVerso: boolean
+  agrafage: boolean
+  afficherAvantImpression: boolean
+  docNonModifiable: boolean
+  impression: boolean
+  garderEditionLot1: boolean
+  typeGeneration: string
+  requeteSql: string
+}
+
+/** Ce que rend le pont (Pont/EcranMaquettesEdition.cs, VueMaquettes) : les maquettes de la base, et d'ou elles viennent. */
+export interface VueMaquettes {
+  maquettes: Maquette[]
+  total: number
+  mode?: ModeLecture
+  message?: string | null
+}
+
+/** Les options d'une liste, plus la valeur lue en base si elle n'y est pas (sinon la liste montrerait une autre option). */
+function avecValeur(options: string[], valeur: string): string[] {
+  return options.includes(valeur) ? options : [valeur, ...options]
 }
 
 const Maquettes: Maquette[] = [
@@ -64,7 +112,7 @@ function ListeLots({ libelle, valeur, choisir }: { libelle: string; valeur: stri
     <label className="rig-saisie-champ">
       <span className="rig-saisie-champ__libelle">{libelle}</span>
       <select className="rig-saisie-champ__saisie" value={valeur} onChange={(e) => choisir(e.target.value)}>
-        {LotsDisponibles.map((l) => <option key={l} value={l}>{l}</option>)}
+        {avecValeur(LotsDisponibles, valeur).map((l) => <option key={l} value={l}>{l === '' ? '(non renseigné)' : l}</option>)}
       </select>
     </label>
   )
@@ -96,10 +144,53 @@ export function EcranMaquettesEdition() {
   const [requeteSql, setRequeteSql] = useState('SELECT * FROM DEMANDE WHERE DEMAN_ID = @id')
   const [autresParam, setAutresParam] = useState('')
   const [selection, setSelection] = useState<Maquette | null>(Maquettes[0]!)
+  // null : la demonstration (pas encore de reponse du pont, ou mode « demo »).
+  const [vueBase, setVueBase] = useState<VueMaquettes | null>(null)
+
+  /** Choisir une maquette ; une maquette de la base remplit le panneau avec son premier parametre d'edition. */
+  function choisir(m: Maquette | null) {
+    setSelection(m)
+    if (!m || m.parametres === undefined) return
+    const p = m.parametres[0]
+    setEntetePlieuse(m.entetePlieuse === true)
+    setCodeParamEdt(p?.code ?? '')
+    setLibParamEdt(p?.libelle ?? '')
+    setNatureEdition(p?.nature ?? '')
+    setImprimante(p?.imprimante ?? '')
+    setTypePapier(p?.typePapier ?? '')
+    setLot(p?.lot ?? '')
+    setLotLrar(p?.lotLrar ?? '')
+    setLotIlrar(p?.lotIlrar ?? '')
+    setLotSubstitution(p?.lotSubstitution ?? '')
+    setNbExemplaires(p?.nbExemplaires ?? '')
+    setRectoVerso(p?.rectoVerso === true)
+    setAgrafage(p?.agrafage === true)
+    setApercuAvantImpression(p?.afficherAvantImpression === true)
+    setDocNonModifiable(p?.docNonModifiable === true)
+    setImpression(p?.impression === true)
+    setGarderEditionLot1(p?.garderEditionLot1 === true)
+    setRequeteSql(p?.requeteSql ?? '')
+    setAutresParam('')
+  }
+
+  useEffect(() => {
+    let perime = false
+    void appeler<VueMaquettes>('EcranMaquettesEdition.Maquettes')
+      .then((v) => {
+        if (perime || v.mode === 'demo' || v.mode === undefined) return
+        // La base remplace la demonstration : sa premiere maquette choisie (aucune en panne).
+        setVueBase(v)
+        choisir(v.maquettes[0] ?? null)
+      })
+      .catch(() => { /* pas de pont (tests, page hors WebView2) : la demonstration reste */ })
+    return () => { perime = true }
+  }, [])
+
+  const source = vueBase ? vueBase.maquettes : Maquettes
 
   /** Les maquettes de l'ecran d'origine choisi, pour un type de document (une vue compte les siennes). */
   function trouver(type: string): Maquette[] {
-    let q = Maquettes
+    let q = source
     if (codeProcess !== '') q = q.filter((m) => m.process === codeProcess)
     if (type !== '') q = q.filter((m) => m.typeDoc === type)
     return q
@@ -126,7 +217,7 @@ export function EcranMaquettesEdition() {
           <span className="rig-saisie-champ__libelle">Ecran d'origine</span>
           <select className="rig-saisie-champ__saisie" value={codeProcess} onChange={(e) => setCodeProcess(e.target.value)}>
             <option value="">Tous</option>
-            {distinctsTries(Maquettes.map((m) => m.process)).map((p) => <option key={p} value={p}>{p}</option>)}
+            {distinctsTries(source.map((m) => m.process)).map((p) => <option key={p} value={p}>{p}</option>)}
           </select>
         </label>
 
@@ -134,7 +225,7 @@ export function EcranMaquettesEdition() {
           <span className="rig-saisie-champ__libelle">Type de document</span>
           <select className="rig-saisie-champ__saisie" value={typeDoc} onChange={(e) => setTypeDoc(e.target.value)}>
             <option value="">Tous</option>
-            {distinctsTries(Maquettes.map((m) => m.typeDoc)).map((t) => <option key={t} value={t}>{t}</option>)}
+            {distinctsTries(source.map((m) => m.typeDoc)).map((t) => <option key={t} value={t}>{t}</option>)}
           </select>
         </label>
 
@@ -143,17 +234,15 @@ export function EcranMaquettesEdition() {
           <label className="rig-saisie-champ">
             <span className="rig-saisie-champ__libelle">Imprimante</span>
             <select className="rig-saisie-champ__saisie" value={imprimante} onChange={(e) => setImprimante(e.target.value)}>
-              <option>Greffe - Accueil</option>
-              <option>Greffe - Etage 1</option>
-              <option>PDF (fichier)</option>
+              {avecValeur(['Greffe - Accueil', 'Greffe - Etage 1', 'PDF (fichier)'], imprimante)
+                .map((o) => <option key={o} value={o}>{o === '' ? '(non renseignée)' : o}</option>)}
             </select>
           </label>
           <label className="rig-saisie-champ">
             <span className="rig-saisie-champ__libelle">Type de papier</span>
             <select className="rig-saisie-champ__saisie" value={typePapier} onChange={(e) => setTypePapier(e.target.value)}>
-              <option>A4 blanc</option>
-              <option>A4 en-tete</option>
-              <option>Enveloppe plieuse</option>
+              {avecValeur(['A4 blanc', 'A4 en-tete', 'Enveloppe plieuse'], typePapier)
+                .map((o) => <option key={o} value={o}>{o === '' ? '(non renseigné)' : o}</option>)}
             </select>
           </label>
           {/* v2 (OPE_PARAM_EDT_MAJ) a QUATRE listes de lot distinctes, pas une
@@ -196,10 +285,8 @@ export function EcranMaquettesEdition() {
             <label className="rig-saisie-champ">
               <span className="rig-saisie-champ__libelle">Nature d'edition</span>
               <select className="rig-saisie-champ__saisie" value={natureEdition} onChange={(e) => setNatureEdition(e.target.value)}>
-                <option>Courrier</option>
-                <option>Acte</option>
-                <option>Bordereau</option>
-                <option>Etat</option>
+                {avecValeur(['Courrier', 'Acte', 'Bordereau', 'Etat'], natureEdition)
+                  .map((o) => <option key={o} value={o}>{o === '' ? '(non renseignée)' : o}</option>)}
               </select>
             </label>
           </div>
@@ -223,10 +310,12 @@ export function EcranMaquettesEdition() {
                      synthese={<>{affichees.length}{affichees.length > 1 ? ' maquettes' : ' maquette'}
                        {parFormat.map(([format, n]) => <span key={format}>{' · '}<b>{n}</b>{' '}{format}</span>)}</>}
                      filtre={{ valeur: filtreRapide, changer: setFiltreRapide, indication: 'Aller a une maquette…',
-                               valider: () => { if (affichees.length === 1) setSelection(affichees[0]!) } }} />
+                               valider: () => { if (affichees.length === 1) choisir(affichees[0]!) } }} />
+        {vueBase ? <ProvenanceEcran mode={vueBase.mode} message={vueBase.message} quoi="Maquettes" />
+          : <ProvenanceEcran mode="demo" quoi="Maquettes" />}
 
         <VuesListe vues={[{ cle: '', libelle: 'Toutes', compte: trouver('').length },
-                          ...distinctsTries(Maquettes.map((m) => m.typeDoc)).map((t) => ({ cle: t, libelle: t, compte: trouver(t).length }))]}
+                          ...distinctsTries(source.map((m) => m.typeDoc)).map((t) => ({ cle: t, libelle: t, compte: trouver(t).length }))]}
                    active={typeDoc} choisir={setTypeDoc} />
 
         <div className="rig-table-cadre">
@@ -248,7 +337,7 @@ export function EcranMaquettesEdition() {
             </thead>
             <tbody>
               {affichees.map((maq) => (
-                <tr key={maq.code} onClick={() => setSelection(maq)}>
+                <tr key={maq.code} onClick={() => choisir(maq)}>
                   <td className="rig-table__mono">{maq.code}</td>
                   <td title={maq.libelle}>{maq.libelle}</td>
                   <td title={maq.process}>{maq.process}</td>
@@ -281,12 +370,19 @@ export function EcranMaquettesEdition() {
             <p className="rig-nonmaq__texte rig-nonmaq__texte--sourd">
               Edition : {imprimante} — {typePapier} — {lot}{' '}{rectoVerso ? ' — recto-verso' : ''}{agrafage ? ' — agrafe' : ''}
             </p>
+            {s.parametres !== undefined && (
+              <p className="rig-nonmaq__texte rig-nonmaq__texte--sourd rig-maq-parametres">
+                {s.parametres.length === 0 ? "Aucun parametre d'edition"
+                  : "Parametres d'edition : " + s.parametres.map((p) => p.code).join(', ')}
+              </p>
+            )}
           </div>
         )}
 
         <PiedListe>
           <span><b>{affichees.length}</b>{affichees.length > 1 ? ' maquettes affichees' : ' maquette affichee'}</span>
           <span>Tables liees <b>{tablesLiees}</b></span>
+          {vueBase && <span>Fichier <b>{vueBase.total}</b></span>}
         </PiedListe>
       </ListeModerne>
     </div>

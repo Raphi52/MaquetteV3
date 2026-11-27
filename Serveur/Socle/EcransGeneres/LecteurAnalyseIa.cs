@@ -69,7 +69,7 @@ internal sealed class LecteurAnalyseIa : IRechercheEcran, IFicheEcran
         var regularisation = FormeLigne.Texte(r, "DMTLCF_ORIGINE") == "INPI_FORMA_MAJ";
         var precisions = FormeLigne.Joindre(regularisation ? "régularisation INPI" : "formalité INPI",
             FormeLigne.Texte(r, "DMTLCF_NUM_GESTION") is { Length: > 0 } g ? $"dossier {FormeLigne.NumeroGestion(g)}" : null,
-            $"reçue le {FormeLigne.Date(FormeLigne.DateDe(r, "DMTLCF_DATE_CREATION"))}", analysee ? "analysée" : "à analyser");
+            FormeLigne.DateDe(r, "DMTLCF_DATE_CREATION") is { } recue ? $"reçue le {FormeLigne.Date(recue)}" : null, analysee ? "analysée" : "à analyser");
         return new LigneLue(FormeLigne.Texte(r, "DMTLCF_NUMERO_NATIONAL_INPI"), precisions, regularisation ? Regularisations : Formalites,
             analysee ? "Validee" : "AFaire", [])
         {

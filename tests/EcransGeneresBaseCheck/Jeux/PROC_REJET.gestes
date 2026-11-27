@@ -58,6 +58,7 @@ Chèque n° J12CHQ02 | Chèque (banc 12) · 80,00 € · encaissé le {J-20} · 
 Encaissement n° 2300212 | Chèque · 99,99 € · encaissé le 08/02/2024 · PAYEUR L13 HORS · non comptabilisé | Chèques | AFaire | []
 Encaissement n° 2300205 | Chèque · 40,00 € · encaissé le 06/02/2024 · PAYEUR L13 SANS VENTIL · non comptabilisé | Chèques | AFaire | []
 Encaissement n° 2300204 | Chèque · 30,00 € · encaissé le 06/02/2024 · PAYEUR L13 SANS AFFAIRE · non comptabilisé | Chèques | AFaire | []
+Encaissement n° 2500201 | Chèque banc · 15,00 € · encaissé le 15/01/2019 · non comptabilisé | Chèques | AFaire | []
 Rejet n° 2204402 · chèque J12CHQ01 | rejeté le {J+0} · 150,00 € · PAYEUR J12A · motif : Chèque sans provision | Rejets enregistrés | Validee | []
 Rejet n° 2204401 · chèque J12CHQ06 | rejeté le {J-25} · 90,00 € · PAYEUR J12F · motif : Provision insuffisante | Rejets enregistrés | Validee | []
 controle: SELECT ENCRR_CLIENT + ' / ' + ENCRR_CLIENT_EMAIL + ' / ' + ENCRR_CLIENT_ADRESSE + ' / ' + CONVERT(varchar(20), CAST(ENCRR_MONTANT AS decimal(19,2))) FROM v2.ENCAISSEMENT_RECUS_REJETES WHERE ENCRR_ID_ENCRR = 2204402 AND ENCRR_NUM_TITRE = 'J12CHQ01' AND ENCRR_DESIGNATION_BANQUE = 'BANQUE J12' => CLI REJET A / cli.a@banc12.test / 5 rue du Rejet|69001 LYON / 150.00
@@ -83,6 +84,7 @@ Chèque n° J12CHQ05 | Chèque (banc 12) · 25,00 € · encaissé le {J-8} · P
 Encaissement n° 2300212 | Chèque · 99,99 € · encaissé le 08/02/2024 · PAYEUR L13 HORS · non comptabilisé | Chèques | AFaire | []
 Encaissement n° 2300205 | Chèque · 40,00 € · encaissé le 06/02/2024 · PAYEUR L13 SANS VENTIL · non comptabilisé | Chèques | AFaire | []
 Encaissement n° 2300204 | Chèque · 30,00 € · encaissé le 06/02/2024 · PAYEUR L13 SANS AFFAIRE · non comptabilisé | Chèques | AFaire | []
+Encaissement n° 2500201 | Chèque banc · 15,00 € · encaissé le 15/01/2019 · non comptabilisé | Chèques | AFaire | []
 Rejet n° 2204403 · chèque J12CHQ02 | rejeté le {J+0} · 80,00 € · PAYEUR J12B · motif : Opposition sur chèque | Rejets enregistrés | Validee | []
 Rejet n° 2204402 · chèque J12CHQ01 | rejeté le {J+0} · 150,00 € · PAYEUR J12A · motif : Chèque sans provision | Rejets enregistrés | Validee | []
 Rejet n° 2204401 · chèque J12CHQ06 | rejeté le {J-25} · 90,00 € · PAYEUR J12F · motif : Provision insuffisante | Rejets enregistrés | Validee | []
