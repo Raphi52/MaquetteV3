@@ -1,0 +1,47 @@
+# Les Parametres du « Journal de caisse » cherches dans la base (LecteurJournalCaisse), sur les encaissements de fevrier 2024 de
+# PROC_JCAISSE.sql. Les cellules (valeurs:) portent les montants en decimal exact : leur somme est le total du journal
+# (12,34 + 50,05 - 20,00 + 1 234,56 = 1 276,95), celle d'un SELECT SUM(ENCMT_MONTANT) sur ces encaissements.
+# Bloc 1 : la periode du 05 au 07/02/2024, tri par mode (type CB, ES, RBT, VI). 2300202 est ventile deux fois : UNE ligne, 50,05.
+# 2300203 est un remboursement : le payeur est son client (CLIENT CAISSE B). Ecartes, chacun avec son jumeau retenu 2300210 : 2300204
+# (ventilation sans affaire), 2300205 (sans ventilation), 2300206 (mode absent de MODE_PAIEMENT) ; 2300212 le 08/02 a 0 h (jumeau
+# 2300211, le 07 a 23 h 59).
+critere: Période = 2024-02-05|2024-02-07
+lignes:
+Encaissement 2300211 | Carte bancaire · 12,34 € · le 07/02/2024 · PAYEUR L13 CARTE · caissier Alice CAISSE · à comptabiliser | Carte bancaire | AFaire | [] | valeurs: Encaissement 2300211 ; 2024-02-07 ; PAYEUR L13 CARTE ; Carte bancaire ;  ; Alice CAISSE ; 12.34
+Encaissement 2300202 | Espèce · 50,05 € · le 05/02/2024 · PAYEUR L13 B · caissier Alice CAISSE · comptabilisé | Espèces | Validee | [] | valeurs: Encaissement 2300202 ; 2024-02-05 ; PAYEUR L13 B ; Espèce ;  ; Alice CAISSE ; 50.05
+Encaissement 2300203 | Remboursement par chèque · -20,00 € · le 05/02/2024 · CLIENT CAISSE B · titre L13RBT · caissier Bruno GUICHET · remis en banque (remise 5) | Remboursement | EnCours | [] | valeurs: Encaissement 2300203 ; 2024-02-05 ; CLIENT CAISSE B ; Remboursement par chèque ; L13RBT ; Bruno GUICHET ; -20.00
+Encaissement 2300210 | Virement LCL · 1 234,56 € · le 06/02/2024 · PAYEUR L13 MARS · titre L13VIR1 · BANQUE MARS · caissier Bruno GUICHET · comptabilisé | Virement | Validee | [] | valeurs: Encaissement 2300210 ; 2024-02-06 ; PAYEUR L13 MARS ; Virement LCL ; L13VIR1 ; Bruno GUICHET ; 1234.56
+---
+# Le tri « Par montant » (OPE_METHODETRI, mode 3).
+critere: Période = 2024-02-05|2024-02-07
+critere: Tri = Par montant
+lignes:
+Encaissement 2300203 | Remboursement par chèque · -20,00 € · le 05/02/2024 · CLIENT CAISSE B · titre L13RBT · caissier Bruno GUICHET · remis en banque (remise 5) | Remboursement | EnCours | []
+Encaissement 2300211 | Carte bancaire · 12,34 € · le 07/02/2024 · PAYEUR L13 CARTE · caissier Alice CAISSE · à comptabiliser | Carte bancaire | AFaire | []
+Encaissement 2300202 | Espèce · 50,05 € · le 05/02/2024 · PAYEUR L13 B · caissier Alice CAISSE · comptabilisé | Espèces | Validee | []
+Encaissement 2300210 | Virement LCL · 1 234,56 € · le 06/02/2024 · PAYEUR L13 MARS · titre L13VIR1 · BANQUE MARS · caissier Bruno GUICHET · comptabilisé | Virement | Validee | []
+---
+# Le caissier (ENCMT_ID_UTLST) : Bruno GUICHET seul -- jumeaux ecartes 2300202 et 2300211 (Alice CAISSE).
+critere: Période = 2024-02-05|2024-02-07
+critere: Caissier = guichet
+lignes:
+Encaissement 2300203 | Remboursement par chèque · -20,00 € · le 05/02/2024 · CLIENT CAISSE B · titre L13RBT · caissier Bruno GUICHET · remis en banque (remise 5) | Remboursement | EnCours | []
+Encaissement 2300210 | Virement LCL · 1 234,56 € · le 06/02/2024 · PAYEUR L13 MARS · titre L13VIR1 · BANQUE MARS · caissier Bruno GUICHET · comptabilisé | Virement | Validee | []
+---
+# Les modes de paiement, par code (CB) ou par libelle (Espèce) -- jumeaux ecartes 2300203 (RBT) et 2300210 (VI).
+critere: Période = 2024-02-05|2024-02-07
+critere: Modes de paiement = CB, Espèce
+lignes:
+Encaissement 2300211 | Carte bancaire · 12,34 € · le 07/02/2024 · PAYEUR L13 CARTE · caissier Alice CAISSE · à comptabiliser | Carte bancaire | AFaire | []
+Encaissement 2300202 | Espèce · 50,05 € · le 05/02/2024 · PAYEUR L13 B · caissier Alice CAISSE · comptabilisé | Espèces | Validee | []
+---
+# Le champ de recherche : le payeur, le titre ou la banque (« mars » : PAYEUR L13 MARS, BANQUE MARS).
+critere: Période = 2024-02-05|2024-02-07
+texte: mars
+lignes:
+Encaissement 2300210 | Virement LCL · 1 234,56 € · le 06/02/2024 · PAYEUR L13 MARS · titre L13VIR1 · BANQUE MARS · caissier Bruno GUICHET · comptabilisé | Virement | Validee | []
+---
+# Le jumeau de la borne haute : le 08/02/2024 seul rend 2300212.
+critere: Période = 2024-02-08|2024-02-08
+lignes:
+Encaissement 2300212 | Chèque · 99,99 € · le 08/02/2024 · PAYEUR L13 HORS · caissier Alice CAISSE · à comptabiliser | Chèque | AFaire | []

@@ -82,13 +82,19 @@ public sealed class DomaineFacturer : IDomaineEcrans
         {
             Code = "PROC_ARTICLE", Titre = "Articles tarifaires", Sujet = "articles tarifaires",
             Forme = FormeEcran.Referentiel,
-            Colonnes = ["Libellé", "Code de l'article", "Type d'article", "Période de validité", Champ.Montant("Prix HT")],
-            Recherche = "Rechercher un article, un code, une période…",
-            Criteres = ["Période de validité", "Type : article principal ou titre composé", "Catégorie de ventilation"],
+            // La grille : la dernière version de chaque article (LecteurArticles.cs, lot 13) ; Ajouter un article principal et
+            // Modifier son libellé ou son prix écrivent v2.ARTICLE (EcrivainArticles.cs, DoSauveAfterEtape de RIG v2).
+            // « Période de validité » se devine en deux dates (Champ.Deviner) : la grille ouvrait deux champs date vides pour
+            // « depuis le 01/01/2000 » (bureau caché, lot 13) ; c'est le texte de la date d'application, saisi « depuis le jj/mm/aaaa ».
+            Colonnes = ["Libellé", "Code de l'article", Champ.Liste("Type d'article", "Article principal", "Titre composé"), Champ.Texte("Période de validité"), Champ.Montant("Prix HT")],
+            Recherche = "Rechercher un article : code ou libellé…",
+            // Critères que la base cherche : le type et le statut (le paramètre inclureSommeil de RIG v2, PROC_ARTICLE.cs:100).
+            Criteres = ["Type d'article", "Statut"],
             // Action citée par la fiche (proc_article.md) : « la transaction de sauvegarde ».
             Valider = "Sauvegarder",
             Rang = 6,
-            Etats = EtatsEcran.Trois("À compléter", "En cours de saisie", "Enregistré"),
+            // États : le statut et la date d'application de la version (ARTCL_STATUT, ARTCL_DATE_APPLICATION) -- règle du lecteur.
+            Etats = EtatsEcran.Trois("En sommeil", "À venir", "En vigueur"),
             Groupes = ["Articles principaux", "Titres composés"],
             Sections =
             [
@@ -293,8 +299,11 @@ public sealed class DomaineFacturer : IDomaineEcrans
             ],
         },
 
-        // Le code n'a pas de grille : c'est un rapport Crystal édité sur critères. Les lignes
-        // ci-dessous sont une démonstration (encaissements par mode de paiement).
+        // Le code n'a pas de grille : c'est un rapport Crystal édité sur critères. La V3 calcule le journal dans la base
+        // (Serveur/Socle/EcransGeneres/LecteurJournalCaisse.cs, lot 13) : les lignes ci-dessous ne sont que l'exemple sans serveur.
+        // « Éditer » n'a pas d'écrivain : RIG v2 affiche son état Crystal sans passer par la file des éditions
+        // (OPE_METHODETRI.Editer, :100-108 ; JournalCaisse.AfficherCrystal) ; RIG v3 ne génère pas cet état, le tableau et ses
+        // totaux sont le journal.
         new DescripteurEcran
         {
             Code = "PROC_JCAISSE", Titre = "Journal de caisse", Sujet = "encaissements",
@@ -304,13 +313,16 @@ public sealed class DomaineFacturer : IDomaineEcrans
             Parametres = [Champ.Periode("Période"), "Caissier", "Modes de paiement", Champ.Liste("Tri", "Par mode de paiement", "Par utilisateur", "Par montant", "Par date")],
             Colonnes = ["Encaissement", Champ.Date("Date"), "Payeur", "Mode de paiement", "Numéro de titre", "Caissier", Champ.Montant("Montant")],
             Gestes = ["Éditer"],
-            Recherche = "Rechercher un encaissement, une référence, un client…",
-            Criteres = ["Période (du, au), 31 jours au plus conseillés", "Caissier (tous par défaut)", "Modes de paiement"],
+            Recherche = "Rechercher un payeur, un numéro de titre, une banque…",
+            // Les criteres sont les Parametres, au libelle pres : c'est ce que l'Etat envoie a la base (LecteurJournalCaisse.cs).
+            Criteres = ["Période", "Caissier", "Modes de paiement", "Tri"],
             // Bouton cité par la fiche (proc_jcaisse.md, Détail OPE) : « sur clic EDITER ».
             Valider = "Éditer",
             Rang = 6,
-            Etats = EtatsEcran.Trois("À éditer", "Critères choisis", "Journal édité"),
-            Groupes = ["Espèces", "Chèque", "Carte bancaire", "Virement"],
+            // États : la comptabilisation de l'encaissement (ENCMT_DATE_COMPTABILISATION, ENCMT_REMIS) -- règle en tête du lecteur.
+            Etats = EtatsEcran.Trois("À comptabiliser", "Remis en banque", "Comptabilisé"),
+            // Groupes : le type du mode de paiement (MODE_PAIEMENT.R_MODEPAIEME_TYPE de RIG_DEV : ES, CH, CB, VI, RBT, REG, DIV).
+            Groupes = ["Espèces", "Chèque", "Carte bancaire", "Virement", "Remboursement", "Régularisation", "Autre mode"],
             Sections =
             [
                 Marche("Critères généraux", "La date de fin ne précède pas la date de début. Au-delà de 31 jours, un avertissement signale un affichage possiblement lent. Seuls les encaissements du greffe courant sont retenus.", true,
@@ -330,43 +342,51 @@ public sealed class DomaineFacturer : IDomaineEcrans
             ],
         },
 
-        // Meme cas que le journal de caisse : pas de grille dans le code, un rapport Crystal édité
-        // sur critères. Les lignes sont une démonstration (une vente par ligne).
+        // Meme cas que le journal de caisse : pas de grille dans le code, un rapport Crystal édité sur critères (JournalVente,
+        // RigCrystalFactu). La V3 calcule le journal dans la base (LecteurJournalVente.cs, lot 13) : les articles vendus de la
+        // période, édition « Détaillée » triée par date, celle que RIG v2 ouvre par défaut (OPE_EDITION.cs:34-37, OPE_TRI.cs:50-51).
+        // Le corps de la fiche parlait de criées et d'adjudicataires (« ventes ») : le code n'en lit aucune (proc_jvente.md:182),
+        // groupes et colonnes suivent le code. « Éditer » n'a pas d'écrivain : l'état Crystal s'affiche sans file des éditions.
         new DescripteurEcran
         {
             Code = "PROC_JVENTE", Titre = "Journal de vente", Sujet = "ventes du greffe",
             Forme = FormeEcran.Etat,
-            Parametres = [Champ.Periode("Période"), "Utilisateurs", "Clients", "Articles", "TVA", "Factures", "Type d'édition", "Tri"],
-            // Colonnes : la vente et son montant (role, proc_jvente.md:6 : « les ventes réalisées »).
-            Colonnes = ["Vente", Champ.Montant("Montant")],
+            // Parametres : les critères que la base cherche (LecteurJournalVente.cs) -- dates et utilisateurs (OPE_CRITERESGENERAUX),
+            // abrégé client, code ou libellé, type d'article et taux de TVA (OPE_FILTRES), tri (OPE_TRI).
+            Parametres = [Champ.Periode("Période"), "Utilisateurs", "Abrégé client", "Code ou libellé article",
+                Champ.Liste("Type d'article", "Facturés au greffe", "Web", "Tarifés"), "Taux de TVA", Champ.Liste("Tri", "Par date", "Par article")],
+            // Colonnes : les champs de la table du journal (JournalVente.SqlCreateTable, :67-93), édition détaillée.
+            Colonnes = [Champ.Date("Date"), "Facture", "Code article", "Libellé", "Client", Champ.Nombre("Quantité"), Champ.Montant("Montant HT"), Champ.Montant("Montant TTC")],
             Gestes = ["Éditer"],
-            Recherche = "Rechercher une vente, un adjudicataire, une référence…",
-            Criteres = ["Période et utilisateurs", "Clients, articles, TVA et factures", "Type d'édition et tri"],
+            Recherche = "Rechercher un article, un libellé, un client…",
+            Criteres = ["Période", "Utilisateurs", "Abrégé client", "Code ou libellé article", "Type d'article", "Taux de TVA", "Tri"],
             // Bouton cité par la fiche (proc_jvente.md, Détail OPE) : « uniquement sur EDITER ».
             Valider = "Éditer",
             Rang = 6,
-            Etats = EtatsEcran.Trois("À éditer", "Critères choisis", "Journal édité"),
-            Groupes = ["Criée judiciaire", "Vente aux enchères"],
+            // États : la facture de l'article (ARTUT_NUMERO_FACTURE, FACTU_DATE_COMPTABILISATION) -- règle en tête du lecteur.
+            Etats = EtatsEcran.Trois("Non facturé", "Facturé", "Comptabilisé"),
+            // Groupes : les trois types d'article de la V2 (OPE_FILTRES.Designer.cs:151-171).
+            Groupes = ["Facturés au greffe", "Web", "Tarifés"],
             Sections =
             [
-                Marche("Généraux", "Dates et utilisateurs. Seules les ventes du greffe courant sont retenues, et seules les affaires de nature « vente » paramétrée.", true,
+                Marche("Généraux", "Dates et utilisateurs, aujourd'hui par défaut. Un article facturé compte à la date de sa facture, un article tarifé à la sienne.", true,
                     "Date de début", "Date de fin", "Utilisateurs"),
-                Marche("Filtres", "Clients, articles, TVA et factures pour restreindre le rapport.", true,
-                    "Clients", "Articles", "TVA", "Factures"),
-                Marche("Édition", "Type d'édition. Le rapport se lance en tâche de fond : un rapport encore ouvert bloque la fermeture de l'écran.", true,
+                Marche("Filtres", "Abrégé client, code ou libellé d'article, type d'article et taux de TVA. Par défaut, les articles facturés au greffe et web, pas les tarifés.", true,
+                    "Abrégé client", "Code ou libellé article", "Type d'article", "Taux de TVA"),
+                Marche("Édition", "Édition détaillée : une ligne par article vendu, son montant HT (prix unitaire × quantité) et TTC.", true,
                     "Type d'édition"),
-                Marche("Tri", "Choix du tri ; le rapport est généré de façon asynchrone.", true,
+                Marche("Tri", "Par date (défaut) ou par article.", true,
                     "Tri"),
             ],
             Lignes =
             [
-                Ligne("Criée du 03/03/2026, lot 12", $"Adjudicataire de démonstration A · {Euros(1_450_000)}", "Criée judiciaire", "Validee", 0, 1, 2, 3) with { Valeurs = ["Criée du 03/03/2026, lot 12", "14500.00"] },
-                Ligne("Criée du 10/03/2026, lot 3", $"Adjudicataire de démonstration B · {Euros(320_000)}", "Criée judiciaire", "EnCours", 0) with { Valeurs = ["Criée du 10/03/2026, lot 3", "3200.00"] },
-                Ligne("Vente aux enchères 2026-07", $"Adjudicataire de démonstration C · {Euros(890_000)}", "Vente aux enchères", "AFaire") with { Valeurs = ["Vente aux enchères 2026-07", "8900.00"] },
-                Ligne("Vente aux enchères 2026-09", $"Mise à prix {Euros(100_000)}", "Vente aux enchères", "EnCours", 0, 1) with { Valeurs = ["Vente aux enchères 2026-09", "1000.00"] },
-                Ligne("Criée du 17/03/2026, lot 5", $"Adjudication {Euros(2_200_000)}", "Criée judiciaire", "AFaire") with { Valeurs = ["Criée du 17/03/2026, lot 5", "22000.00"] },
-                Ligne("Vente aux enchères 2026-11", $"Adjudication {Euros(64_000)}", "Vente aux enchères", "Validee", 0, 1, 2, 3) with { Valeurs = ["Vente aux enchères 2026-11", "640.00"] },
-                Ligne("Criée du 24/03/2026, lot 8", $"Adjudication {Euros(476_000)}", "Criée judiciaire", "AFaire") with { Valeurs = ["Criée du 24/03/2026, lot 8", "4760.00"] },
+                Ligne("KBIS · Extrait Kbis", $"facture F2026-00412 · le 03/03/2026 · Client de démonstration A · 2 × {Euros(296)} HT", "Facturés au greffe", "Validee") with { Valeurs = ["2026-03-03", "F2026-00412", "KBIS", "Extrait Kbis", "Client de démonstration A", "2", "5.92", "7.10"] },
+                Ligne("DEPACT · Dépôt d'acte", $"facture F2026-00413 · le 04/03/2026 · Client de démonstration B · 1 × {Euros(3_250)} HT", "Facturés au greffe", "EnCours") with { Valeurs = ["2026-03-04", "F2026-00413", "DEPACT", "Dépôt d'acte", "Client de démonstration B", "1", "32.50", "39.00"] },
+                Ligne("WEB · Commande en ligne", $"facture F2026-00415 · le 09/03/2026 · Client de démonstration C · 1 × {Euros(1_000)} HT", "Web", "Validee") with { Valeurs = ["2026-03-09", "F2026-00415", "WEB", "Commande en ligne", "Client de démonstration C", "1", "10.00", "12.00"] },
+                Ligne("IMMAT · Immatriculation", $"facture F2026-00418 · le 12/03/2026 · Client de démonstration D · 1 × {Euros(2_510)} HT", "Facturés au greffe", "EnCours") with { Valeurs = ["2026-03-12", "F2026-00418", "IMMAT", "Immatriculation", "Client de démonstration D", "1", "25.10", "30.12"] },
+                Ligne("COPIE · Copie d'acte", $"le 16/03/2026 · Client de démonstration A · 3 × {Euros(780)} HT · non facturé", "Tarifés", "AFaire") with { Valeurs = ["2026-03-16", "", "COPIE", "Copie d'acte", "Client de démonstration A", "3", "23.40", "28.08"] },
+                Ligne("WEB · Commande en ligne", $"facture F2026-00424 · le 20/03/2026 · Client de démonstration E · 1 × {Euros(1_000)} HT", "Web", "EnCours") with { Valeurs = ["2026-03-20", "F2026-00424", "WEB", "Commande en ligne", "Client de démonstration E", "1", "10.00", "12.00"] },
+                Ligne("RADIAT · Radiation", $"facture F2026-00430 · le 27/03/2026 · Client de démonstration B · 1 × {Euros(1_430)} HT", "Facturés au greffe", "Validee") with { Valeurs = ["2026-03-27", "F2026-00430", "RADIAT", "Radiation", "Client de démonstration B", "1", "14.30", "17.16"] },
             ],
         },
 
@@ -390,8 +410,10 @@ public sealed class DomaineFacturer : IDomaineEcrans
                     "Désignation", "Adresse (3 lignes au plus)"),
                 Marche("Exemplaires", "Nombre d'exemplaires, 1 par défaut. Une saisie vide ou nulle repasse à 1. Vingt destinataires au plus.", true,
                     "Nombre d'exemplaires"),
-                Marche("Type d'envoi", "Lettre recommandée simple ou avec accusé de réception. Chaque destinataire ajoute ses éditions à la demande en cours.", true,
-                    "Type de lettre"),
+                // Les deux étapes de RIG v2 (ETP_LR, ETP_LRAR) : un choix par destinataire. Lignes lues et geste :
+                // LecteurLettresRecommandees.cs, EcrivainLettresRecommandees.cs (lot 13).
+                Marche("Type d'envoi", "Lettre recommandée simple ou avec accusé de réception. Chaque destinataire ajoute ses éditions à la file des éditions.", true,
+                    Champ.Liste("Type de lettre", "Lettre recommandée", "Lettre avec accusé de réception")),
             ],
             Lignes =
             [
@@ -405,28 +427,33 @@ public sealed class DomaineFacturer : IDomaineEcrans
             ],
         },
 
-        // Prototype (la fiche le dit) : les agrégats sont calculés puis jetés, et les filtres PC
-        // ne sont pas appliqués au calcul. La maquette montre les règles d'interaction voulues.
-        // Consultation seule : aucune écriture de lettrage.
+        // Prototype (la fiche le dit) : les agrégats sont calculés puis jetés, et les filtres PC ne sont pas appliqués au calcul.
+        // La V3 branche ce que la fiche demande (proc_vlettrage.md:150-153) : les agrégats de l'entité Lettrage, par client, dans
+        // la base (LecteurLettrage.cs, lot 13) ; et les deux gestes de cette entité, que RIG v2 joue à la comptabilisation :
+        // « Lettrer » (Lettrage.LettrerClientCompte / LettrerAffaire) et « Délettrer » (leur branche AnnuleRemplace) sur les
+        // clients affichés (EcrivainLettrage.cs). fix-ok: mesuré au lot 13 (27/11/2026) -- l'écran V2 n'écrit rien
+        // (proc_vlettrage.md:46) mais l'entité Lettrage écrit LETTRAGE (Lettrage.cs:64-134, :295-394) : les gestes la citent.
         new DescripteurEcran
         {
             Code = "PROC_VLETTRAGE", Titre = "Lettrage", Sujet = "clients",
             Forme = FormeEcran.Etat,
-            // Un ecran de consultation d'agregats (proc_vlettrage.md:46,57) : criteres, Rechercher, tableau de totaux.
-            Parametres = [Champ.Periode("Période"), Champ.Liste("Catégorie de client", "Compte", "Divers", "PC"), "État PC", "Type PC"],
+            // Les critères que la base cherche (LecteurLettrage.cs) : la période et une catégorie (GetLettrageTotalParType). Les
+            // filtres « État PC » et « Type PC » ne sont lus nulle part par RIG v2 (proc_vlettrage.md:109) : retirés.
+            Parametres = [Champ.Periode("Période"), Champ.Liste("Catégorie de client", "Compte hors PC", "Divers", "PC")],
             Colonnes = ["Client", Champ.Montant("Facturé"), Champ.Montant("Payé"), Champ.Montant("Restant")],
-            Gestes = ["Rechercher"],
-            Recherche = "Rechercher un client, un compte…",
-            Criteres = ["Période", "Catégorie de client (compte, divers, PC)", "Filtres PC : état et type, si PC est coché"],
-            // Bouton cité par la fiche (proc_vlettrage.md) : « bouton Rechercher ». Aucun geste de validation n'est cité.
+            Gestes = ["Lettrer", "Délettrer"],
+            Recherche = "Rechercher un client, un abrégé, un compte…",
+            Criteres = ["Période", "Catégorie de client"],
+            // Bouton cité par la fiche (proc_vlettrage.md) : « bouton Rechercher ».
             Valider = "Rechercher",
             Rang = 6,
-            Etats = EtatsEcran.Trois("À vérifier", "En vérification", "Vérifié"),
+            // États : ce qui reste à lettrer, puis le restant dû -- règle en tête du lecteur.
+            Etats = EtatsEcran.Trois("À lettrer", "Lettré, non soldé", "Soldé"),
             Groupes = ["Compte hors PC", "Divers", "PC"],
             Sections =
             [
-                Marche("Critères", "Période et catégories de client, toutes cochées par défaut. Si PC est coché, filtres d'état (clôturé, ouvert, en attente) et de type (sauvegarde, RJ, LIJI, plan de sauvegarde, plan de redressement, CIA, CEP). Rien ne se calcule avant Rechercher.", true,
-                    "Période", "Catégorie de client", "État PC", "Type PC"),
+                Marche("Critères", "Période et catégorie de client, toutes par défaut. « Lettrer » lettre les factures et ventilations comptabilisées des clients affichés ; « Délettrer » annule leurs lettrages (Délettrer puis Lettrer : l'« annule et refait » de RIG v2).", true,
+                    "Période", "Catégorie de client"),
                 // L'etape « Resultat » de V2 EST la grille des totaux par client, que l'Etat affiche (Colonnes) : la section qui
                 // la repetait est retiree (controle final du lot 1, 25/11/2026). Reste a lire pour le lot 13 : la grille V2
                 // detaille facture et paye par poste, HT, TVA, BODACC, INPI, debours (proc_vlettrage.md:113, :125).
@@ -606,12 +633,17 @@ public sealed class DomaineFacturer : IDomaineEcrans
         {
             Code = "PROC_XEX", Titre = "Édition interne d'un Kbis", Sujet = "dossiers RCS",
             Forme = FormeEcran.Operation,
+            // UN dossier, désigné par son numéro de gestion (le seul critère, ETP_RCS sans numéro d'identification) : lu dans la
+            // base (LecteurKbisInterne.cs, lot 13) ; « Éditer le Kbis » valide la demande XEX du dossier (EcrivainKbisInterne.cs).
+            ObjetUnique = true,
             Recherche = "Rechercher un dossier RCS, un numéro de gestion…",
             Criteres = ["Numéro de gestion du dossier RCS"],
             // Action citée par la fiche (proc_xex.md, Détail OPE) : « Edition interne d'un Kbis ».
             Valider = "Éditer le Kbis",
             Rang = 3,
-            Etats = EtatsEcran.Trois("À rechercher", "Dossier choisi", "Kbis édité"),
+            // États : un dossier sans ou avec Kbis interne déjà édité (ses demandes XEX). Aucun n'est « traité » : RIG v2 valide autant
+            // de demandes XEX qu'on édite de Kbis (RIG_DEV, lu le 27/11/2026) -- « Kbis édité » ne fige donc aucune ligne lue.
+            Etats = EtatsEcran.Trois("Aucun Kbis interne", "Kbis interne déjà édité", "Kbis édité"),
             Groupes = ["Dossiers RCS"],
             Sections =
             [
@@ -620,15 +652,16 @@ public sealed class DomaineFacturer : IDomaineEcrans
                 Marche("Demande", "Renseignée à partir du dossier choisi : désignation, numéro de gestion, identifiant interne. Pas de saisie ; la date est toujours celle du jour.", false,
                     "Désignation", "Numéro de gestion", "Identifiant interne"),
             ],
+            // Le nom d'une ligne est le numéro de gestion : c'est lui qu'on saisit (opération sur UN objet).
             Lignes =
             [
-                Ligne("Alpha Services SARL", "Dossier RCS 2026B00601 · Kbis édité", "Dossiers RCS", "Validee", 0, 1),
-                Ligne("Bêta Industrie SAS", "Dossier RCS 2026B00602 · dossier choisi", "Dossiers RCS", "EnCours", 0),
-                Ligne("Gamma Conseil SARL", "Dossier RCS 2026B00603", "Dossiers RCS", "AFaire"),
-                Ligne("Delta Transports SAS", "Dossier RCS 2026B00604", "Dossiers RCS", "AFaire"),
-                Ligne("Epsilon Habitat SARL", "Dossier RCS 2026B00605 · dossier choisi", "Dossiers RCS", "EnCours", 0),
-                Ligne("Zêta Commerce SAS", "Dossier RCS 2026B00606 · Kbis édité", "Dossiers RCS", "Validee", 0, 1),
-                Ligne("Êta Boulangerie SARL", "Dossier RCS 2026B00607", "Dossiers RCS", "AFaire"),
+                Ligne("2026B00601", "Alpha Services SARL · 1 Kbis interne, le dernier le 03/03/2026", "Dossiers RCS", "EnCours"),
+                Ligne("2026B00602", "Bêta Industrie SAS · aucun Kbis interne édité", "Dossiers RCS", "AFaire"),
+                Ligne("2026B00603", "Gamma Conseil SARL · aucun Kbis interne édité", "Dossiers RCS", "AFaire"),
+                Ligne("2026B00604", "Delta Transports SAS · 2 Kbis internes, le dernier le 10/03/2026", "Dossiers RCS", "EnCours"),
+                Ligne("2026B00605", "Epsilon Habitat SARL · aucun Kbis interne édité", "Dossiers RCS", "AFaire"),
+                Ligne("2026B00606", "Zêta Commerce SAS · 1 Kbis interne, le dernier le 16/03/2026", "Dossiers RCS", "EnCours"),
+                Ligne("2026B00607", "Êta Boulangerie SARL · aucun Kbis interne édité", "Dossiers RCS", "AFaire"),
             ],
         },
     ];

@@ -1,0 +1,51 @@
+# « Livre de répertoire » (EcrivainLettresRecommandees), une saisie : « Configurer l'édition » d'un destinataire genere ses lettres
+# recommandees dans la file des editions (OPE_LR / OPE_LRAR, DoGenererLesEditions et DoVerifier). Le numero de la demande vient de la
+# numerotation DMD : les lettres ecrites se controlent par SELECT.
+# Non joue ici : la plage de LR non commandee (NUMERO_METIER 'LRN' a NMMTR_CHRONO_DEBUT = 1) -- la table n'est pas dans le banc, et la
+# poser a 1 refuserait aussi la lettre simple du bloc 5 ; une adresse de plus de 3 lignes -- une valeur de bloc tient sur une ligne.
+
+# Refus : rien de saisi (PROC_JLR.cs:59-63). Jumeau accepte : bloc 5.
+geste: Creer
+resultat: refuse
+message: Vous devez saisir au moins un recommandé
+---
+# Refus : la designation sans adresse (OPE_LR.cs:74-76). Jumeau accepte : bloc 5.
+geste: Creer
+valeur: Destinataire › Désignation = DESTINATAIRE LR BANC
+valeur: Type d'envoi › Type de lettre = Lettre recommandée
+resultat: refuse
+message: Saisie adresse
+---
+# Refus : l'adresse sans designation (OPE_LR.cs:71-73). Jumeau accepte : bloc 5.
+geste: Creer
+valeur: Destinataire › Adresse (3 lignes au plus) = 1 RUE DU BANC 75001 PARIS
+valeur: Type d'envoi › Type de lettre = Lettre recommandée
+resultat: refuse
+message: Saisie désignation
+---
+# Refus : sans type de lettre (l'etape LR ou LRAR de RIG v2). Jumeau accepte : bloc 5.
+geste: Creer
+valeur: Destinataire › Désignation = DESTINATAIRE LR BANC
+valeur: Destinataire › Adresse (3 lignes au plus) = 1 RUE DU BANC 75001 PARIS
+resultat: refuse
+message: « Type de lettre » est obligatoire. (Lettre recommandée ou Lettre avec accusé de réception)
+---
+# Deux exemplaires d'une lettre simple : la demande JLR validee, deux demandes d'edition du parametre JLR (« Imprimé LR La Poste »),
+# libelle source « designation 1-1 », « 1-2 », source DEMANDE, phase C (creee).
+geste: Creer
+valeur: Destinataire › Désignation = DESTINATAIRE LR BANC
+valeur: Destinataire › Adresse (3 lignes au plus) = 1 RUE DU BANC 75001 PARIS
+valeur: Exemplaires › Nombre d'exemplaires = 2
+valeur: Type d'envoi › Type de lettre = Lettre recommandée
+resultat: fait
+controle: SELECT STRING_AGG(CONCAT(de.DMNED_LIBELLE_DOCUMENT, '|', de.DMNED_LIBELLE_SOURCE, '|', de.DMNED_CODE_ENTITE_SOURCE, '|', CASE WHEN de.DMNED_VALEUR_ID_SOURCE = CAST(d.DMND_ID_DMND AS varchar(20)) THEN 'demande' ELSE 'autre' END, '|', de.DMNED_PHASE_TRAITEMENT, '|', de.DMNED_BLOC_ADRESSE_DESTINATAIRE), ' ; ') WITHIN GROUP (ORDER BY de.DMNED_ID_DMNED) FROM v2.DEMANDE_EDITION AS de JOIN v2.DEMANDE AS d ON d.DMND_ID_DMND = de.DMNED_ID_DMND WHERE d.DMND_CODE_PROSS = 'JLR' AND de.DMNED_DESIGNATION_DESTINATAIRE = 'DESTINATAIRE LR BANC' => Imprimé LR La Poste|DESTINATAIRE LR BANC 1-1|DEMANDE|demande|C|1 RUE DU BANC 75001 PARIS ; Imprimé LR La Poste|DESTINATAIRE LR BANC 1-2|DEMANDE|demande|C|1 RUE DU BANC 75001 PARIS
+controle: SELECT CONCAT(DMND_ETAT_DEMANDE, '|', DMND_NOM) FROM v2.DEMANDE WHERE DMND_CODE_PROSS = 'JLR' AND DMND_NOM = 'DESTINATAIRE LR BANC' => V|DESTINATAIRE LR BANC
+---
+# Avec accuse de reception, nombre d'exemplaires 0 : il repasse a 1 (OPE_LRAR.cs:26-30) ; le parametre JLRAR.
+geste: Creer
+valeur: Destinataire › Désignation = ACCUSE BANC
+valeur: Destinataire › Adresse (3 lignes au plus) = 2 RUE DU BANC 75002 PARIS
+valeur: Exemplaires › Nombre d'exemplaires = 0
+valeur: Type d'envoi › Type de lettre = Lettre avec accusé de réception
+resultat: fait
+controle: SELECT STRING_AGG(CONCAT(de.DMNED_LIBELLE_DOCUMENT, '|', de.DMNED_LIBELLE_SOURCE), ' ; ') FROM v2.DEMANDE_EDITION AS de JOIN v2.DEMANDE AS d ON d.DMND_ID_DMND = de.DMNED_ID_DMND WHERE d.DMND_CODE_PROSS = 'JLR' AND de.DMNED_DESIGNATION_DESTINATAIRE = 'ACCUSE BANC' => Imprimé LRAR La Poste|ACCUSE BANC 1-1

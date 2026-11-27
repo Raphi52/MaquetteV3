@@ -1,0 +1,36 @@
+# Les Parametres du « Lettrage » cherches dans la base (LecteurLettrage), sur le premier trimestre 2025 de PROC_VLETTRAGE.sql.
+# Bloc 1 : la periode du 01/01 au 31/03/2025, par categorie (compte hors PC, divers, PC) puis abrege.
+#   L13LCA : son lettrage de 2019 est hors periode ; LF01 (comptabilisee) et la ventilation 2300531 sont a lettrer (LF03, non
+#   comptabilisee, ne compte pas) ; L13LCB : LF04 et 2300533 ; L13VTA : la facture comptabilisee L13F010 de PROC_JVENTE.sql ;
+#   L13LDV : un divers, par son affaire 2300581 (la demande de LF02) ; L13LPC : facture 30 et reglement 30, « Soldé ».
+# Ecartes, chacun avec son jumeau retenu : le client d'attente L13LATT (CLIEN_NUMERO_COMPTE 99999999 -- L13LPC) ; le lettrage du
+# 31/12/2024 de L13LPC (bloc 4).
+critere: Période = 2025-01-01|2025-03-31
+lignes:
+L13LCA · LETTRAGE COMPTE A | compte 411L13LCA · facturé 0,00 € · payé 0,00 € · restant 0,00 € · 0 lettrage · 2 éléments à lettrer | Compte hors PC | AFaire | []
+L13LCB · LETTRAGE COMPTE B | compte 411L13LCB · facturé 0,00 € · payé 0,00 € · restant 0,00 € · 0 lettrage · 2 éléments à lettrer | Compte hors PC | AFaire | []
+L13VTA · CLIENT VENTE A | compte 411L13VTA · facturé 0,00 € · payé 0,00 € · restant 0,00 € · 0 lettrage · 1 élément à lettrer | Compte hors PC | AFaire | []
+L13LDV · LETTRAGE DIVERS / affaire 2300581 | compte 411L13LDV · facturé 0,00 € · payé 0,00 € · restant 0,00 € · 0 lettrage · 2 éléments à lettrer | Divers | AFaire | []
+L13LPC · LETTRAGE PC | compte 411L13LPC · facturé 30,00 € · payé 30,00 € · restant 0,00 € · 2 lettrages · soldé | PC | Validee | [] | valeurs: L13LPC · LETTRAGE PC ; 30.00 ; 30.00 ; 0.00
+---
+# La categorie PC (clien_type C, clien_is_compte_pc 1, Lettrage.cs:226-228) -- jumeaux ecartes, les comptes hors PC et le divers.
+critere: Période = 2025-01-01|2025-03-31
+critere: Catégorie de client = PC
+lignes:
+L13LPC · LETTRAGE PC | compte 411L13LPC · facturé 30,00 € · payé 30,00 € · restant 0,00 € · 2 lettrages · soldé | PC | Validee | []
+---
+# Le champ de recherche : l'abrege, le nom ou le compte du client.
+critere: Période = 2025-01-01|2025-03-31
+texte: compte b
+lignes:
+L13LCB · LETTRAGE COMPTE B | compte 411L13LCB · facturé 0,00 € · payé 0,00 € · restant 0,00 € · 0 lettrage · 2 éléments à lettrer | Compte hors PC | AFaire | []
+---
+# Le jumeau de la borne basse du bloc 1 : le 31/12/2024 seul rend le lettrage ecarte de L13LPC (facture 1, rien de regle).
+critere: Période = 2024-12-31|2024-12-31
+lignes:
+L13LPC · LETTRAGE PC | compte 411L13LPC · facturé 1,00 € · payé 0,00 € · restant 1,00 € · 1 lettrage · lettré, non soldé | PC | EnCours | [] | valeurs: L13LPC · LETTRAGE PC ; 1.00 ; 0.00 ; 1.00
+---
+# Une categorie que la V2 ne connait pas : rien (jumeau : le bloc 2).
+critere: Période = 2025-01-01|2025-03-31
+critere: Catégorie de client = XX
+lignes:

@@ -897,6 +897,28 @@ describe('socle fonctionnel : recherche et fiche sur Referentiel, Audience et Op
       expect(pont.appels).toHaveBeenCalledWith('EcranGenere.Geste', 'ECRAN_TEST', 'Injonctions de payer', 'Agir', 'Impression', ['I-7'], {})
     })
 
+    // Lot 13 du plan « RIG v3 100 % fonctionnel » : un geste ECRIT sur un Etat (« Lettrer » du lettrage) change les chiffres de la
+    // base ; l'Etat les relit, comme une File. Mesure sur le bureau cache (27/11/2026) : « 6 lettrages écrits » s'affichait, et la
+    // ligne restait a 0,00 € tant qu'on ne retouchait pas la recherche.
+    it('un geste ecrit relit les lignes : les cellules et les totaux suivent la base', async () => {
+      const lettrage = descripteur({
+        forme: 'Etat', titre: 'Lettrage', gestes: ['Lettrer'], groupes: ['Compte hors PC'],
+        colonnes: [champ('Client'), champ('Facturé', 'Montant')],
+      })
+      let facture = '0.00'
+      const pont = installerFauxPont({
+        'EcranGenere.Lignes': () => base([{ nom: 'Client A', precisions: '', groupe: 'Compte hors PC', etat: 'AFaire', faites: [], id: 'C-1',
+                                            valeurs: ['Client A', facture] }]),
+        'EcranGenere.Geste': () => { facture = '120.00'; return { fait: true, message: '2 lettrages écrits pour 1 client.', sansEcrivain: false, ids: ['C-1'] } },
+      })
+      const { container } = render(<EcranGenere descripteur={lettrage} />)
+      const o = outils(container)
+      await waitFor(() => expect(container.querySelector('tbody tr')?.textContent).toContain('0,00'))
+      fireEvent.click(o.bouton('Lettrer'))
+      await waitFor(() => expect(container.querySelector('tbody tr')?.textContent).toContain('120,00'))
+      expect(pont.appels.mock.calls.filter((c) => c[0] === 'EcranGenere.Lignes')).toHaveLength(2)
+    })
+
     // RIG v2 imprime le registre ENTIER avec le total de sa requete (OPE_RESULTATS.cs:35-39 et :65-73, « ALL » ;
     // OPE_REGISTRE_GENERAL.cs:221) : une liste coupee au plafond du serveur n'est pas le registre, son titre compterait faux.
     it('liste coupee au plafond : « Impression » refuse et ne part pas, le message dit pourquoi', async () => {

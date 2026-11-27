@@ -1,0 +1,93 @@
+# « Lettrage » (EcrivainLettrage) : « Lettrer » et « Délettrer » les clients envoyes (Lettrage.LettrerClientCompte / LettrerAffaire et
+# leur branche AnnuleRemplace, Outils\DLL\RigMetier\Facture\Lettrage.cs). Les lignes LETTRAGE ecrites se controlent par SELECT : une
+# ligne « date facture encaissement HT facture/regle TVA facture/regle BODACC facture/regle numero ventilation » par lettrage du client.
+# Lignes du jeu : PROC_VLETTRAGE.sql et .recherches.
+
+# Refus : un geste que l'ecran ne porte pas. Jumeau accepte : bloc 7.
+geste: Agir Relettrer
+ids: C-2300571
+resultat: refuse
+message: « Relettrer » n'est pas un geste du lettrage : « Lettrer » ou « Délettrer ».
+---
+# Refus : aucune ligne envoyee. Jumeau accepte : bloc 7.
+geste: Agir Lettrer
+resultat: refuse
+message: Aucun client à lettrer : filtrez la liste sur les clients voulus.
+---
+# Refus : une ligne illisible. Jumeau accepte : bloc 7.
+geste: Agir Lettrer
+ids: X-1
+resultat: refuse
+message: Ligne de lettrage illisible (X-1).
+---
+# Refus : le client d'attente, que RIG v2 ne lettre pas (Lettrage.cs:405-406). Jumeau accepte : bloc 7 (un client compte).
+geste: Agir Lettrer
+ids: C-2300574
+resultat: refuse
+message: L13LATT · LETTRAGE ATTENTE : RIG v2 ne lettre pas le client d'attente.
+---
+# Refus : un client divers sans affaire (LettrerAffaire lettre par affaire, :586). Jumeau accepte : bloc 9 (le divers sur son affaire).
+geste: Agir Lettrer
+ids: D-2300472
+resultat: refuse
+message: L13VTB · CLIENT VENTE B : un client divers se lettre par affaire (RIG v2, LettrerAffaire).
+---
+# Refus : le client PC est deja entierement lettre (rien de comptabilise apres son dernier lettrage, :420-433). Jumeau accepte : bloc 7.
+geste: Agir Lettrer
+ids: C-2300573
+resultat: refuse
+message: Rien à lettrer : toutes les factures et ventilations comptabilisées de ces clients le sont déjà.
+---
+# Le COMPLEMENT du compte A (il a un lettrage de 2019) : la facture LF01 (TTC 120 = BODACC 10 + TVA 20 + emoluments 90 ; LF03, non
+# comptabilisee, n'est pas lettree), puis sa ventilation de 50, repartie BODACC 10, TVA 20, emoluments 20 (calculMontantReaffect, dans
+# l'ordre BODACC, INPI, autres, TVA, emoluments). Aucun encaissement n'etait disponible a la facture : rien de regle sur elle.
+geste: Agir Lettrer
+ids: C-2300571
+resultat: fait
+message: 2 lettrages écrits pour 1 client.
+controle: SELECT STRING_AGG(CONCAT(CONVERT(char(10), LTTRG_DATE, 23), ' ', CAST(LTTRG_MT_FACTURE AS decimal(9, 2)), ' ', CAST(LTTRG_MT_ENCAISSEMENT AS decimal(9, 2)), ' ', CAST(LTTRG_FACT_HT AS decimal(9, 2)), '/', CAST(LTTRG_REGLE_HT AS decimal(9, 2)), ' ', CAST(LTTRG_FACT_TVA AS decimal(9, 2)), '/', CAST(LTTRG_REGLE_TVA AS decimal(9, 2)), ' ', CAST(LTTRG_FACT_BODACC AS decimal(9, 2)), '/', CAST(LTTRG_REGLE_BODACC AS decimal(9, 2)), ' ', ISNULL(LTTRG_NUMERO_FACTURE, '-'), ' ', ISNULL(CAST(LTTRG_ID_VENTI AS varchar(10)), '-')), ' | ') WITHIN GROUP (ORDER BY LTTRG_ID_LTTRG) FROM v2.LETTRAGE WHERE LTTRG_ID_CLIEN = 2300571 AND LTTRG_DATE >= '20250101' => 2025-01-05 120.00 0.00 90.00/0.00 20.00/0.00 10.00/0.00 L13LF01 - | 2025-01-10 0.00 50.00 0.00/20.00 0.00/20.00 0.00/10.00 - 2300531
+---
+# Refus : relettrer le compte A ne double rien (la facture est lettree, LTTRG_NUMERO_FACTURE ; la ventilation aussi, LTTRG_ID_VENTI).
+# Jumeau accepte : bloc 7.
+geste: Agir Lettrer
+ids: C-2300571
+resultat: refuse
+message: Rien à lettrer : toutes les factures et ventilations comptabilisées de ces clients le sont déjà.
+---
+# Le client divers sur son affaire (LettrerAffaire) : sa facture LF02 (60, TVA 10), puis sa ventilation de 60 qui la solde ; les deux
+# lettrages portent l'affaire 2300581.
+geste: Agir Lettrer
+ids: D-2300572-2300581
+resultat: fait
+message: 2 lettrages écrits pour 1 client.
+controle: SELECT STRING_AGG(CONCAT(CONVERT(char(10), LTTRG_DATE, 23), ' ', CAST(LTTRG_MT_FACTURE AS decimal(9, 2)), ' ', CAST(LTTRG_MT_ENCAISSEMENT AS decimal(9, 2)), ' ', CAST(LTTRG_FACT_HT AS decimal(9, 2)), '/', CAST(LTTRG_REGLE_HT AS decimal(9, 2)), ' ', CAST(LTTRG_FACT_TVA AS decimal(9, 2)), '/', CAST(LTTRG_REGLE_TVA AS decimal(9, 2)), ' ', ISNULL(LTTRG_NUMERO_FACTURE, '-'), ' ', ISNULL(CAST(LTTRG_ID_VENTI AS varchar(10)), '-'), ' ', LTTRG_ID_AFFRE), ' | ') WITHIN GROUP (ORDER BY LTTRG_ID_LTTRG) FROM v2.LETTRAGE WHERE LTTRG_ID_CLIEN = 2300572 => 2025-02-01 60.00 0.00 50.00/0.00 10.00/0.00 L13LF02 - 2300581 | 2025-02-03 0.00 60.00 0.00/50.00 0.00/10.00 - 2300532 2300581
+---
+# Le compte B, jamais lettre : son premier solde connu (CLIENT_SOLDE au plus tard le 01/01/2019 : 25 au 31/12/2018 ; celui du
+# 01/06/2019 est ecarte) devient un lettrage d'encaissement (Lettrage.cs:528-548) ; la facture LF04 (50) en consomme 25, la
+# ventilation de 20 complete.
+geste: Agir Lettrer
+ids: C-2300575
+resultat: fait
+message: 3 lettrages écrits pour 1 client.
+controle: SELECT STRING_AGG(CONCAT(CONVERT(char(10), LTTRG_DATE, 23), ' ', CAST(LTTRG_MT_FACTURE AS decimal(9, 2)), ' ', CAST(LTTRG_MT_ENCAISSEMENT AS decimal(9, 2)), ' ', CAST(LTTRG_FACT_HT AS decimal(9, 2)), '/', CAST(LTTRG_REGLE_HT AS decimal(9, 2)), ' ', ISNULL(LTTRG_NUMERO_FACTURE, '-'), ' ', ISNULL(CAST(LTTRG_ID_VENTI AS varchar(10)), '-')), ' | ') WITHIN GROUP (ORDER BY LTTRG_ID_LTTRG) FROM v2.LETTRAGE WHERE LTTRG_ID_CLIEN = 2300575 => 2018-12-31 0.00 25.00 0.00/0.00 - - | 2025-01-20 50.00 0.00 50.00/25.00 L13LF04 - | 2025-01-22 0.00 20.00 0.00/20.00 - 2300533
+---
+# Refus : délettrer un client sans lettrage. Jumeau accepte : bloc 12.
+geste: Agir Délettrer
+ids: C-2300471
+resultat: refuse
+message: Aucun lettrage à annuler pour ces clients.
+---
+# Délettrer le compte A : ses trois lettrages (2019 et les deux du bloc 7) sont supprimes (branche AnnuleRemplace, :412-419).
+geste: Agir Délettrer
+ids: C-2300571
+resultat: fait
+message: 3 lettrages annulés pour 1 client.
+controle: SELECT COUNT(*) FROM v2.LETTRAGE WHERE LTTRG_ID_CLIEN = 2300571 => 0
+---
+# Puis Lettrer : l'« annule et refait » de RIG v2. Sans lettrage, tout ce qui est comptabilise se lettre (pas de premier solde pour lui) :
+# les memes deux lignes qu'au bloc 7.
+geste: Agir Lettrer
+ids: C-2300571
+resultat: fait
+message: 2 lettrages écrits pour 1 client.
+controle: SELECT STRING_AGG(CONCAT(CONVERT(char(10), LTTRG_DATE, 23), ' ', CAST(LTTRG_MT_FACTURE AS decimal(9, 2)), ' ', CAST(LTTRG_MT_ENCAISSEMENT AS decimal(9, 2)), ' ', CAST(LTTRG_FACT_HT AS decimal(9, 2)), '/', CAST(LTTRG_REGLE_HT AS decimal(9, 2)), ' ', CAST(LTTRG_FACT_TVA AS decimal(9, 2)), '/', CAST(LTTRG_REGLE_TVA AS decimal(9, 2)), ' ', CAST(LTTRG_FACT_BODACC AS decimal(9, 2)), '/', CAST(LTTRG_REGLE_BODACC AS decimal(9, 2)), ' ', ISNULL(LTTRG_NUMERO_FACTURE, '-'), ' ', ISNULL(CAST(LTTRG_ID_VENTI AS varchar(10)), '-')), ' | ') WITHIN GROUP (ORDER BY LTTRG_ID_LTTRG) FROM v2.LETTRAGE WHERE LTTRG_ID_CLIEN = 2300571 => 2025-01-05 120.00 0.00 90.00/0.00 20.00/0.00 10.00/0.00 L13LF01 - | 2025-01-10 0.00 50.00 0.00/20.00 0.00/20.00 0.00/10.00 - 2300531

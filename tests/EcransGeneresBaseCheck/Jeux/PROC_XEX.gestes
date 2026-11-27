@@ -1,0 +1,33 @@
+# « Édition interne d'un Kbis » (EcrivainKbisInterne), operation sur UN dossier : « Éditer le Kbis » valide une demande XEX sur le
+# dossier (PROC_XEX.cs:21-40), avec son dossier, son numero de gestion et sa designation. Le numero de la demande vient de la
+# numerotation DMD : le message, qui le porte, n'est pas compare ; la demande ecrite l'est par SELECT.
+
+# Refus : aucun dossier (DoValider de RIG v2 refuse sans MetierBase). Jumeau accepte : bloc 3.
+geste: Confirmer Éditer le Kbis
+resultat: refuse
+message: Choisissez un dossier RCS par son numéro de gestion : RIG v2 ne valide pas sans dossier.
+---
+# Refus : un dossier qu'aucune ligne ne porte. Jumeau accepte : bloc 3.
+geste: Confirmer Éditer le Kbis
+ids: 999
+resultat: refuse
+message: Dossier RCS introuvable dans la base du greffe (999).
+---
+# Le dossier radie 2300602, sans Kbis interne : sa demande XEX validee ; il entre dans la liste, le plus recent d'abord.
+geste: Confirmer Éditer le Kbis
+ids: 2300602
+resultat: fait
+lignes:
+2013B60002 | KBIS INTERNE BETA SAS · 523 006 020 · radié le 30/06/2020 · 1 Kbis interne, le dernier le {J+0} | Dossiers RCS | EnCours | []
+2013B60001 | KBIS INTERNE ALPHA SARL · 523 006 010 · 1 Kbis interne, le dernier le 15/01/2025 | Dossiers RCS | EnCours | []
+controle: SELECT CONCAT(DMND_ETAT_DEMANDE, '|', DMND_ID_DSRCS, '|', DMND_NUM_INDICATIF, '|', DMND_NOM) FROM v2.DEMANDE WHERE DMND_CODE_PROSS = 'XEX' AND DMND_ID_DSRCS = 2300602 => V|2300602|2013B60002|KBIS INTERNE BETA SAS
+fiche: 2300602
+Dossier RCS › Numéro de gestion = 2013B60002
+Demande › Désignation = KBIS INTERNE BETA SAS
+Demande › Identifiant interne = 2300602
+---
+# Un dossier deja edite s'edite encore (RIG v2 valide une demande XEX par Kbis interne) : une deuxieme demande sur 2300601.
+geste: Confirmer Éditer le Kbis
+ids: 2300601
+resultat: fait
+controle: SELECT COUNT(*) FROM v2.DEMANDE WHERE DMND_CODE_PROSS = 'XEX' AND DMND_ID_DSRCS = 2300601 => 2

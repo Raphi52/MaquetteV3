@@ -6,7 +6,10 @@
 #   1600407 le lendemain a 0 h -- 1600401, le jour a 10 h ;
 #   1600404 et 1600405 (mars 2025) : retrouves par PROC_RECHENC.recherches.
 # 1600401 a deux ventilations : deux lignes ; la seconde, d'un tiers payeur, n'a ni client ni affaire. Une remise -1 ne s'affiche pas.
+# 2300201 et 2300208 : les deux encaissements du jour de PROC_JCAISSE.sql (lot 13), le journal de caisse les lit aussi.
 Encaissement L6CHQ001 · PAYEUR ALPHA | Chèque · 1 200,00 € · le {J+0} · BANQUE BANC · remise 12 · ventilé 1 000,00 € · client L6ALPHA · CLI ALPHA · affaire 1600431 | Encaissement ventilé | Validee | []
 Encaissement L6CHQ001 · PAYEUR ALPHA | Chèque · 1 200,00 € · le {J+0} · BANQUE BANC · remise 12 · ventilé 200,00 € | Encaissement ventilé | Validee | []
+Encaissement L13CHQ1 · PAYEUR L13 A | Chèque · 100,10 € · le {J+0} · BANQUE L13 · ventilé 100,10 € · client L13CLIA · CLIENT CAISSE A · affaire 2300281 | Encaissement ventilé | Validee | []
 Encaissement L6VIR002 · PAYEUR BETA | Virement · 850,00 € · le {J+0} · sans ventilation | Encaissement sans ventilation | AFaire | []
+Encaissement n° 2300208 · PAYEUR L13 MINUIT | Carte bancaire · 7,77 € · le {J+0} · ventilé 7,77 € · client L13CLIA · CLIENT CAISSE A · affaire 2300281 | Encaissement ventilé | Validee | []
 Encaissement n° 1600403 · L6GAMMA · CLI GAMMA | ESP · 50,00 € · le {J+0} · sans ventilation | Encaissement sans ventilation | AFaire | []

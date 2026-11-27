@@ -1,0 +1,130 @@
+# « Articles tarifaires » (EcrivainArticles), en grille (Referentiel) : « Modifier » le libelle ou le prix de la derniere version d'un
+# article, « Ajouter » un article principal (DoSauveAfterEtape de PROC_ARTICLE, PROC_ARTICLE.cs:322-430). Les cellules sont envoyees par
+# libelle de colonne. Lignes du jeu : PROC_ARTICLE.sql et .attendu.
+
+# Refus : un article qu'aucune ligne ne porte. Jumeau accepte : bloc 6.
+geste: Modifier
+ids: 999
+valeur: Libellé = Inconnu
+resultat: refuse
+message: Article introuvable dans la base du greffe (999).
+---
+# Refus : le libelle vide (OPE_DONNEES_SPECIFIQUES.cs:94-96). Jumeau accepte : bloc 6 (un libelle saisi).
+geste: Modifier
+ids: 2300102
+valeur: Libellé =
+resultat: refuse
+message: Le libellé principal d'un article ne doit pas être vide
+---
+# Refus : le code d'un article existant (lecture seule hors creation). Jumeau accepte : bloc 6 (le code inchange).
+geste: Modifier
+ids: 2300102
+valeur: Code de l'article = L13AUTRE
+resultat: refuse
+message: Le code d'un article existant ne se modifie pas : « L13PR01 » est en lecture seule hors création (RIG v2).
+---
+# Refus : le prix d'un titre, qui n'en a pas de propre (somme de ses composants). Jumeau accepte : bloc 6 (le prix d'un principal).
+geste: Modifier
+ids: 1600801
+valeur: Prix HT = 30
+resultat: refuse
+message: Un titre composé n'a pas de prix propre : son prix est la somme de ses composants.
+---
+# Refus : rien ne change. Jumeau accepte : bloc 6.
+geste: Modifier
+ids: 2300102
+valeur: Libellé = Copie banc
+valeur: Prix HT = 2.25
+resultat: refuse
+message: Rien à enregistrer : ni le libellé ni le prix ne changent.
+---
+# Le libelle et le prix de la derniere version (2300102) ; la version de 2024 (2300101) ne change pas. Le prix s'arrondit au centime ;
+# la date d'ecriture et l'auteur sont reecrits (ARTCL_DATE_CREATION = maintenant, ARTCL_ID_UTLST = l'utilisateur RIG v2 de l'agent,
+# :361-362 ; soc.Compte.IdV2 de l'agent du banc, pose par un autre jeu).
+geste: Modifier
+ids: 2300102
+valeur: Libellé = Copie banc 2026
+valeur: Prix HT = 2,60
+resultat: fait
+message: Article L13PR01 enregistré : Copie banc 2026, 2,60 € HT.
+lignes:
+Renvoi facture du banc | Article ART17B · Article principal · 10,00 € HT · depuis le 01/01/2000 · en vigueur | Articles principaux | Validee | []
+Copie banc 2026 | Article L13PR01 · Article principal · 2,60 € HT · depuis le 01/01/2025 · en vigueur | Articles principaux | Validee | [] | valeurs: Copie banc 2026 ; L13PR01 ; Article principal ; depuis le 01/01/2025 ; 2.60
+Extrait banc futur | Article L13PR03 · Article principal · 3,10 € HT · depuis le {A+1} · à venir | Articles principaux | EnCours | []
+Principal un | Article L6PR01 · Article principal · 10,00 € HT · depuis le 01/01/2025 · en vigueur | Articles principaux | Validee | []
+Principal deux | Article L6PR02 · Article principal · 5,50 € HT · depuis le 01/01/2025 · en vigueur | Articles principaux | Validee | []
+Inscription banc | Article L6TI01 · Titre composé · 25,50 € HT · depuis le 01/01/2025 · en vigueur | Titres composés | Validee | []
+Inscription derivee | Article L6TI04 · Titre composé · 0,00 € HT · depuis le 01/01/2025 · en vigueur | Titres composés | Validee | []
+Recherche banc | Article L6TI05 · Titre composé · 22,00 € HT · depuis le 01/01/2025 · en vigueur | Titres composés | Validee | []
+controle: SELECT CAST(ARTCL_PRIX_UHT AS decimal(9, 2)) FROM v2.ARTICLE WHERE ARTCL_ID_ARTCL = 2300102 => 2.60
+controle: SELECT ARTCL_LIBELLE + ' / ' + CAST(CAST(ARTCL_PRIX_UHT AS decimal(9, 2)) AS varchar(12)) FROM v2.ARTICLE WHERE ARTCL_ID_ARTCL = 2300101 => Copie banc 2024 / 1.50
+controle: SELECT CASE WHEN ARTCL_DATE_CREATION > DATEADD(DAY, -1, SYSDATETIME()) THEN 'reecrite' ELSE 'ancienne' END FROM v2.ARTICLE WHERE ARTCL_ID_ARTCL = 2300102 => reecrite
+controle: SELECT CASE WHEN ARTCL_ID_UTLST = (SELECT IdV2 FROM soc.Compte WHERE CompteWindows = 'banc.ecrans') THEN 'agent' ELSE 'autre' END FROM v2.ARTICLE WHERE ARTCL_ID_ARTCL = 2300102 => agent
+---
+# Refus : sans type (le formulaire de RIG v2 ne s'ouvre qu'apres le choix du type). Jumeau accepte : bloc 13.
+geste: Ajouter
+valeur: Code de l'article = L13NEW
+valeur: Libellé = Article neuf banc
+resultat: refuse
+message: « Type d'article » est obligatoire : Article principal (PR).
+---
+# Refus : un titre (sa composition n'est pas reprise). Jumeau accepte : bloc 13 (un principal).
+geste: Ajouter
+valeur: Type d'article = Titre composé
+valeur: Code de l'article = L13NEW
+valeur: Libellé = Article neuf banc
+resultat: refuse
+message: Un titre composé se crée avec sa composition, que RIG v3 ne reprend pas : créez un article principal.
+---
+# Refus : le code vide (OPE_DONNEES_SPECIFIQUES.cs:98-100). Jumeau accepte : bloc 13.
+geste: Ajouter
+valeur: Type d'article = Article principal
+valeur: Libellé = Article neuf banc
+resultat: refuse
+message: Le code article ne doit pas être vide
+---
+# Refus : un code deja porte (DoVerifyUniqueness, ProcArticleExtensions.cs:15-21). Jumeau accepte : bloc 13 (un code neuf).
+geste: Ajouter
+valeur: Type d'article = Article principal
+valeur: Code de l'article = L13PR01
+valeur: Libellé = Doublon banc
+resultat: refuse
+message: Le code article L13PR01 existe déjà : RIG v2 le refuse (un code est unique).
+---
+# Refus : le libelle vide. Jumeau accepte : bloc 13.
+geste: Ajouter
+valeur: Type d'article = Article principal
+valeur: Code de l'article = L13NEW
+resultat: refuse
+message: Le libellé principal d'un article ne doit pas être vide
+---
+# Refus : une date d'application passee (OPE_DONNEES_SPECIFIQUES.cs:91-92). Jumeau accepte : bloc 13 (le 01/01/2030).
+geste: Ajouter
+valeur: Type d'article = Article principal
+valeur: Code de l'article = L13NEW
+valeur: Libellé = Article neuf banc
+valeur: Période de validité = 2020-01-01
+resultat: refuse
+message: Interdit de saisir une valeur d'application passée
+---
+# Un article principal, applicable le 01/01/2030 (« À venir ») ; son groupe de TVA est le groupe PR du taux le plus recent (2300191,
+# PROC_ARTICLE.cs:115-117, pas le groupe TI 2300193) ; son code greffe est son code ; statut A.
+geste: Ajouter
+valeur: Type d'article = Article principal
+valeur: Code de l'article = L13NEW
+valeur: Libellé = Article neuf banc
+valeur: Période de validité = 2030-01-01
+valeur: Prix HT = 12,40
+resultat: fait
+message: Article L13NEW créé : Article neuf banc, 12,40 € HT, applicable depuis le 01/01/2030.
+lignes:
+Renvoi facture du banc | Article ART17B · Article principal · 10,00 € HT · depuis le 01/01/2000 · en vigueur | Articles principaux | Validee | []
+Article neuf banc | Article L13NEW · Article principal · 12,40 € HT · depuis le 01/01/2030 · à venir | Articles principaux | EnCours | [] | valeurs: Article neuf banc ; L13NEW ; Article principal ; depuis le 01/01/2030 ; 12.40
+Copie banc 2026 | Article L13PR01 · Article principal · 2,60 € HT · depuis le 01/01/2025 · en vigueur | Articles principaux | Validee | []
+Extrait banc futur | Article L13PR03 · Article principal · 3,10 € HT · depuis le {A+1} · à venir | Articles principaux | EnCours | []
+Principal un | Article L6PR01 · Article principal · 10,00 € HT · depuis le 01/01/2025 · en vigueur | Articles principaux | Validee | []
+Principal deux | Article L6PR02 · Article principal · 5,50 € HT · depuis le 01/01/2025 · en vigueur | Articles principaux | Validee | []
+Inscription banc | Article L6TI01 · Titre composé · 25,50 € HT · depuis le 01/01/2025 · en vigueur | Titres composés | Validee | []
+Inscription derivee | Article L6TI04 · Titre composé · 0,00 € HT · depuis le 01/01/2025 · en vigueur | Titres composés | Validee | []
+Recherche banc | Article L6TI05 · Titre composé · 22,00 € HT · depuis le 01/01/2025 · en vigueur | Titres composés | Validee | []
+controle: SELECT CONCAT(ARTCL_CODE_ARTICLE_GREFFE, ' / ', ARTCL_TYPE_ARTICLE, ' / ', ARTCL_STATUT, ' / ', ARTCL_ID_ARTGR) FROM v2.ARTICLE WHERE ARTCL_CODE_ARTICLE_RIG = 'L13NEW' => L13NEW / PR / A / 2300191

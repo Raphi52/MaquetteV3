@@ -1,0 +1,2 @@
+# Aucune lettre a l'ouverture du banc : PROC_JLR.sql ne pose aucune demande d'edition (elle entrerait dans la File des editions).
+# Les lettres creees par PROC_JLR.gestes sont relues par ses blocs « lignes: ».

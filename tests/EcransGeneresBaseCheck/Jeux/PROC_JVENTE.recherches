@@ -1,0 +1,37 @@
+# Les Parametres du « Journal de vente » cherches dans la base (LecteurJournalVente), sur mars 2025 de PROC_JVENTE.sql.
+# Bloc 1 : la periode du 09 au 11/03/2025, cellules comprises (montant HT = prix unitaire x quantite, en decimal exact). 2300412,
+# tarife, est ecarte (« Tarifés » non coche) -- jumeau retenu 2300410.
+critere: Période = 2025-03-09|2025-03-11
+lignes:
+L13DEP · Depot banc | facture L13F010 · le 10/03/2025 · L13VTA · CLIENT VENTE A · 1 × 32,50 € HT · 39,00 € TTC · comptabilisé | Facturés au greffe | Validee | [] | valeurs: 2025-03-10 ; L13F010 ; L13DEP ; Depot banc ; L13VTA · CLIENT VENTE A ; 1 ; 32.50 ; 39.00
+L13RAD · Radiation banc | facture L13F011 · le 11/03/2025 · L13VTB · CLIENT VENTE B · 1 × 14,30 € HT · 14,30 € TTC · facturé | Facturés au greffe | EnCours | [] | valeurs: 2025-03-11 ; L13F011 ; L13RAD ; Radiation banc ; L13VTB · CLIENT VENTE B ; 1 ; 14.30 ; 14.30
+---
+# « Type d'article = Tarifés » : les articles sans facture, a LEUR date -- jumeaux ecartes 2300410 et 2300411 (factures).
+critere: Période = 2025-03-09|2025-03-11
+critere: Type d'article = Tarifés
+lignes:
+L13COPIE · Copie banc tarif | le 10/03/2025 · L13VTA · CLIENT VENTE A · 2 × 0,78 € HT · 1,87 € TTC · non facturé | Tarifés | AFaire | [] | valeurs: 2025-03-10 ;  ; L13COPIE ; Copie banc tarif ; L13VTA · CLIENT VENTE A ; 2 ; 1.56 ; 1.87
+---
+# L'abrege client -- jumeau ecarte 2300410 (L13VTA).
+critere: Période = 2025-03-09|2025-03-11
+critere: Abrégé client = l13vtb
+lignes:
+L13RAD · Radiation banc | facture L13F011 · le 11/03/2025 · L13VTB · CLIENT VENTE B · 1 × 14,30 € HT · 14,30 € TTC · facturé | Facturés au greffe | EnCours | []
+---
+# Le taux de TVA (un a la fois) -- jumeau ecarte 2300410 (20 %).
+critere: Période = 2025-03-09|2025-03-11
+critere: Taux de TVA = 0
+lignes:
+L13RAD · Radiation banc | facture L13F011 · le 11/03/2025 · L13VTB · CLIENT VENTE B · 1 × 14,30 € HT · 14,30 € TTC · facturé | Facturés au greffe | EnCours | []
+---
+# Le code ou le libelle de l'article -- jumeau ecarte 2300411.
+critere: Période = 2025-03-09|2025-03-11
+critere: Code ou libellé article = dep
+lignes:
+L13DEP · Depot banc | facture L13F010 · le 10/03/2025 · L13VTA · CLIENT VENTE A · 1 × 32,50 € HT · 39,00 € TTC · comptabilisé | Facturés au greffe | Validee | []
+---
+# L'utilisateur de l'article (ARTUT_ID_UTLST) -- jumeau ecarte 2300411 (sans utilisateur).
+critere: Période = 2025-03-09|2025-03-11
+critere: Utilisateurs = vendeur
+lignes:
+L13DEP · Depot banc | facture L13F010 · le 10/03/2025 · L13VTA · CLIENT VENTE A · 1 × 32,50 € HT · 39,00 € TTC · comptabilisé | Facturés au greffe | Validee | []

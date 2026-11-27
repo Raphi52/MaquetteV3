@@ -1,0 +1,13 @@
+# « Articles tarifaires » (LecteurArticles) : la grille a l'ouverture, la derniere version de chaque code (PROC_ARTICLE.cs:103), les
+# articles principaux (PR) et titres (TI) actifs, par code. Les articles de PROC_RETAUD.sql (ART17B) et PROC_TARIFS.sql (L6...) y entrent.
+# L13PR01 : sa version de 2025 (jumeau ecarte : 2300101, 2024). L13PR03 : applicable dans un an, « À venir ». Ecartes, chacun avec son
+# jumeau retenu : L13PR04 et ART17C, L6TI03 (en sommeil -- L13PR01, actif) ; L13BO06 (une charge -- L13PR01, principal). Un titre
+# vaut la somme de ses composants (L6TI01 : 2 x 10,00 + 1 x 5,50).
+Renvoi facture du banc | Article ART17B · Article principal · 10,00 € HT · depuis le 01/01/2000 · en vigueur | Articles principaux | Validee | []
+Copie banc | Article L13PR01 · Article principal · 2,25 € HT · depuis le 01/01/2025 · en vigueur | Articles principaux | Validee | []
+Extrait banc futur | Article L13PR03 · Article principal · 3,10 € HT · depuis le {A+1} · à venir | Articles principaux | EnCours | []
+Principal un | Article L6PR01 · Article principal · 10,00 € HT · depuis le 01/01/2025 · en vigueur | Articles principaux | Validee | []
+Principal deux | Article L6PR02 · Article principal · 5,50 € HT · depuis le 01/01/2025 · en vigueur | Articles principaux | Validee | []
+Inscription banc | Article L6TI01 · Titre composé · 25,50 € HT · depuis le 01/01/2025 · en vigueur | Titres composés | Validee | []
+Inscription derivee | Article L6TI04 · Titre composé · 0,00 € HT · depuis le 01/01/2025 · en vigueur | Titres composés | Validee | []
+Recherche banc | Article L6TI05 · Titre composé · 22,00 € HT · depuis le 01/01/2025 · en vigueur | Titres composés | Validee | []

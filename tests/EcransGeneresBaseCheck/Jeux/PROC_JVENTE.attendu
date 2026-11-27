@@ -1,0 +1,6 @@
+# « Journal de vente » (LecteurJournalVente) sur PROC_JVENTE.sql : la liste a l'ouverture -- aujourd'hui, edition detaillee triee par
+# date, cases initiales de RIG v2 (articles facturés au greffe et web, pas les tarifés) : un article facture compte a la date de sa
+# FACTURE. Ecartes, chacun avec son jumeau retenu 2300401 : 2300403 (tarife, sans facture), 2300404 (facture de la veille), 2300405
+# (client absent de la base). Les articles des autres jeux : leurs factures n'ont pas de date, ou ils sont tarifes.
+L13KBIS · Extrait banc | facture L13F001 · le {J+0} · L13VTA · CLIENT VENTE A · 2 × 2,96 € HT · 7,10 € TTC · facturé | Facturés au greffe | EnCours | []
+WEB · Commande banc | facture L13F002 · le {J+0} · L13VTB · CLIENT VENTE B · 1 × 10,00 € HT · 12,00 € TTC · comptabilisé | Web | Validee | []
