@@ -60,6 +60,8 @@ export interface VueRedaction {
   /** D'ou viennent les decisions (Pont/LectureEcranMain.cs, lot 10) : la base du greffe, ou la demonstration (« exemple »). */
   mode?: ModeLecture
   message?: string | null
+  /** Branche : combien la base en compte. La lecture s'arrete au plafond (LectureRedaction.Plafond) : au-dela, l'ecran le dit. */
+  total?: number
 }
 
 const ou = (valeur: string): string => (valeur === '' ? '—' : valeur)
@@ -97,6 +99,13 @@ export function EcranRedaction() {
       <aside className="rig-criteres">
         <div className="rig-kicker" style={{ marginBottom: 'var(--rig-esp-3)' }}>Appels d'affaires</div>
         {vue && <ProvenanceEcran mode={vue.mode} message={vue.message} quoi="Décisions" />}
+        {vue && (vue.total ?? 0) > decisions.length && (
+          // fix-ok: liste coupee sans le dire -- la route de dev rend total 689 pour 500 lignes (LectureRedaction.Plafond) et le
+          // pont perdait ce total (Pont/EcranRedactionBase.cs) ; l'ecran dit maintenant « n affichees sur total ».
+          <p className="rig-eg-note" role="note">
+            {decisions.length} décisions affichées sur {vue.total} : la liste s'arrête au plafond de lecture.
+          </p>
+        )}
 
         <div className="rig-onglets">
           <button className={`rig-onglet${surDelibere ? ' rig-onglet--actif' : ''}`}

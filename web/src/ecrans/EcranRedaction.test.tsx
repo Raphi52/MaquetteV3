@@ -85,6 +85,21 @@ describe('EcranRedaction : provenance des decisions', () => {
     expect(container.querySelector('[role="note"]')).toBeNull()
   })
 
+  // La lecture s'arrete au plafond (LectureRedaction.Plafond, 500 ; 689 decisions dans la copie de dev) : l'ecran le dit.
+  it('liste coupee au plafond : « n decisions affichees sur total »', async () => {
+    installerFauxPont({ 'EcranRedaction.Decisions': () => vue({ total: 5 }) })
+    const { container } = render(<EcranRedaction />)
+    await screen.findByText('Expertise n°26EXP00114')
+    expect(container.querySelector('[role="note"]')!.textContent).toBe('3 décisions affichées sur 5 : la liste s\'arrête au plafond de lecture.')
+  })
+
+  it('liste complete (total = decisions lues) : rien a dire', async () => {
+    installerFauxPont({ 'EcranRedaction.Decisions': () => vue({ total: 3 }) })
+    const { container } = render(<EcranRedaction />)
+    await screen.findByText('Expertise n°26EXP00114')
+    expect(container.querySelector('[role="note"]')).toBeNull()
+  })
+
   it('en panne, le motif et aucune decision (jamais la demonstration a la place)', async () => {
     installerFauxPont({ 'EcranRedaction.Decisions': () => ({ decisions: [], mode: 'erreur', message: 'La base du greffe 3801 ne répond pas.' }) })
     const { container } = render(<EcranRedaction />)

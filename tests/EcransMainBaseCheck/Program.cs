@@ -1141,11 +1141,14 @@ Exiger((await http.GetAsync(RoutesEcransMain.Pour(RoutesRedaction.Decisions, Gre
     "route de la redaction : greffe absent -> 404, sans repli");
 var redaPont = await EcranRedaction.DecisionsAsync(client, Greffe);
 var exemple = EcranRedaction.Exemple();
-Exiger(redaPont.Mode == "serveur" && redaPont.Decisions.Length == 6
+// fix-ok: le pont perdait le total lu (Pont/EcranRedactionBase.cs construisait VueRedaction sans v.Total), l'ecran ne pouvait pas
+// dire « 500 affichees sur 689 » (route de dev : total 689, 500 lignes) ; Total == 6 ci-dessous le garde.
+Exiger(redaPont.Mode == "serveur" && redaPont.Decisions.Length == 6 && redaPont.Total == 6
        && redaPont.Decisions.Single(d => d.Id == 2000201) is { Numero: "2026J10101", Delibere: true, Date: "06/03/2026", DatePrevue: "05/03/2026" }
        && redaPont.Decisions.Single(d => d.Id == 2000204) is { Delibere: false, Date: "06/03/2026", DatePrevue: "" }
        && !redaPont.Decisions.Any(d => exemple.Decisions.Any(e => e.Numero == d.Numero)),
-    "pont Redaction branche : les decisions de la base (deliberee tant qu'aucun appel prononce, dates jj/mm/aaaa), aucune de la demonstration");
+    $"pont Redaction branche : les decisions de la base (deliberee tant qu'aucun appel prononce, dates jj/mm/aaaa), leur total "
+    + $"(l'ecran dit « n affichees sur total » au plafond : {redaPont.Total}), aucune de la demonstration");
 Exiger((await EcranRedaction.DecisionsAsync(null, null)) is { Mode: "demo", Decisions.Length: 4 },
     "pont Redaction sans serveur : la demonstration, mode « demo »");
 Exiger((await EcranRedaction.DecisionsAsync(client, GreffeAbsent)) is { Mode: "erreur", Decisions.Length: 0, Message: not null },

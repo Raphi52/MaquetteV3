@@ -25,7 +25,7 @@ public static partial class EcranRedaction
             s.LireAsync<DecisionsRedactionLues>(RoutesEcransMain.Pour(RoutesRedaction.Decisions, g)));
         if (lu.Mode == LectureEcransMain.Demo) return Exemple();
         if (lu.Valeur is not { } v) return new VueRedaction([], lu.Mode, lu.Message);
-        return new VueRedaction([.. v.Lignes.Select(Vue)], lu.Mode, null);
+        return new VueRedaction([.. v.Lignes.Select(Vue)], lu.Mode, null, v.Total);
     }
 
     /// <summary>Une décision lue, telle que l'écran la montre (dates jj/mm/aaaa, vide sans date).</summary>
