@@ -49,6 +49,18 @@ $ErrorActionPreference = 'Stop'
 & dotnet msbuild "$PSScriptRoot\RigV3Desktop.csproj" -restore "-t:ResolveReferences;PrepareResources;Compile" -v:m -nologo
 $codeCs = $LASTEXITCODE
 
+# POURQUOI LE SERVEUR AUSSI (27/11/2026, plan-676a4b19).
+# RigV3Desktop.csproj ne reference pas Serveur\RigV3.Serveur.csproj : ce script rendait 0 alors que le serveur
+# ne compilait plus. Mesure : la reunion des lots 7 et 8 (4905f96) avait 10 error CS dans
+# Serveur\Socle\EcransGeneres, que seul le banc EcransGeneresBaseCheck a vues. Meme cible `Compile` : la dll du
+# serveur reste dans obj\, rien n'est copie dans Serveur\bin, et le serveur de dev (donnees-dev.ps1) tourne
+# depuis sa propre sortie sous %LOCALAPPDATA% : aucun verrou.
+$serveur = Join-Path $PSScriptRoot 'Serveur\RigV3.Serveur.csproj'
+if (Test-Path $serveur) {
+    & dotnet msbuild $serveur -restore -t:Compile -v:m -nologo
+    if ($LASTEXITCODE -ne 0) { $codeCs = $LASTEXITCODE }
+}
+
 # POURQUOI tsc ICI (18/11/2026, ecrans React de web/).
 # Vite construit le JavaScript SANS verifier les types : une erreur TypeScript
 # partirait dans l'appli sans bruit. tsc --noEmit (mode strict, web/tsconfig.json)
