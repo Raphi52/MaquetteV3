@@ -223,6 +223,13 @@ public sealed record DescripteurEcran
     /// bouton <see cref="Valider"/> seul.</summary>
     public string[] Gestes { get; init; } = [];
 
+    /// <summary>Une <see cref="FormeEcran.File"/> : par geste de <see cref="Gestes"/>, les codes d'etat des lignes qu'il vise quand
+    /// la fiche RIG v2 l'offre hors « a faire » et « en cours » -- PROC_FNIG : « Désactiver » une demande ENVOYEE (Validee),
+    /// « Renvoyer la demande à l'identique » une demande EN ERREUR (Rejetee), OPE_EDITION.cs:296-305. La ligne se coche et le geste
+    /// part sur elle ; l'ecrivain garde ses controles. Geste absent : les lignes a faire et en cours, les autres restent figees
+    /// (web/src/ecrans/formes/commun.tsx, gesteVaut). Plan « RIG v3 100 % fonctionnel », lot 16, decision du chef.</summary>
+    public IReadOnlyDictionary<string, string[]> EtatsGestes { get; init; } = new Dictionary<string, string[]>();
+
     /// <summary>Les lignes de demonstration (6 a 15 ; un ecran reuni porte celles de ses membres).</summary>
     public required LigneEcran[] Lignes { get; init; }
 

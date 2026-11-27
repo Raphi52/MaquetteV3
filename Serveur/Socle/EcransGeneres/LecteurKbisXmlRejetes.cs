@@ -49,7 +49,7 @@ internal sealed class LecteurKbisXmlRejetes : ILecteurEcran
     internal static readonly LectureReglage Vivants = new("KBISXML_VIVANTS_DEFAULT", "1", "FrmRejetsKbisXml.cs:97");
 
     private static string Requete(bool vivants, bool radies, IEnumerable<string> categories) => $"""
-        SELECT TOP (@plafond) k.KBIS_CATEGORIE_ERREUR, k.KBIS_LIBELLE_ERREUR, k.KBIS_DATE_TRANSMISSION, k.KBIS_DATE_RETOUR,
+        SELECT TOP (@plafond) k.KBIS_ID_KBIS, k.KBIS_CATEGORIE_ERREUR, k.KBIS_LIBELLE_ERREUR, k.KBIS_DATE_TRANSMISSION, k.KBIS_DATE_RETOUR,
                s.NumeroGestion, s.DateRadiation, e.Denomination, COUNT(*) OVER () AS Total
         FROM v2.KBIS_XML AS k
         JOIN rec.DossierRcs AS s ON s.Id = k.KBIS_ID_DSRCS
@@ -92,8 +92,12 @@ internal sealed class LecteurKbisXmlRejetes : ILecteurEcran
             retour is null ? null : $"retour du {FormeLigne.Date(retour)}",
             PremiereLigne(FormeLigne.Texte(r, "KBIS_LIBELLE_ERREUR")));
         var nom = FormeLigne.Joindre(FormeLigne.Texte(r, "Denomination"), FormeLigne.NumeroGestion(FormeLigne.Texte(r, "NumeroGestion")));
-        // La regle d'etat (en tete du fichier) : tout rejet de la liste est a examiner, aucune marche franchie.
-        return new LigneLue(nom, precisions, Groupes[FormeLigne.Texte(r, "KBIS_CATEGORIE_ERREUR")], "AFaire", []);
+        // La regle d'etat (en tete du fichier) : tout rejet de la liste est a examiner, aucune marche franchie. L'id : le Kbis
+        // (KBIS_ID_KBIS, colIdKbis de la V2), que « Annuler le rejet » vise (EcrivainKbisXmlRejetes.cs, lot 16).
+        return new LigneLue(nom, precisions, Groupes[FormeLigne.Texte(r, "KBIS_CATEGORIE_ERREUR")], "AFaire", [])
+        {
+            Id = Convert.ToInt32(r["KBIS_ID_KBIS"], System.Globalization.CultureInfo.InvariantCulture).ToString(System.Globalization.CultureInfo.InvariantCulture),
+        };
     }
 
     /// <summary>Le libelle d'erreur de la V2 tient sur plusieurs lignes (l'erreur, puis son detail entre parentheses,

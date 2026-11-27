@@ -77,6 +77,11 @@ export interface LigneTenue extends LigneEcranVue { i: number }
 /** Une ligne est figee hors « a faire » et « en cours » : aucun geste, une fiche en lecture seule. */
 export const figee = (etat: string) => etat !== AFAIRE && etat !== ENCOURS
 
+/** Le geste <geste> de la procedure <d> vaut-il pour une ligne a l'etat <etat> ? Les etats qu'il declare (etatsGestes : RIG v2
+ * l'offre sur une ligne envoyee, en erreur...), sinon les lignes a faire et en cours (lot 16, decision du chef). */
+export const gesteVaut = (d: DescripteurEcranVue, geste: string, etat: string): boolean =>
+  d.etatsGestes?.[geste]?.includes(etat) ?? !figee(etat)
+
 /**
  * Les lignes de l'ecran : celles de la base, ou les exemples. Un appel qui echoue (pont absent, erreur du C#) laisse les
  * exemples, marques comme tels : l'ecran n'est jamais vide sans le dire. Lues UNE fois par procedure ([d.code]) : chaque
@@ -604,8 +609,12 @@ export interface ProprietesTableLignes {
   /** Une recherche, un etat ou un critere filtre la liste : les groupes vides se cachent alors. */
   filtre?: boolean | undefined
   /** Les cases a cocher (File, Audience, Operation) ; absent, pas de case. Sans « toutes », une seule ligne se choisit
-   * (Operation sur UN objet) : pas de case « Tout cocher ». */
-  cases?: { cochees: ReadonlySet<number>; basculer: (i: number) => void; toutes?: ((cocher: boolean) => void) | undefined } | undefined
+   * (Operation sur UN objet) : pas de case « Tout cocher ». « cochable » : une ligne qu'au moins un geste vise (File, gesteVaut) ;
+   * absent, les lignes a faire et en cours. */
+  cases?: {
+    cochees: ReadonlySet<number>; basculer: (i: number) => void; toutes?: ((cocher: boolean) => void) | undefined
+    cochable?: ((l: LigneTenue) => boolean) | undefined
+  } | undefined
   /** Le detail d'une ligne depliee (chevron) ; absent, pas de chevron. */
   detail?: ((l: LigneTenue) => ReactNode) | undefined
   /** Clic sur la ligne : l'ouvrir (Fiche, Consultation, Document). */
@@ -621,7 +630,8 @@ export function TableLignes({ d, vue, lignes, total, filtre = false, cases, deta
   const [depliees, poserDepliees] = useState<ReadonlySet<number>>(() => new Set())
   const avecGroupe = d.groupes.length > 1
   const nbColonnes = (cases ? 1 : 0) + (detail ? 1 : 0) + 2 + (avecGroupe ? 1 : 0) + (actions ? 1 : 0)
-  const cochables = cases ? lignes.filter((l) => !figee(l.etat)) : []
+  const cochable = cases?.cochable ?? ((l: LigneTenue) => !figee(l.etat))
+  const cochables = cases ? lignes.filter(cochable) : []
   const toutesCochees = cases !== undefined && cochables.length > 0 && cochables.every((l) => cases.cochees.has(l.i))
   const basculerDepliee = (i: number) => poserDepliees((avant) => {
     const apres = new Set(avant)
@@ -644,8 +654,8 @@ export function TableLignes({ d, vue, lignes, total, filtre = false, cases, deta
           aria-current={ouverte === l.i ? 'true' : undefined} onClick={ouvrir ? () => ouvrir(l) : undefined}>
         {cases && (
           <td className="rig-eg-case-cellule" onClick={(e) => e.stopPropagation()}>
-            <input type="checkbox" aria-label={`Cocher ${l.nom}`} checked={cases.cochees.has(l.i)} disabled={figee(l.etat)}
-                   title={figee(l.etat) ? `Ligne figée (${etat?.libelle ?? l.etat}) : aucun geste` : undefined}
+            <input type="checkbox" aria-label={`Cocher ${l.nom}`} checked={cases.cochees.has(l.i)} disabled={!cochable(l)}
+                   title={cochable(l) ? undefined : `Ligne figée (${etat?.libelle ?? l.etat}) : aucun geste`}
                    onChange={() => cases.basculer(l.i)} />
           </td>
         )}

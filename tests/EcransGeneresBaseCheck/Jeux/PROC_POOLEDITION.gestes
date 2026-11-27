@@ -1,0 +1,60 @@
+# « File des éditions » (EcrivainFileEditions) : « Imprimer » les éditions cochées, comme la fenêtre « Propriétés du document » de la
+# V2 validée sans reprise (PoolEditionProprietes._Valider, l. 206-327) : DMNED_IMPRESSION, DMNED_IMPRIMANTE, DMNED_NOMBRE_EXEMPLAIRE.
+# Aucune imprimante n'est appelée : le service d'édition de RIG v2 imprime à l'émission. Lignes : PROC_POOLEDITION.sql (2004xx) --
+# 200411 initiale sans imprimante, 200414 prête à imprimer, 200415 émise ; imprimantes du greffe : PROC_COURRIERM.sql
+# (« Imprimante banc 10 »). Pas de « lignes: » ici : d'autres jeux ajoutent des éditions à la file (leurs gestes).
+
+# Refus : rien de coché. Jumeau accepté : bloc 7.
+geste: Agir Imprimer
+valeur: Imprimante = Imprimante banc 10
+resultat: refuse
+message: Aucune édition cochée : rien n'est imprimé.
+---
+# Refus : l'édition n'existe pas (l. 222-224, au mot près). Jumeau accepté : bloc 7 (200414 existe).
+geste: Agir Imprimer
+ids: 2699999
+valeur: Imprimante = Imprimante banc 10
+resultat: refuse
+message: Impossible de valider ces changements. L'edition est introuvable : 2699999
+---
+# Refus : 200415 est déjà émise ; sans reprise, la V2 ne la réimprime pas (message sans source V2). Jumeau accepté : bloc 7 (phase P).
+geste: Agir Imprimer
+ids: 200415
+valeur: Imprimante = Imprimante banc 10
+resultat: refuse
+message: L'édition n° 200415 (« Extrait Kbis ») est déjà émise : la réimprimer est une reprise de RIG v2 (« Simple réémission »), que la V3 ne fait pas.
+---
+# Refus : une imprimante absente de la liste du greffe (ImprimanteLot2.IsImprimanteExistante ; l. 238-242, au mot près). Jumeau
+# accepté : bloc 7, « Imprimante banc 10 », dans IMPRIMANTE_EDITION.
+geste: Agir Imprimer
+ids: 200414
+valeur: Imprimante = Imprimante fantome
+resultat: refuse
+message: L'imprimante n'existe pas ou n'a pas été définie.
+controle: SELECT COUNT(*) FROM v2.DEMANDE_EDITION WHERE DMNED_ID_DMNED = 200414 AND DMNED_IMPRIMANTE IS NULL => 1
+---
+# Refus : rien de saisi et l'édition 200411 n'a pas d'imprimante : la V2 refuse une édition à imprimer sans imprimante définie
+# (l. 238). Jumeau accepté : bloc 7, imprimante saisie.
+geste: Agir Imprimer
+ids: 200411
+resultat: refuse
+message: L'imprimante n'existe pas ou n'a pas été définie.
+---
+# Refus : 101 exemplaires, au-delà du compteur de la V2 (NumericUpDown, 0 à 100 ; message sans source V2). Jumeau accepté : bloc 7 (2).
+geste: Agir Imprimer
+ids: 200414
+valeur: Imprimante = Imprimante banc 10
+valeur: Nombre d'exemplaires = 101
+resultat: refuse
+message: « Nombre d'exemplaires » : un nombre entier de 0 à 100, comme le compteur de RIG v2 (101 saisi).
+---
+# Accepté : 200414 (prête à imprimer) passe à imprimer, sur « Imprimante banc 10 », en 2 exemplaires ; sa phase ne bouge pas (le
+# service d'édition l'émettra).
+geste: Agir Imprimer
+ids: 200414
+valeur: Imprimante = Imprimante banc 10
+valeur: Nombre d'exemplaires = 2
+resultat: fait
+message: Édition n° 200414 « Extrait Kbis » à imprimer sur « Imprimante banc 10 » (2 exemplaires) : le service d'édition de RIG v2 l'imprime à son émission. Aucune imprimante n'est appelée d'ici.
+controle: SELECT CONCAT(CONVERT(int, DMNED_IMPRESSION), '/', DMNED_IMPRIMANTE, '/', DMNED_NOMBRE_EXEMPLAIRE, '/', DMNED_PHASE_TRAITEMENT) FROM v2.DEMANDE_EDITION WHERE DMNED_ID_DMNED = 200414 => 1/Imprimante banc 10/2/P
+controle: SELECT COUNT(*) FROM soc.Journal WHERE Ecran = 'File des éditions' AND Famille = 'demande' AND Objet = 'l''édition n° 200414 « Extrait Kbis »' AND Verbe = 'a modifie' => 1

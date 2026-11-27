@@ -53,3 +53,38 @@ INSERT INTO v2.DEMAT_RPJC_REN (RPJCR_ID_RPJCR, RPJCR_ETAT, RPJCR_ETAT_TRAITEMENT
     (300209, NULL, 'A', DATEADD(DAY, -4, @aujourdhui), '2026F30001', '300011', DATEADD(DAY, -3, @aujourdhui), NULL, NULL, NULL, NULL),
     -- erreur d'envoi (etat 8) apres acceptation, audience dans le mois : retenue, Validee
     (300210, '8', 'A', DATEADD(DAY, -4, @aujourdhui), '2026F30001', '300011', DATEADD(DAY, -3, @aujourdhui), NULL, NULL, NULL, NULL);
+
+-- Lot 16 (plan-676a4b19) : les gestes « Accepter » et « Rejeter » (EcrivainRenvoisRpjc.cs, PROC_EDI_RPJC_REN.gestes). Identifiants
+-- 26001xx (lot 16 : a partir de 2600000). Les colonnes que les gestes ecrivent, et la table des motifs, aux types de RIG_DEV
+-- (INFORMATION_SCHEMA.COLUMNS de la copie de dev du greffe 3801, lu le 27/11/2026).
+IF COL_LENGTH('v2.DEMAT_RPJC_REN', 'RPJCR_USER_TRAITEMENT_RIG') IS NULL ALTER TABLE v2.DEMAT_RPJC_REN ADD RPJCR_USER_TRAITEMENT_RIG varchar(255) NULL;
+IF COL_LENGTH('v2.DEMAT_RPJC_REN', 'RPJCR_ID_AUDIENCE_CHOISIE') IS NULL ALTER TABLE v2.DEMAT_RPJC_REN ADD RPJCR_ID_AUDIENCE_CHOISIE int NULL;
+IF COL_LENGTH('v2.DEMAT_RPJC_REN', 'RPJCR_CODE_REJET_RIG') IS NULL ALTER TABLE v2.DEMAT_RPJC_REN ADD RPJCR_CODE_REJET_RIG varchar(100) NULL;
+IF COL_LENGTH('v2.DEMAT_RPJC_REN', 'RPJCR_DATE_PRONONCE_REJET_RIG') IS NULL ALTER TABLE v2.DEMAT_RPJC_REN ADD RPJCR_DATE_PRONONCE_REJET_RIG datetime NULL;
+IF OBJECT_ID(N'v2.DEMAT_RPJC_REN_MOTIF_RENVOI') IS NULL
+    CREATE TABLE v2.DEMAT_RPJC_REN_MOTIF_RENVOI (RPJCRMR_CODE varchar(50) NOT NULL PRIMARY KEY, RPJCRMR_LIBELLE varchar(100) NULL,
+        RPJCRMR_UTILISABLE_SAISIE bit NOT NULL, RPJCRMR_DATE_OBLIGATOIRE bit NOT NULL);
+-- Deux motifs de RIG_DEV : MISEDELIBERE impose la date de prononce, DIVERS non.
+INSERT INTO v2.DEMAT_RPJC_REN_MOTIF_RENVOI (RPJCRMR_CODE, RPJCRMR_LIBELLE, RPJCRMR_UTILISABLE_SAISIE, RPJCRMR_DATE_OBLIGATOIRE) VALUES
+    ('DIVERS', 'Voir commentaire', 1, 0),
+    ('MISEDELIBERE', 'Mise en délibéré du dossier', 1, 1);
+-- Les avocats : ceux de PROC_EDI_RPJC_TRCNC.sql (meme table, aucun mandataire ajoute : les Mandataires et le rapprochement
+-- d'acteurs les listent tous) -- CNBF 130001, 1300201 actif avec abrege ALP13 (retenu par la V2) ; CNBF 130002, 1300202 inactif
+-- (ecarte). L'audience de renvoi : 2400401 de PROC_CABINET.sql (10/03/2099 a 09:00).
+INSERT INTO v2.DEMAT_RPJC_REN (RPJCR_ID_RPJCR, RPJCR_ETAT, RPJCR_ETAT_TRAITEMENT_RIG, RPJCR_DATE_TRAITEMENT_RIG,
+    RPJCR_NUMERO_AFFAIRE, RPJCR_CNBF_DEMANDE, RPJCR_DATE_AUDIENCE_INITIALE, RPJCR_DATE_RENVOI_DEMANDEE, RPJCR_USER_EN_COURS,
+    RPJCR_MOTIF_REJET_RIG, RPJCR_DATE_RECEPTION_EXTELIA_CT) VALUES
+    -- en attente, avocat actif avec abrege, audience initiale passee : accepte (geste « Accepter »)
+    (2600101, '1', NULL, NULL, '2026F30001', '130001', DATEADD(DAY, -2, @aujourdhui), NULL, NULL, NULL, NULL),
+    -- en attente, audience initiale a venir : refusee (OPE_INFO_DEMANDE.cs:458-460) -- jumeau 2600101
+    (2600102, '1', NULL, NULL, '2026F30001', '130001', DATEADD(DAY, 3, @aujourdhui), NULL, NULL, NULL, NULL),
+    -- en attente, l'avocat du CNBF est inactif : refusee (l. 103-108) -- jumeau 2600101
+    (2600103, '1', NULL, NULL, '2026F30001', '130002', DATEADD(DAY, -2, @aujourdhui), NULL, NULL, NULL, NULL),
+    -- en attente, tenue par un agent : refusee (OPE_RESULTAT_RECHERCHE.cs:386-387) -- jumeau 2600101
+    (2600104, '1', NULL, NULL, '2026F30001', '130001', DATEADD(DAY, -2, @aujourdhui), NULL, 'agent.l16', NULL, NULL),
+    -- en attente : rejetee avec MISEDELIBERE et sa date de prononce
+    (2600105, '1', NULL, NULL, '2026F30001', '130001', DATEADD(DAY, -2, @aujourdhui), NULL, NULL, NULL, NULL),
+    -- en attente : rejetee avec DIVERS, sans date
+    (2600106, '1', NULL, NULL, '2026F30001', '130001', DATEADD(DAY, -2, @aujourdhui), NULL, NULL, NULL, NULL),
+    -- en attente mais deja rejetee (R) : un nouveau rejet ne change rien (l. 532-535) -- jumeau 2600106
+    (2600107, '1', 'R', DATEADD(DAY, -1, @aujourdhui), '2026F30001', '130001', DATEADD(DAY, -2, @aujourdhui), NULL, NULL, NULL, NULL);

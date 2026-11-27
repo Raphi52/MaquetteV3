@@ -1,0 +1,51 @@
+# « Radiations d'office » (EcrivainRadiationsOffice) : « Radier d'office » pose la demande ROF du dossier, INTERROMPUE, comme le premier
+# pas de _radiationOffice (FrmProcROFSurveillances.cs:391-395) ; le reste (mention, evenement, editions, liasse CFE) se reprend dans
+# RIG v2 (processus ROF). Lignes : celles que le banc pose lui-meme (Program.cs, section 1b « RADIATIONS D'OFFICE ») -- dossiers 11 et
+# 14 a radier (S123-124), 16 avec une demande ROF Q (en cours), 17 avec une demande ROF V (radie), 12 hors liste (terme a 14 mois).
+# Le reglage ROFSURV_S123_136 est absent a ce moment (Program.cs l'efface apres sa lecture).
+
+# Refus : aucun dossier coche. Jumeau accepte : bloc 3.
+geste: Agir Radier d'office
+resultat: refuse
+message: Aucun dossier coché : rien n'est radié.
+---
+# Refus : le dossier 12 n'est pas dans la liste de la V2 (terme passe de 14 mois, il en faut 15 : _requeteS123124). Jumeau accepte :
+# bloc 3, le dossier 11 (16 mois).
+geste: Agir Radier d'office
+ids: 12
+resultat: refuse
+message: Le dossier 12 n'est plus à radier d'office : il est sorti de la liste (radié, hors surveillance ou en procédure collective).
+---
+# Radiation commencee sur le dossier 11 : une demande ROF interrompue (I), au nom de la V2 (l. 390), numero de gestion en indicatif,
+# auteur l'agent ; la ligne passe « En cours » (radiation commencee). Aucune autre ecriture (ni mention, ni date de radiation).
+geste: Agir Radier d'office
+ids: 11
+resultat: fait
+message: Radiation d'office commencée pour le dossier 2001 B 00011 : demande ROF posée interrompue. La mention, l'événement de radiation, les éditions (dont la lettre au procureur) et la liasse CFE ne sont pas repris par la V3 : reprendre la demande dans RIG v2 (processus ROF).
+controle: SELECT DMND_ETAT_DEMANDE FROM v2.DEMANDE WHERE DMND_ID_DSRCS = 11 AND DMND_CODE_PROSS = 'ROF' => I
+controle: SELECT DMND_NOM FROM v2.DEMANDE WHERE DMND_ID_DSRCS = 11 AND DMND_CODE_PROSS = 'ROF' => ROFSURV - Radiation d'Office - BANC ROF 11
+controle: SELECT DMND_NUM_INDICATIF FROM v2.DEMANDE WHERE DMND_ID_DSRCS = 11 AND DMND_CODE_PROSS = 'ROF' => 2001B00011
+controle: SELECT DMND_NOM_UTILISATEUR FROM v2.DEMANDE WHERE DMND_ID_DSRCS = 11 AND DMND_CODE_PROSS = 'ROF' => Ecrans BANC
+controle: SELECT COUNT(*) FROM rec.DossierRcs WHERE Id = 11 AND DateRadiation IS NULL => 1
+controle: SELECT COUNT(*) FROM soc.Journal WHERE Ecran = 'Radiations d''office' AND Famille = 'dossier' AND Objet = 'le dossier 2001 B 00011' AND Verbe = 'a cree' => 1
+---
+# Refus : la radiation du dossier 11 vient d'etre commencee (la V2 grise « Radiation » apres l'avoir lancee, l. 528-529). Jumeau
+# accepte : bloc 3, le meme dossier avant sa demande.
+geste: Agir Radier d'office
+ids: 11
+resultat: refuse
+message: Une radiation d'office est déjà commencée pour le dossier 2001 B 00011 : reprenez-la dans RIG v2 (processus ROF).
+---
+# Refus : le dossier 16 a deja une demande ROF qualifiee depuis son terme. Jumeau accepte : bloc 3 (dossier 11, sans demande ROF).
+geste: Agir Radier d'office
+ids: 16
+resultat: refuse
+message: Une radiation d'office est déjà commencée pour le dossier 2001 B 00016 : reprenez-la dans RIG v2 (processus ROF).
+---
+# Refus : le dossier 17 a une demande ROF validee (radiation faite) ; le refus vise tout le lot coche, le dossier 14 n'est pas radie
+# non plus. Jumeau accepte : bloc 3.
+geste: Agir Radier d'office
+ids: 14,17
+resultat: refuse
+message: Le dossier 2001 B 00017 est déjà radié d'office depuis sa relance.
+controle: SELECT COUNT(*) FROM v2.DEMANDE WHERE DMND_ID_DSRCS = 14 AND DMND_CODE_PROSS = 'ROF' => 0

@@ -6,9 +6,13 @@
 # Ecartes, jumeau retenu 300101 (etat 1) : 300103 et 300105 (etat 2, acceptee / refusee), 300104 (etat 4), 300107
 # (etat 9) -- la case « Traites » est decochee a l'ouverture ; 300106 (sans etat).
 # 300108 : sans nom ni prenom, la denomination ; sans date de demande, pas de « reçue le ».
+# Lot 16 (plan-676a4b19) : LYS Irène et MAUVE Paul, demandes 2600201-2600202 de PROC_EDI_RPJC_INS.sql (gestes RPJC, joues avant
+# ceux de ce jeu : elles en sortent, etat 2).
 # Lot 15 (plan-676a4b19) : VERGER Anne et VIOLETTE Marc, demandes 2500101-2500102 de PROC_EDI_RPVAINS.sql (« Traiter la demande »).
 ARDOISE Irène | Cnbf 300001 · reçue le {J-2} | Personnes physiques | AFaire | []
 BELIER Simon | Cnbf 300002 · structure Cnbf 300902 · ouverte par agent.banc | Structures | EnCours | [0,1]
 MU JURIS | Cnbf 300008 | Personnes physiques | AFaire | []
 VERGER Anne | Cnbf 250001 · structure Cnbf 250901 · SIREN 512 500 101 · reçue le {J-1} | Structures | AFaire | []
 VIOLETTE Marc | Cnbf 250002 · SIREN 512 500 102 · reçue le {J-1} | Personnes physiques | AFaire | []
+LYS Irène | Cnbf 130001 · reçue le {J-2} | Personnes physiques | AFaire | []
+MAUVE Paul | Cnbf 130009 · reçue le {J-2} | Personnes physiques | AFaire | []

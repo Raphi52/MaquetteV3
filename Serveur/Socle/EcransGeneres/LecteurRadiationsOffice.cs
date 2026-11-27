@@ -111,8 +111,8 @@ internal sealed class LecteurRadiationsOffice : ILecteurEcran
     /// <summary>Les trois surveillances, l'exclusion des procedures collectives (_exclusionPC : une procedure dont le
     /// code de cloture ou de solution n'autorise pas la surveillance, ou qui n'a ni l'un ni l'autre, ecarte le
     /// dossier), la demande ROF qui donne l'etat, le tri de la V2 et le plafond.</summary>
-    private static string Requete(bool relanceSeule) => $"""
-        SELECT TOP (@plafond) l.Surveillance, l.NumeroGestion, l.Siren, e.Denomination, l.DateMaj, l.AvecRelance,
+    internal static string Requete(bool relanceSeule) => $"""
+        SELECT TOP (@plafond) l.Surveillance, l.IdDossier, l.NumeroGestion, l.Siren, e.Denomination, l.DateMaj, l.AvecRelance,
                l.DateRelance, l.DateLimite, rof.DMND_ETAT_DEMANDE AS EtatRof, rof.DMND_DATE_CREATION AS DateRof,
                COUNT(*) OVER () AS Total
         FROM ({S123124}
@@ -161,7 +161,11 @@ internal sealed class LecteurRadiationsOffice : ILecteurEcran
             _ => null,
         };
         var nom = FormeLigne.Joindre(FormeLigne.Texte(r, "Denomination"), FormeLigne.NumeroGestion(FormeLigne.Texte(r, "NumeroGestion")));
-        return new LigneLue(nom, FormeLigne.Joindre(motif, misAJour, radiation), Groupes[surveillance], etat, faites);
+        // L'id : le dossier (DSSRC_ID_DSRCS), que « Radier d'office » vise (EcrivainRadiationsOffice.cs, lot 16).
+        return new LigneLue(nom, FormeLigne.Joindre(motif, misAJour, radiation), Groupes[surveillance], etat, faites)
+        {
+            Id = Convert.ToInt32(r["IdDossier"], System.Globalization.CultureInfo.InvariantCulture).ToString(System.Globalization.CultureInfo.InvariantCulture),
+        };
     }
 
     /// <summary>La regle d'etat (en tete du fichier) : l'etat de la derniere demande ROF, ou null sans demande.</summary>

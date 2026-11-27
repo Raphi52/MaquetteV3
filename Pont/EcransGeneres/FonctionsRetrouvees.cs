@@ -28,21 +28,35 @@ public sealed class DomaineFonctionsRetrouvees : IDomaineEcrans
             Recherche = "Rechercher un dossier RCS, un numéro de gestion, un SIREN…",
             Criteres = ["Numéro de gestion ou SIREN", "Exercice", "Origine : guichet, INPI, CREFO"],
             Valider = "Valider le dépôt", // proc_dca.md, FORM_DCA : bouton VALIDER, état Validee (dépôt accepté).
+            // « Valider le dépôt » au guichet écrit l'exercice, le dépôt (BILA, CONFI, RESUL), l'événement DCA et la demande validée
+            // (ETP_EXERCICES.cs:365-615, DossierRCS.AddDCA) ; facture, éditions et BODACC restent à RIG v2 (lot 16 du plan « RIG v3 100 %
+            // fonctionnel » : EcrivainComptesAnnuels.cs). Les deux confidentialités sont des cases de la grille V2 (ExerciceDca.cs:50-55) ; la
+            // date d'arrivée est la saisie obligatoire de OPE_ACTES, dans l'étape des exercices (OPE_ACTES.Designer.cs:104, contrôles :153-163).
             Rang = 1,
             Etats = [.. EtatsEcran.Trois("À enregistrer", "En cours", "Déposé"),
                      new EtatEcran("EnAttente", "Réclamation", "en-attente"), new EtatEcran("Rejetee", "Refusé", "rejetee")],
             Groupes = ["Guichet", "Dématérialisé (INPI, CREFO)"],
             Marches =
             [
-                Marche("Dossier RCS", "Le dossier se retrouve par son numéro de gestion. En dépôt dématérialisé, le numéro arrive avec le flux et ne se modifie pas.", true,
-                    "Numéro de gestion", "SIREN", "Dénomination"),
-                Marche("Exercices", "Les exercices non déposés sont proposés, plus une ligne vide pour en saisir un nouveau. Un seul exercice clos depuis trois ans au plus est coché d'office ; plusieurs : le plus récent clos depuis six mois. La confidentialité du dernier dépôt est reprise. Une injonction non soldée est signalée sans bloquer : « Affaire non régularisée pour l'exercice ».", true,
-                    "Exercice", "Date de clôture", "Bilan confidentiel", "Résultat confidentiel"),
-                Marche("Pièces jointes", "En dépôt dématérialisé : le bilan toujours ; la déclaration de confidentialité, le compte de résultat confidentiel ou le bilan simplifié selon le niveau choisi. Une pièce absente bloque si le greffe l'a réglé ainsi, sinon elle est signalée.", false,
+                // Seules les saisies que lit EcrivainComptesAnnuels.cs (SaisiesLues) : le SIREN et la dénomination de RIG v2 affichent
+                // le dossier trouvé, l'« Exercice » est la ligne de la grille V2, que la date de clôture désigne ici ; une saisie non lue
+                // fait refuser le dépôt (PROC_DCA.gestes bloc 10).
+                // fix-ok: mesuré le 27/11/2026 (banc-r5-rouge.log, PROC_DCA.gestes bloc 10 « obtenu fait 200 ») -- l'écran offrait des champs
+                // que l'écrivain ne lit pas et annonçait une grille d'exercices proposés que la V3 n'a pas : le dépôt s'écrivait en les ignorant.
+                Marche("Dossier RCS", "Le dossier se retrouve par son numéro de gestion. En dépôt dématérialisé, le numéro arrive avec le flux et ne se modifie pas. La recherche par SIREN de RIG v2 n'est pas reprise par la V3.", true,
+                    "Numéro de gestion"),
+                Marche("Exercices", "L'exercice se désigne par sa date de clôture : l'exercice non déposé de cette date, sinon un exercice neuf. La date d'arrivée est obligatoire et jamais après le jour ; à plus de trois mois, elle est signalée. Un exercice sous injonction de déposer ne se dépose pas ici : RIG v2 y traite le retrait du rôle ou le dépôt hors délai, que la V3 ne reprend pas. Non repris par la V3, à saisir par l'agent : la liste des exercices non déposés, l'exercice coché d'office, la confidentialité du dernier dépôt et la date d'arrivée pré-remplie.", true,
+                    "Date de clôture", Champ.Case("Bilan confidentiel"), Champ.Case("Résultat confidentiel"), "Date d'arrivée"),
+                Marche("Pièces jointes", "En dépôt dématérialisé : le bilan toujours ; la déclaration de confidentialité, le compte de résultat confidentiel ou le bilan simplifié selon le niveau choisi. Une pièce absente bloque si le greffe l'a réglé ainsi, sinon elle est signalée. Le dépôt dématérialisé n'est pas repris par la V3 : une pièce saisie ici fait refuser le dépôt.", false,
                     "Bilan", "Déclaration de confidentialité", "Compte de résultat confidentiel", "Bilan simplifié"),
-                Marche("Facturation", "Un dépôt accepté est toujours facturé ; une réclamation ou un refus ne l'est que si le greffe le prévoit. Un dépôt venu de l'INPI est toujours facturé.", true,
-                    "Client", "Client d'expédition", "Encaissement"),
-                Marche("Réclamation ou refus", "Le motif et la date de réception. Après la validation, le dépôt passe en récapitulatif : le dossier et les exercices ne se modifient plus.", false,
+                // Comme « Facturation » de PROC_DAS (Ouvrir.cs) : l'étape de RIG v2 (etpFactuGestcom : articles, client d'expédition,
+                // encaissement) n'est pas écrite par la V3 (EcrivainComptesAnnuels.cs, NON REPRIS) ; des champs saisissables y seraient
+                // exigés par l'écran puis ignorés. Le tableau des articles la montre sans la faire saisir.
+                Marche("Facturation", "Un dépôt accepté est toujours facturé ; une réclamation ou un refus ne l'est que si le greffe le prévoit. Un dépôt venu de l'INPI est toujours facturé. Client, client d'expédition et encaissement : non repris par la V3, le dépôt est validé sans facture.", true,
+                    Champ.Tableau("Articles de facturation")),
+                // Récapitulatif V2 : après Validee/Reclamee/Refusee, etpRcs et etpExercices passent en lecture seule
+                // (PROC_DCA.cs:603-606, proc_dca.md:421) ; l'écran V3 n'a pas ce mode, il se vide après « Créer ».
+                Marche("Réclamation ou refus", "Le motif et la date de réception. La réclamation et le refus ne sont pas repris par la V3 : un motif saisi ici fait refuser le dépôt, à traiter dans RIG v2. Le récapitulatif de RIG v2 (dossier et exercices en lecture seule après la validation) n'est pas repris non plus : la V3 revient à une saisie vide, et le dépôt enregistré se relit dans la liste.", false,
                     "Motif", "Date de réception"),
             ],
             Lignes =
@@ -68,6 +82,10 @@ public sealed class DomaineFonctionsRetrouvees : IDomaineEcrans
             Recherche = "Rechercher un dossier, un numéro de gestion, un SIREN…",
             Criteres = ["Surveillance", "Date d'expiration de la relance", "Exclure les dossiers provoquant une notification"],
             Valider = "Éditer la lettre au procureur", // FrmProcROFSurveillances.Designer.cs : « Lettre au Procureur ».
+            // Le bouton RADIATION de la barre de la V2 (_radiationOffice, FrmProcROFSurveillances.cs:383-534) : la demande ROF du dossier,
+            // posee interrompue, a reprendre dans RIG v2 (lot 16 du plan « RIG v3 100 % fonctionnel » : EcrivainRadiationsOffice.cs).
+            // La lettre au procureur est une edition de cette radiation (l. 487-490) : elle part avec elle, dans RIG v2.
+            Gestes = ["Radier d'office"],
             Rang = 5,
             Etats = EtatsEcran.Trois("À radier", "En cours", "Lettre éditée"),
             Groupes = ["Dissolution par survenance du terme", "Dissolution depuis plus de trois ans", "Sans activité"],
@@ -103,9 +121,8 @@ public sealed class DomaineFonctionsRetrouvees : IDomaineEcrans
             Recherche = "Rechercher un dossier, un SIREN, un numéro de dépôt…",
             Criteres = ["N° dossier", "Siren", "Date de la commande"],
             Valider = "Envoyer au VGED", // OPE_RES.Designer.cs : tsmiSendToVged « Envoyer au VGED ».
-            // Le seul geste du menu de la ligne qui ECRIT : « Annuler » (tsmiAnnuler, OPE_RESULTATS.cs:84-117), sur UNE ligne -- la
-            // commande web quitte l'acte ; son flux dans la base EDI du greffe (hors de la V3) n'est pas appele, simule (lot 16 du plan
-            // « RIG v3 100 % fonctionnel » : EcrivainActesWebNonTransmis.cs). « Envoyer au VGED » ouvre la GED, un autre ecran : non repris.
+            // « Annuler » du menu de la ligne (_tsmiAnnuler_Click, OPE_RESULTATS.cs:84-117) : la commande web de l'acte (lot 16 :
+            // EcrivainActesWebNonTransmis.cs). « Envoyer au VGED » ouvre la GED dans un autre processus : pas une ecriture, pas offert.
             Gestes = ["Annuler"],
             Rang = 5,
             Etats = [.. EtatsEcran.Trois("À transmettre", "En cours", "Transmis"), new EtatEcran("Rejetee", "Annulé", "rejetee")],
@@ -142,9 +159,8 @@ public sealed class DomaineFonctionsRetrouvees : IDomaineEcrans
             Recherche = "Rechercher un dossier, une erreur…",
             Criteres = ["Types d'erreur : bloquantes, avertissements, informations", "Dossiers : vivants, radiés", "Historiques"],
             Valider = "Extrait Kbis", // FrmRejetsKbisXml.Designer.cs : « Extrait &Kbis », « Afficher à l'écran l'extrait kbis du kbis sélectionné ».
-            // Le geste qui ECRIT : « Annuler le rejet » (tsmiAnnulerRejet_Click, FrmRejetsKbisXml.cs:159-184), offert par la V2 en mode
-            // Amitel seulement (l. 141-144, 255) : reserve a l'equipe Amitel (lot 16 : EcrivainKbisXmlRejetes.cs). « Extrait Kbis »
-            // affiche le Kbis, il n'ecrit rien : non repris dans la file.
+            // « Annuler le rejet sélectionné... » du menu de la ligne, en mode Amitel (tsmiAnnulerRejet_Click, FrmRejetsKbisXml.cs:159-184 ;
+            // lot 16 : EcrivainKbisXmlRejetes.cs). L'extrait Kbis s'affiche : pas une ecriture, pas offert.
             Gestes = ["Annuler le rejet"],
             Rang = 5,
             Etats = EtatsEcran.Trois("À examiner", "En cours", "Examiné"),
@@ -180,6 +196,14 @@ public sealed class DomaineFonctionsRetrouvees : IDomaineEcrans
             Recherche = "Rechercher un avocat, un CNBF, une structure…",
             Criteres = ["État de la demande", "Cnbf", "Date du traitement"],
             Valider = "Traiter la demande", // FORM_EDI_RPJC_INS.Designer.cs : « &Traiter la demande ».
+            // Les deux gestes de la demande cochee (frmTrt.cs:79-80, VALIDER et REFUS l. 893-897) et leurs saisies : les mandataires et
+            // structures des grilles de frmTrt nommes par leur abrege, le motif de frmRejet (Designer l. 144) -- lot 16 :
+            // EcrivainInscriptionsRpjc.cs.
+            Gestes = ["Traiter la demande", "Rejeter la demande"],
+            // Une inscription deja acceptee se retraite (frmChoixTrt.cs:270-272, PROC_EDI_RPJC_INS.gestes bloc 11) : « Traiter » vise
+            // aussi la ligne « Traitée ». Refusee : la V2 refuse de la rouvrir (l. 281-283), elle reste figee.
+            EtatsGestes = new Dictionary<string, string[]> { ["Traiter la demande"] = ["AFaire", "EnCours", "Validee"] },
+            Parametres = ["Mandataires traités", "Mandataire principal", "Structures traitées", Champ.Zone("Motif du rejet")],
             Rang = 7,
             Etats = [.. EtatsEcran.Trois("En attente", "En cours", "Traitée"), new EtatEcran("Rejetee", "Rejetée", "rejetee")],
             Groupes = ["Avocat seul", "Avocat et structure"],
@@ -215,6 +239,10 @@ public sealed class DomaineFonctionsRetrouvees : IDomaineEcrans
             Recherche = "Rechercher une affaire, un avocat, une audience…",
             Criteres = ["En attente", "Traitées : audience initiale du … au …", "200 demandes au plus"],
             Valider = "Valider", // proc_edi_rpjc_ren.md : DoSauver -> OPE_INFO_DEMANDE.Valider().
+            // Les deux cases exclusives de la decision (OPE_AUDIENCE.Designer.cs l. 83, 92), jouees sur la demande cochee, et leurs
+            // saisies (l. 102, 126, 137) ; l'audience de renvoi par son numero (lot 16 : EcrivainRenvoisRpjc.cs).
+            Gestes = ["Accepter", "Rejeter"],
+            Parametres = ["Audience de renvoi", "Motif rejet", "Observation rejet", Champ.Date("Date de prononcé")],
             Rang = 7,
             Etats = [.. EtatsEcran.Trois("En attente", "En cours", "Acceptée"),
                      new EtatEcran("Rejetee", "Rejetée par le greffe", "rejetee"), new EtatEcran("EnAttente", "Rejet Extelia", "en-attente")],
@@ -252,6 +280,16 @@ public sealed class DomaineFonctionsRetrouvees : IDomaineEcrans
             Recherche = "Rechercher une personne, une entreprise, un jugement…",
             Criteres = ["État : à envoyer, envoyée, en erreur, à désactiver", "Date du jugement", "Demande d'une autre juridiction"],
             Valider = "Valider", // proc_fnig.md, OPE_EDITION : VALIDER, apres « Êtes vous sur de vouloir envoyer la demande au FNIG? ».
+            // Les deux gestes de la barre de l'edition qui visent une demande de la liste (OPE_EDITION.cs:102-111) : « Désactiver » une
+            // demande envoyee (une demande de desactivation neuve, a envoyer) et « Renvoyer la demande à l'identique » une demande en
+            // erreur ; l'envoi au FNIG est le traitement de fond de RIG v2, jamais appele d'ici (lot 16 : EcrivainDemandesFnig.cs).
+            // « Raison annulation » : le seul champ que la desactivation ouvre (OPE_EDITION_JUGEMENT.cs:126-138).
+            Gestes = ["Désactiver", "Renvoyer la demande à l'identique"],
+            // Les etats qui allument chaque bouton (_ChangerActivationBouttons, OPE_EDITION.cs:296-305) : « Désactiver » une demande
+            // ENVOYEE (EstDesactivationPossible, l. 46-51), « Renvoyer » une demande EN ERREUR (EstCasierFnigEnErreur, l. 56-58) --
+            // deux lignes que la file figerait sans cela (lot 16, decision du chef).
+            EtatsGestes = new Dictionary<string, string[]> { ["Désactiver"] = ["Validee"], ["Renvoyer la demande à l'identique"] = ["Rejetee"] },
+            Parametres = [Champ.Texte("Raison annulation")],
             Rang = 4,
             Etats = [.. EtatsEcran.Trois("Nouvelle demande", "En saisie", "Envoyée"),
                      new EtatEcran("Rejetee", "En erreur", "rejetee"), new EtatEcran("EnAttente", "À désactiver", "en-attente")],
@@ -289,6 +327,8 @@ public sealed class DomaineFonctionsRetrouvees : IDomaineEcrans
             Recherche = "Rechercher un code, un nom, un type…",
             Criteres = ["Code", "Nom", "Type"],
             Valider = "Valider", // frmListeDestInst.cs : « Vous devez annuler ou valider les modifications ».
+            // Ajouter, Modifier, Supprimer dans la grille : frmAddDestInst._Valider et le bouton SUPPRIMER de frmListeDestInst (lot 16 :
+            // EcrivainDestinatairesInstitutionnels.cs) ; la grille saisit ses colonnes, les autres champs restent ceux de la base.
             Rang = 7,
             Etats = [.. EtatsEcran.Trois("À compléter", "En saisie", "Enregistré"), new EtatEcran("EnAttente", "Inactif", "en-attente")],
             Groupes = ["Parquet et juridictions", "Administrations", "Organismes"],
@@ -323,6 +363,11 @@ public sealed class DomaineFonctionsRetrouvees : IDomaineEcrans
             Recherche = "Rechercher une demande, un dossier, un destinataire…",
             Criteres = ["Dossier (ou demande)", "Date de création", "Inclure les demandes supprimées"],
             Valider = "Imprimer", // PoolEdition, etape IMPRESSION : « Imprimer : ».
+            // « Imprimer » = la fenetre « Propriétés du document » validee sans reprise (PoolEditionProprietes._Valider, l. 206-327) :
+            // « Imprimer : » coche, l'imprimante et le nombre d'exemplaires saisis a cote de la liste (Designer l. 256, 506, 467). Lot 16 :
+            // EcrivainFileEditions.cs ; la reprise d'une edition emise n'est pas reprise (nomme dans l'ecrivain).
+            Gestes = ["Imprimer"],
+            Parametres = [Champ.Texte("Imprimante"), Champ.Nombre("Nombre d'exemplaires")],
             Rang = 2,
             Etats = [.. EtatsEcran.Trois("À émettre", "En cours", "Émise"), new EtatEcran("Rejetee", "Supprimée", "rejetee")],
             Groupes = ["Courrier", "Courriel", "File différée"],
@@ -360,6 +405,10 @@ public sealed class DomaineFonctionsRetrouvees : IDomaineEcrans
             Recherche = "Flasher un code Data ou saisir un numéro de demande…",
             Criteres = ["Code Data", "Numéro de demande"],
             Valider = "Valider", // FrmActionsNPAI.Designer.cs : « Valider ».
+            // Le bouton « Annuler » de l'action ouverte (btAnnule, FrmProcTraitementNpai.cs:1101-1107) : la demande NPAI restee qualifiee
+            // passe en X (lot 16 : EcrivainCourriersNpai.cs). « Valider » une action vise le courrier FLASHE, absent de la demande laissee
+            // en cours : non repris (nomme dans l'ecrivain).
+            Gestes = ["Annuler"],
             Rang = 2,
             Etats = EtatsEcran.Trois("À traiter", "En cours", "Traité"),
             Groupes = ["Formalités", "Relances de comptes annuels"],

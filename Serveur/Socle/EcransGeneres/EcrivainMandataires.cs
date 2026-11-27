@@ -199,7 +199,7 @@ internal sealed partial class EcrivainMandataires : IEcrivainEcran
     private static object? Nul(string valeur) => valeur.Length == 0 ? null : valeur;
 
     /// <summary>RIG.TOOLS.RegEx.Email (D:\RigApplication\Source\Outils\DLL\RigTools\TOOLS\RegEx.cs:17-19), recopiee : une adresse
-    /// simple, ou « Nom &lt;adresse&gt; ».</summary>
+    /// simple, ou « Nom &lt;adresse&gt; ». Partagee avec EcrivainDestinatairesInstitutionnels (frmAddDestInst.TesterEmails, la meme regle).</summary>
     [GeneratedRegex(@"^([a-zA-Z0-9]+(([\.\-_+][a-zA-Z0-9]+)+)?)@(([a-zA-Z0-9]+[\.\-_])+[a-zA-Z]+)$|^[^;<]*<([a-zA-Z0-9]+(([\.\-_+][a-zA-Z0-9]+)+)?)@(([a-zA-Z0-9]+[\.\-_])+[a-zA-Z]+)>$")]
-    private static partial Regex Email();
+    internal static partial Regex Email();
 }

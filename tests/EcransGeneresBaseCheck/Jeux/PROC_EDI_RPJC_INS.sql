@@ -40,3 +40,37 @@ INSERT INTO v2.DEMAT_RPJC_INS (RPJCI_ID_RPJCI, RPJCI_DATE_CREATION, RPJCI_ETAT, 
     -- la date de creation
     (300108, DATEADD(DAY, -1, @aujourdhui), '1', NULL, NULL, NULL, NULL, 'I', '300008',
      '', '', 'MU JURIS', NULL, '', '');
+
+-- Lot 16 (plan-676a4b19) : les gestes « Traiter la demande » et « Rejeter la demande » (EcrivainInscriptionsRpjc.cs,
+-- PROC_EDI_RPJC_INS.gestes). Identifiants 26002xx (lot 16 : a partir de 2600000). Les colonnes que les gestes lisent ou ecrivent, aux
+-- types de RIG_DEV (INFORMATION_SCHEMA.COLUMNS de la copie de dev du greffe 3801, lu le 27/11/2026) ; PROC_EDI_RPVAINS.sql, joue
+-- apres, ajoute les memes s'il ne les trouve pas.
+IF COL_LENGTH('v2.DEMAT_RPJC_INS', 'RPJCI_USER_TRAITEMENT_RIG') IS NULL ALTER TABLE v2.DEMAT_RPJC_INS ADD RPJCI_USER_TRAITEMENT_RIG varchar(255) NULL;
+IF COL_LENGTH('v2.DEMAT_RPJC_INS', 'RPJCI_MAIL') IS NULL ALTER TABLE v2.DEMAT_RPJC_INS ADD RPJCI_MAIL varchar(80) NULL;
+IF COL_LENGTH('v2.DEMAT_RPJC_INS', 'RPJCI_MAIL2') IS NULL ALTER TABLE v2.DEMAT_RPJC_INS ADD RPJCI_MAIL2 varchar(80) NULL;
+IF COL_LENGTH('v2.DEMAT_RPJC_INS', 'RPJCI_MAIL3') IS NULL ALTER TABLE v2.DEMAT_RPJC_INS ADD RPJCI_MAIL3 varchar(80) NULL;
+-- Les demandes des gestes. Les mandataires : ceux d'autres jeux (aucun ajoute : les Mandataires et le rapprochement d'acteurs les
+-- listent tous) -- 1300201 ALP13 actif au CNBF 130001 et 1300202 BET13 inactif (PROC_EDI_RPJC_TRCNC.sql), 2500104 actif et
+-- 2500103 inactif, tous deux d'abrege L15DBL (PROC_EDI_RPVAINS.sql). Le traitement de 2600201 laisse ALP13 tel qu'il est lu
+-- (meme CNBF, ni structure, ni SIREN, ni courriel a reprendre) : les jeux qui relisent les mandataires ne changent pas.
+INSERT INTO v2.DEMAT_RPJC_INS (RPJCI_ID_RPJCI, RPJCI_DATE_CREATION, RPJCI_ETAT, RPJCI_ETAT_TRAITEMENT_RIG,
+    RPJCI_DATE_TRAITEMENT_RIG, RPJCI_MOTIF_TRAITEMENT_RIG, RPJCI_DATE_DEMANDE, RPJCI_TYPE_MAJ, RPJCI_NUMERO_CNBF, RPJCI_NOM,
+    RPJCI_PRENOM, RPJCI_DENOMINATION, RPJCI_USER_EN_COURS, RPJCI_NUMERO_SIREN, RPJCI_NUMERO_CNBF_STRUCTURE) VALUES
+    -- en attente, inscription : traitee (« Traiter la demande », principal ALP13)
+    (2600201, DATEADD(DAY, -2, @aujourdhui), '1', NULL, NULL, NULL, DATEADD(DAY, -2, @aujourdhui), 'I', '130001',
+     'LYS', 'Irène', NULL, NULL, '', ''),
+    -- en attente, inscription : rejetee (« Rejeter la demande »)
+    (2600202, DATEADD(DAY, -2, @aujourdhui), '1', NULL, NULL, NULL, DATEADD(DAY, -2, @aujourdhui), 'I', '130009',
+     'MAUVE', 'Paul', NULL, NULL, '', ''),
+    -- acceptee (etat 4), tenue par un agent : refusee a l'ouverture (frmChoixTrt.cs:255-257) -- jumeau 2600201, que personne ne tient
+    (2600203, DATEADD(DAY, -9, @aujourdhui), '4', 'A', DATEADD(DAY, -8, @aujourdhui), NULL, NULL, 'I', '130001',
+     'NACRE', 'Léa', NULL, 'agent.l16', '', ''),
+    -- modification acceptee (etat 4) : ne se retraite pas (l. 266-269) -- jumeau 2600201 (inscription)
+    (2600204, DATEADD(DAY, -9, @aujourdhui), '4', 'A', DATEADD(DAY, -8, @aujourdhui), NULL, NULL, 'M', '130001',
+     'OCRE', 'Jean', NULL, NULL, '', ''),
+    -- refusee (etat 2, R) : ne se traite pas, la V2 donne son motif (l. 281-283) -- jumeau 2600201 (sans decision)
+    (2600205, DATEADD(DAY, -9, @aujourdhui), '2', 'R', DATEADD(DAY, -8, @aujourdhui), 'Cnbf inconnu du barreau', NULL, 'I', '130009',
+     'PERLE', 'Anne', NULL, NULL, '', ''),
+    -- modification en erreur d'envoi (etat 8), sans decision : « pas encore gérée » (l. 298-302) -- jumeau 2600201 (inscription)
+    (2600206, DATEADD(DAY, -9, @aujourdhui), '8', NULL, NULL, NULL, NULL, 'M', '130001',
+     'QUARTZ', 'Marc', NULL, NULL, '', '');

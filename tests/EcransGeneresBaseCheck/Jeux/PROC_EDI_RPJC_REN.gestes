@@ -1,0 +1,136 @@
+# « EDI RPJC renvois » (EcrivainRenvoisRpjc) : « Accepter » (une audience de renvoi) ou « Rejeter » (un motif) la demande de renvoi
+# cochee, comme OPE_INFO_DEMANDE.Valider (l. 456-545) apres l'ouverture de OPE_RESULTAT_RECHERCHE (l. 241-262, 380-390). Lignes :
+# PROC_EDI_RPJC_REN.sql (26001xx) ; avocats de PROC_EDI_RPJC_TRCNC.sql (CNBF 130001 actif avec abrege, 130002 inactif) ; audience de
+# renvoi 2400401 de PROC_CABINET.sql. Rien n'est envoye a l'avocat : l'etat 2 est ce que le traitement d'envoi de RIG v2 exporte.
+
+# Refus : rien de coche (OPE_RESULTAT_RECHERCHE.cs:382, au mot pres). Jumeau accepte : bloc 9.
+geste: Agir Accepter
+valeur: Audience de renvoi = 2400401
+resultat: refuse
+message: Vous devez sélectionner une demande à traiter
+---
+# Refus : deux demandes cochees -- la V2 ouvre la ligne double-cliquee, une seule (message sans source V2). Jumeau accepte : bloc 13.
+geste: Agir Rejeter
+ids: 2600105,2600106
+valeur: Motif rejet = DIVERS
+resultat: refuse
+message: RIG v2 traite une demande de renvoi à la fois : cochez-en une seule.
+---
+# Refus : la demande n'est pas dans la base (message sans source V2). Jumeau accepte : bloc 9 (2600101 existe).
+geste: Agir Accepter
+ids: 2699999
+valeur: Audience de renvoi = 2400401
+resultat: refuse
+message: Demande de renvoi introuvable dans la base du greffe (2699999).
+---
+# Refus : un agent tient la demande (RPJCR_USER_EN_COURS, OPE_RESULTAT_RECHERCHE.cs:386-387, au mot pres). Jumeau accepte : bloc 9
+# (2600101, que personne ne tient).
+geste: Agir Accepter
+ids: 2600104
+valeur: Audience de renvoi = 2400401
+resultat: refuse
+message: Cette demande de renvoi est en cours de traitement par l'utilisateur agent.l16
+---
+# Refus : l'avocat du CNBF 130002 est inactif (Mandataire.cs:357-359 ; OPE_INFO_DEMANDE.cs:105, le saut de ligne en espace). Jumeau
+# accepte : bloc 9 (CNBF 130001, actif avec abrege).
+geste: Agir Accepter
+ids: 2600103
+valeur: Audience de renvoi = 2400401
+resultat: refuse
+message: Problème avec le CNBF : 130002. Impossible trouver de mandataire actif avec ce CNBF.
+---
+# Refus : l'audience initiale est a venir (OPE_INFO_DEMANDE.cs:458-460, au mot pres, le saut de ligne en espace). Jumeau accepte :
+# bloc 9 (audience initiale passee).
+geste: Agir Accepter
+ids: 2600102
+valeur: Audience de renvoi = 2400401
+resultat: refuse
+message: La date d'audience initiale est supérieure à la date du jour. Voulez ne pouvez pas traiter cette demande pour le moment.
+---
+# Refus : « Accepter » sans audience de renvoi (l. 482-485, au mot pres). Jumeau accepte : bloc 9.
+geste: Agir Accepter
+ids: 2600101
+resultat: refuse
+message: Vous devez sélectionner une audience de renvoi.
+---
+# Refus : une audience qui n'est pas dans la base (AudienceCabinet.GetAudienceCabinet rend null, l. 481-485). Jumeau accepte :
+# bloc 9 (2400401).
+geste: Agir Accepter
+ids: 2600101
+valeur: Audience de renvoi = 2699999
+resultat: refuse
+message: Vous devez sélectionner une audience de renvoi.
+---
+# Accepte : 2600101 sur l'audience 2400401 -- etat 2, decision A, l'agent, l'audience choisie, personne ne la tient (l. 488-494).
+# La demande passe dans les traitees (audience initiale dans le mois), renvoi accepte aujourd'hui.
+geste: Agir Accepter
+ids: 2600101
+valeur: Audience de renvoi = 2400401
+resultat: fait
+message: Renvoi accepté pour le rôle 2026F30001 : audience de renvoi n° 2400401 du 10/03/2099 à 09:00. La réponse à l'avocat part par le traitement d'envoi de RIG v2 vers Extelia, que la V3 n'appelle pas (envoi simulé).
+controle: SELECT RPJCR_ETAT + '|' + RPJCR_ETAT_TRAITEMENT_RIG + '|' + CONVERT(varchar(10), RPJCR_ID_AUDIENCE_CHOISIE) + '|' + RPJCR_USER_TRAITEMENT_RIG + '|' + COALESCE(RPJCR_USER_EN_COURS, 'personne') FROM v2.DEMAT_RPJC_REN WHERE RPJCR_ID_RPJCR = 2600101 => 2|A|2400401|banc.ecrans|personne
+controle: SELECT COUNT(*) FROM v2.DEMAT_RPJC_REN WHERE RPJCR_ID_RPJCR = 2600101 AND CONVERT(date, RPJCR_DATE_TRAITEMENT_RIG) = CONVERT(date, GETDATE()) => 1
+lignes:
+Rôle 2026F30001 · ALPHA SERVICES SARL c/ BETA INDUSTRIE SAS | ALPHA Irène · audience initiale du {J-2} | À traiter | AFaire | []
+Rôle 2026F30001 · ALPHA SERVICES SARL c/ BETA INDUSTRIE SAS | ALPHA Irène · audience initiale du {J-2} | À traiter | AFaire | []
+Rôle 2026F30001 · ALPHA SERVICES SARL c/ BETA INDUSTRIE SAS | ALPHA Irène · audience initiale du {J-2} · ouverte par agent.l16 | À traiter | EnCours | [0,1]
+Rôle 2026F30001 · ALPHA SERVICES SARL c/ BETA INDUSTRIE SAS | BETA Simon · audience initiale du {J-2} | À traiter | AFaire | []
+Rôle 2026F30001 · ALPHA SERVICES SARL c/ BETA INDUSTRIE SAS | ALPHA Irène · audience initiale du {J+3} | À traiter | AFaire | []
+Rôle 2026F30003 · GAMMA CONSEIL SARL | BETA Simon · audience initiale du {J+5} · ouverte par agent.s | À traiter | EnCours | [0,1]
+Rôle 2026F30002 | avocat non trouvé (CNBF 300099) · audience initiale du {J+12} · ouverte par agent.r | À traiter | EnCours | [0]
+Rôle 2026F30001 · ALPHA SERVICES SARL c/ BETA INDUSTRIE SAS | ALPHA Irène · audience initiale du {J+10} · renvoi demandé au {J+40} | À traiter | AFaire | []
+Rôle 2026F30001 · ALPHA SERVICES SARL c/ BETA INDUSTRIE SAS | ALPHA Irène · audience initiale du {M-6} · rejet Extelia du {J-20} | Rejets Extelia | EnAttente | [0,1,2,3]
+Rôle 2026F30001 · ALPHA SERVICES SARL c/ BETA INDUSTRIE SAS | ALPHA Irène · audience initiale du {J-2} · rejeté le {J-1} | Traitées | Rejetee | [0,1,2,3]
+Rôle 2026F30001 · ALPHA SERVICES SARL c/ BETA INDUSTRIE SAS | ALPHA Irène · audience initiale du {J-2} · renvoi accepté le {J+0} | Traitées | Validee | [0,1,2,3]
+Rôle 2026F30001 · ALPHA SERVICES SARL c/ BETA INDUSTRIE SAS | ALPHA Irène · audience initiale du {J-3} · renvoi accepté le {J-4} | Traitées | Validee | [0,1,2,3]
+Rôle 2026F30003 · GAMMA CONSEIL SARL | ALPHA Irène · audience initiale du {J+0} · rejeté le {J-2} · Motif sans date de prononcé | Traitées | Rejetee | [0,1,2,3]
+Rôle 2026F30001 · ALPHA SERVICES SARL c/ BETA INDUSTRIE SAS | ALPHA Irène · audience initiale du {M-1} · renvoi accepté le {J-40} | Traitées | Validee | [0,1,2,3]
+---
+# Refus : 2600101 n'est plus en attente (RPJCR_ETAT relu <> '1', OPE_RESULTAT_RECHERCHE.cs:251-258, au mot pres). Jumeau accepte :
+# bloc 9 (la meme, en attente).
+geste: Agir Accepter
+ids: 2600101
+valeur: Audience de renvoi = 2400401
+resultat: refuse
+message: Attention cette demande a déjà été traité, veuillez rafraîchir votre recherche.
+---
+# Refus : « Rejeter » sans motif (ult_MotifRejet MetierObligatoire, OPE_AUDIENCE.Designer.cs:101-102). Jumeau accepte : bloc 13.
+geste: Agir Rejeter
+ids: 2600105
+resultat: refuse
+message: « Motif rejet » est obligatoire.
+---
+# Refus : MISEDELIBERE impose la date de prononce (RPJCRMR_DATE_OBLIGATOIRE ; OPE_AUDIENCE.cs:59-66, Designer l. 136-137). Jumeaux
+# acceptes : bloc 13 (la meme, avec sa date) ; bloc 15 (DIVERS, sans date).
+geste: Agir Rejeter
+ids: 2600105
+valeur: Motif rejet = MISEDELIBERE
+resultat: refuse
+message: « Date de prononcé » est obligatoire.
+---
+# Accepte : 2600105 rejetee pour MISEDELIBERE, avec sa date de prononce et une observation (l. 518-531).
+geste: Agir Rejeter
+ids: 2600105
+valeur: Motif rejet = MISEDELIBERE
+valeur: Date de prononcé = 2026-11-20
+valeur: Observation rejet = Délibéré au 20/11
+resultat: fait
+message: Renvoi rejeté pour le rôle 2026F30001 (motif MISEDELIBERE). La réponse à l'avocat part par le traitement d'envoi de RIG v2 vers Extelia, que la V3 n'appelle pas (envoi simulé).
+controle: SELECT RPJCR_ETAT + '|' + RPJCR_ETAT_TRAITEMENT_RIG + '|' + RPJCR_CODE_REJET_RIG + '|' + CONVERT(varchar(10), RPJCR_DATE_PRONONCE_REJET_RIG, 23) + '|' + RPJCR_MOTIF_REJET_RIG + '|' + COALESCE(CONVERT(varchar(10), RPJCR_ID_AUDIENCE_CHOISIE), 'sans audience') FROM v2.DEMAT_RPJC_REN WHERE RPJCR_ID_RPJCR = 2600105 => 2|R|MISEDELIBERE|2026-11-20|Délibéré au 20/11|sans audience
+---
+# Refus : 2600107 est deja rejetee (l. 532-535, au mot pres). Jumeau accepte : bloc 15 (2600106, sans decision).
+geste: Agir Rejeter
+ids: 2600107
+valeur: Motif rejet = DIVERS
+resultat: refuse
+message: Vous n'avez modifié ni l'état ni l'audience choisie.
+---
+# Accepte : 2600106 rejetee pour DIVERS, qui n'impose pas de date : la date saisie n'est pas ecrite (l. 527-528), l'observation
+# vide s'ecrit NULL (DBObject.cs:165-166).
+geste: Agir Rejeter
+ids: 2600106
+valeur: Motif rejet = DIVERS
+valeur: Date de prononcé = 2026-11-21
+resultat: fait
+message: Renvoi rejeté pour le rôle 2026F30001 (motif DIVERS). La réponse à l'avocat part par le traitement d'envoi de RIG v2 vers Extelia, que la V3 n'appelle pas (envoi simulé).
+controle: SELECT COUNT(*) FROM v2.DEMAT_RPJC_REN WHERE RPJCR_ID_RPJCR = 2600106 AND RPJCR_ETAT = '2' AND RPJCR_ETAT_TRAITEMENT_RIG = 'R' AND RPJCR_CODE_REJET_RIG = 'DIVERS' AND RPJCR_DATE_PRONONCE_REJET_RIG IS NULL AND RPJCR_MOTIF_REJET_RIG IS NULL => 1

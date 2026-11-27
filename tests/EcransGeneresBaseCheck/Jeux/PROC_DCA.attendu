@@ -1,0 +1,28 @@
+# Les lignes de « Comptes annuels » (PROC_DCA) apres TOUS les jeux, dans l'ordre du lecteur (LecteurComptesAnnuels.cs : a faire,
+# commence, reclamation, clos ; la plus recente d'abord). PROC_DCA.sql n'ajoute AUCUNE demande DCA (ses dossiers servent aux gestes,
+# PROC_DCA.gestes) : ces lignes sont celles du banc (section 1a de Program.cs, les « BANC ») et des demandes DCA que PROC_DCA_INJ.sql
+# (« INJONCTION ») et PROC_DCA_RELANCE.sql (« RELANCE », « R1 », lots 1 et 8) posent, chacune a sa date relative du jeu (DATEADD(DAY, -n)).
+# Ecartees, et absentes ici : la supprimee (X) du banc et de PROC_DCA_INJ, la demande ROF du banc.
+RELANCE MU SAS · SIREN 511 000 412 | reçu le {J-1} | Guichet | AFaire | []
+INJONCTION KAPPA SAS · SIREN 511 000 310 | reçu le {J-1} | Guichet | AFaire | []
+INJONCTION BETA SAS · SIREN 511 000 302 | reçu le {J-1} | Guichet | AFaire | []
+Demande n° 26000000110 | reçu le {J-1} | Guichet | AFaire | []
+INJONCTION ALPHA SARL · SIREN 511 000 301 | Dépôt dématérialisé · reçu le {J-2} | Dématérialisé (INPI, CREFO) | AFaire | []
+ALPHA BANC SARL · SIREN 412 000 001 | reçu le {J-2} | Guichet | AFaire | []
+INJONCTION DELTA SAS · SIREN 511 000 304 | reçu le {J-3} | Guichet | AFaire | []
+INJONCTION ALPHA SARL · SIREN 511 000 301 | reçu le {J-31} | Guichet | AFaire | []
+R1 IOTA SAS · SIREN 518 005 509 | reçu le {J-2} | Guichet | EnCours | [0]
+RELANCE OMICRON SAS · SIREN 518 004 401 | reçu le {J-2} | Guichet | EnCours | [0]
+INJONCTION GAMMA SARL · SIREN 511 000 303 | reçu le {J-5} | Guichet | EnCours | [0]
+BETA BANC SAS · SIREN 412 000 002 | reçu le {J-5} | Guichet | EnCours | [0]
+IOTA BANC SARL · SIREN 412 000 009 | reçu le {J-6} · état « S » de l'ancien RIG | Guichet | EnCours | [0]
+INJONCTION ZETA SAS · SIREN 511 000 306 | réclamation du {J-14} | Guichet | EnAttente | [0,1,4]
+EPSILON BANC SARL · 2001 B 00005 | Flux CREFO · Exercice 2025 · réclamation du {J-12} | Dématérialisé (INPI, CREFO) | EnAttente | [0,1,4]
+RELANCE ZETA SAS · SIREN 511 000 406 | refusé le {J-5} | Guichet | Rejetee | [0,1,4]
+INJONCTION DELTA SAS · SIREN 511 000 304 | Dépôt dématérialisé · déposé le {J-8} | Dématérialisé (INPI, CREFO) | Validee | [0,1,2,3]
+DELTA BANC SAS · SIREN 412 000 004 | Flux INPI · Exercice 2025 clos le 31/12/2025 · déposé le {J-8} | Dématérialisé (INPI, CREFO) | Validee | [0,1,2,3]
+INJONCTION EPSILON SARL · SIREN 511 000 305 | déposé le {J-11} | Guichet | Validee | [0,1,3]
+INJONCTION ETA SARL · SIREN 511 000 307 | Dépôt dématérialisé · refusé le {J-30} | Dématérialisé (INPI, CREFO) | Rejetee | [0,1,4]
+GAMMA BANC SARL · SIREN 412 000 003 | Exercice clos le 31/12/2024 · déposé le {J-20} | Guichet | Validee | [0,1,3]
+ZETA BANC SAS · SIREN 412 000 006 | refusé le {J-40} | Guichet | Rejetee | [0,1,4]
+RELANCE ETA SARL · SIREN 511 000 407 | refusé le {J-90} | Guichet | Rejetee | [0,1,4]

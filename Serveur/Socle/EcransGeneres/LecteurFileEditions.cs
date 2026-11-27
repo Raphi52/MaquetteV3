@@ -49,7 +49,7 @@ internal sealed class LecteurFileEditions : ILecteurEcran
         SELECT TOP (@plafond) de.DMNED_ID_DMNED, de.DMNED_PHASE_TRAITEMENT, de.DMNED_LIBELLE_DOCUMENT, de.DMNED_LIBELLE_ERREUR,
                de.DMNED_DESIGNATION_DESTINATAIRE, de.DMNED_LOT, de.DMNED_DATE_CREATION,
                CASE WHEN de.DMNED_ID_EMAIL_ENVOYE IS NOT NULL OR (ISNULL(de.DMNED_MODE_ENVOI, 0) & 512) <> 0 THEN 1 ELSE 0 END AS ParCourriel,
-               de.DMNED_DATE_PRE_EMISSION, d.DMND_NUM_DEMANDE, s.NumeroGestion, e.Denomination,
+               de.DMNED_DATE_PRE_EMISSION, de.DMNED_NOMBRE_EXEMPLAIRE, d.DMND_NUM_DEMANDE, s.NumeroGestion, e.Denomination,
                (SELECT COUNT(*) FROM v2.DEMANDE_EDITION) AS Total
         FROM v2.DEMANDE_EDITION AS de
         LEFT JOIN v2.DEMANDE AS d ON d.DMND_ID_DMND = de.DMNED_ID_DMND
@@ -74,14 +74,22 @@ internal sealed class LecteurFileEditions : ILecteurEcran
             : FormeLigne.DateDe(r, "DMNED_DATE_CREATION");
         var quand = date is null ? null : etat == "Validee" ? $"émise le {FormeLigne.Date(date)}" : $"créée le {FormeLigne.Date(date)}";
         var erreur = phase.EndsWith('Z') ? $"en erreur : {FormeLigne.Texte(r, "DMNED_LIBELLE_ERREUR")}".TrimEnd(' ', ':') : null;
+        // Le nombre d'exemplaires : la colonne « Ex. » de la liste V2 (PoolEdition.cs:279, lu l. 1461, un negatif montre 0 l. 1505-1507),
+        // apres le destinataire comme dans la V2 ; « Imprimer » le reecrit (EcrivainFileEditions.cs, lot 16). Sans valeur : pas de mention.
+        var exemplaires = r["DMNED_NOMBRE_EXEMPLAIRE"] is DBNull ? (int?)null : Math.Max(0, Convert.ToInt32(r["DMNED_NOMBRE_EXEMPLAIRE"]));
         var precisions = FormeLigne.Joindre(FormeLigne.Texte(r, "DMNED_LIBELLE_DOCUMENT"),
-                                            destinataire.Length > 0 ? $"à {destinataire}" : null, quand,
+                                            destinataire.Length > 0 ? $"à {destinataire}" : null,
+                                            exemplaires is { } ex ? $"{ex} ex." : null, quand,
                                             lot.Length > 0 ? $"file « {lot} »" : null, erreur,
                                             Connue(phase) ? null : $"phase « {phase} » de l'ancien RIG");
         var demande = FormeLigne.Texte(r, "DMND_NUM_DEMANDE");
         var nom = FormeLigne.Joindre(FormeLigne.Texte(r, "Denomination"), FormeLigne.NumeroGestion(FormeLigne.Texte(r, "NumeroGestion")),
                                      demande.Length > 0 ? $"demande {demande}" : $"édition n° {FormeLigne.Texte(r, "DMNED_ID_DMNED")}");
-        return new LigneLue(nom, precisions, groupe, etat, faites);
+        // L'id : la demande d'edition (DMNED_ID_DMNED), que « Imprimer » vise (EcrivainFileEditions.cs, lot 16).
+        return new LigneLue(nom, precisions, groupe, etat, faites)
+        {
+            Id = Convert.ToInt32(r["DMNED_ID_DMNED"]).ToString(System.Globalization.CultureInfo.InvariantCulture),
+        };
     }
 
     /// <summary>La regle d'etat (en tete du fichier) : etat du descripteur et marches franchies, par phase.</summary>

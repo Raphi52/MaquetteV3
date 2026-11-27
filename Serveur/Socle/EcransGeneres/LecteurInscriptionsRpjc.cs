@@ -86,6 +86,10 @@ internal sealed class LecteurInscriptionsRpjc : ILecteurEcran
             FormeLigne.Texte(r, "RPJCI_TYPE_MAJ") == "M" ? "modification" : null,
             regle.Statut,
             FormeLigne.Texte(r, "RPJCI_ETAT") == "9" ? "réponse rejetée par Extelia" : null);
-        return new LigneLue(nom, precisions, structure ? AvecStructure : AvocatSeul, regle.Etat, regle.Faites);
+        // L'id : la demande (RPJCI_ID_RPJCI), que « Traiter la demande » et « Rejeter la demande » visent (EcrivainInscriptionsRpjc.cs, lot 16).
+        return new LigneLue(nom, precisions, structure ? AvecStructure : AvocatSeul, regle.Etat, regle.Faites)
+        {
+            Id = Convert.ToInt32(r["RPJCI_ID_RPJCI"], System.Globalization.CultureInfo.InvariantCulture).ToString(System.Globalization.CultureInfo.InvariantCulture),
+        };
     }
 }

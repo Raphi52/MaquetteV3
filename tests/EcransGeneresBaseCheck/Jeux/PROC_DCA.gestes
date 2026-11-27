@@ -1,0 +1,148 @@
+# Les gestes de EcrivainComptesAnnuels (« Comptes annuels », PROC_DCA : « Valider le dépôt » au guichet), joues dans l'ordre par la route
+# POST, sur les dossiers de PROC_DCA.sql. Format : en tete de tests/EcransGeneresBaseCheck/Program.cs (section 6). Un refus n'ecrit
+# rien (lignes et journal inchanges, verifie par le banc) ; chaque refus a son jumeau accepte : les blocs 11, 12 et 13, qui deposent.
+# Les dates d'arrivee sont fixes, comme celles de PROC_DAS.gestes (le format « valeur: » n'a pas de date relative au jour du banc) ;
+# celle du bloc 13, de janvier 2026, reste toujours a plus de trois mois du jour.
+# La liste n'est pas relue ici (« lignes: ») : elle porte aussi les demandes DCA du banc et des jeux PROC_DCA_* ; les controles relisent
+# ce que RIG v2 ecrit (ETP_EXERCICES.cs:365-615, DossierRCS.AddDCA). Les numeros d'arrivee RA1 suivent ceux des jeux joues avant
+# (PROC_DAS, PROC_DASBEN : le compteur du banc est partage).
+
+# 1. Sans date de cloture : aucun exercice choisi (ETP_EXERCICES.cs:274-277). Jumeau : bloc 11, le 31/12/2025.
+geste: Creer
+valeur: Dossier RCS › Numéro de gestion = 2001B26001
+resultat: refuse
+message: « Exercices › Date de clôture » est obligatoire.
+---
+# 2. Un numero qui ne designe aucun dossier RCS (etape etpRcs). Jumeau : bloc 11, le dossier 2001B26001.
+geste: Creer
+valeur: Dossier RCS › Numéro de gestion = 2001B26099
+valeur: Exercices › Date de clôture = 2025-12-31
+valeur: Exercices › Date d'arrivée = 2026-11-02
+resultat: refuse
+message: Aucun dossier RCS ne porte le numéro « 2001B26099 » dans la base du greffe.
+---
+# 3. Un exercice DEJA depose a la meme date, dont le dernier DCA n'etait pas confidentiel (ETP_EXERCICES.cs:161-180). Jumeau : bloc 12,
+#    GAMMA, dont le dernier DCA de la meme date etait a bilan confidentiel.
+geste: Creer
+valeur: Dossier RCS › Numéro de gestion = 2001B26002
+valeur: Exercices › Date de clôture = 2024-12-31
+valeur: Exercices › Date d'arrivée = 2026-11-02
+resultat: refuse
+message: Il existe un exercice déposé à la même date de clôture que l'exercice non déposé clos le 31/12/2024.
+controle: SELECT COUNT(*) FROM v2.EXERCICE WHERE EXRCC_ID_DSRCS = 2601002 => 1
+---
+# 4. Meme borne, autre cote : GAMMA a un dernier DCA confidentiel, mais le nouveau l'est aussi -- la duplication n'est permise que pour
+#    lever la confidentialite (aut_confidentiel, ETP_EXERCICES.cs:173). Jumeau : bloc 12, le meme dossier sans bilan confidentiel.
+geste: Creer
+valeur: Dossier RCS › Numéro de gestion = 2001B26003
+valeur: Exercices › Date de clôture = 2024-12-31
+valeur: Exercices › Date d'arrivée = 2026-11-02
+valeur: Exercices › Bilan confidentiel = true
+resultat: refuse
+message: Il existe un exercice déposé à la même date de clôture que l'exercice non déposé clos le 31/12/2024.
+---
+# 5. Un exercice sous injonction de deposer (relance IDCA de sa diligence, Exercice.Injonction) : RIG v2 y traite le retrait du role ou
+#    le depot hors delai (ETP_EXERCICES.cs:548-560). Jumeau : bloc 11, ALPHA, dont la diligence n'a pas d'injonction.
+geste: Creer
+valeur: Dossier RCS › Numéro de gestion = 2001B26004
+valeur: Exercices › Date de clôture = 2025-12-31
+valeur: Exercices › Date d'arrivée = 2026-11-02
+resultat: refuse
+message: L'exercice clos le 31/12/2025 est sous injonction de déposer : RIG v2 traite au dépôt le retrait du rôle ou le dépôt hors délai et sa facture, que la V3 ne reprend pas ; déposer dans RIG v2.
+controle: SELECT CONCAT(CONVERT(int, EXRCC_DEPOSE), '|', DLGRC_ETAT_DILIGENCE) FROM v2.EXERCICE JOIN v2.DILIGENCE_RCS ON DLGRC_ID_DLGRC = EXRCC_ID_DLGRC WHERE EXRCC_ID_EXRCC = 2601131 => 0|1
+---
+# 6. Sans date d'arrivee : le champ est obligatoire dans RIG v2 (ultDateArrivee, MetierObligatoire, OPE_ACTES.Designer.cs:104).
+#    Jumeau : bloc 11, arrivee le 02/11/2026.
+geste: Creer
+valeur: Dossier RCS › Numéro de gestion = 2001B26001
+valeur: Exercices › Date de clôture = 2025-12-31
+resultat: refuse
+message: « Exercices › Date d'arrivée » est obligatoire.
+---
+# 7. Une date d'arrivee apres le jour du geste (OPE_ACTES.cs:153-157, erreur bloquante). Jumeau : bloc 11, une date passee.
+geste: Creer
+valeur: Dossier RCS › Numéro de gestion = 2001B26001
+valeur: Exercices › Date de clôture = 2025-12-31
+valeur: Exercices › Date d'arrivée = 2099-12-31
+resultat: refuse
+message: La date d'arrivée doit être antérieure ou égale à la date du jour.
+---
+# 8. L'etape « Réclamation ou refus » remplie : dans RIG v2 elle ne sert qu'a une reclamation ou un refus (etpReclamRefus visible
+#    seulement en etat Reclamee, proc_dca.md:250), que la V3 n'ecrit pas ; le depot valide ne s'ecrit pas a sa place. Jumeau : bloc 11,
+#    l'etape vide.
+geste: Creer
+valeur: Dossier RCS › Numéro de gestion = 2001B26001
+valeur: Exercices › Date de clôture = 2025-12-31
+valeur: Exercices › Date d'arrivée = 2026-11-02
+valeur: Réclamation ou refus › Motif = Comptes non approuvés
+resultat: refuse
+message: « Réclamation ou refus » est rempli : la réclamation et le refus d'un dépôt de comptes ne sont pas repris par la V3, à faire dans RIG v2 ; « Valider le dépôt » n'enregistre qu'un dépôt accepté.
+controle: SELECT CONCAT(CONVERT(int, EXRCC_DEPOSE), '|', ISNULL(CONVERT(varchar(10), EXRCC_ID_DMND_RECLA), 'NULL')) FROM v2.EXERCICE WHERE EXRCC_ID_EXRCC = 2601101 => 0|NULL
+---
+# 9. L'etape « Pièces jointes » remplie : elle ne sert qu'au depot dematerialise (verification des pieces DCADEMAT, proc_dca.md:432),
+#    que la V3 ne reprend pas ; au guichet, les pieces deposees suivent les cases de confidentialite. Jumeau : bloc 11, l'etape vide.
+geste: Creer
+valeur: Dossier RCS › Numéro de gestion = 2001B26001
+valeur: Exercices › Date de clôture = 2025-12-31
+valeur: Exercices › Date d'arrivée = 2026-11-02
+valeur: Pièces jointes › Bilan = bilan-2025.pdf
+resultat: refuse
+message: « Pièces jointes » est rempli : les pièces jointes ne servent qu'au dépôt dématérialisé (INPI, CREFO), que la V3 ne reprend pas ; au guichet, les pièces déposées suivent les cases de confidentialité.
+---
+# 10. Un champ que l'ecrivain ne lit pas (ici « Exercice », l'ancien libelle de la grille V2 : l'exercice se designe par sa date de
+#    cloture) : le depot ne s'ecrit pas en l'ignorant, jamais un faux succes. Jumeau : bloc 11, les memes saisies sans ce champ.
+geste: Creer
+valeur: Dossier RCS › Numéro de gestion = 2001B26001
+valeur: Exercices › Date de clôture = 2025-12-31
+valeur: Exercices › Date d'arrivée = 2026-11-02
+valeur: Exercices › Exercice = 2025
+resultat: refuse
+message: « Exercices › Exercice » n'est pas lu par « Valider le dépôt » de la V3 : le dépôt l'ignorerait, rien n'est enregistré.
+controle: SELECT CONCAT(CONVERT(int, EXRCC_DEPOSE), '|', ISNULL(CONVERT(varchar(10), EXRCC_ID_DMND_RECLA), 'NULL')) FROM v2.EXERCICE WHERE EXRCC_ID_EXRCC = 2601101 => 0|NULL
+---
+# 11. Accepte : ALPHA, l'exercice non depose du 31/12/2025, resultat confidentiel. L'exercice passe depose, limites d'AGO (+ 6 mois, pas
+#    d'inscrit PM a delai variable) et de depot (+ 8 mois) au dernier jour du mois ; depot RDC categorie B (B1), saisie simplifiee, etat
+#    VAX 0101, lie a l'exercice, resultat confidentiel ; il annule l'ancien DCA 2025B26301, qui le remplace ; pieces BILA, CONFI, RESUL ;
+#    evenement DCA ; action DCA validee ; demande DCA validee ; la diligence est close regularisee. L'exercice du 31/01/2026, non depose
+#    a moins de 60 jours, est signale (ETP_EXERCICES.cs:187-195).
+geste: Creer
+valeur: Dossier RCS › Numéro de gestion = 2001B26001
+valeur: Exercices › Date de clôture = 2025-12-31
+valeur: Exercices › Date d'arrivée = 2026-11-02
+valeur: Exercices › Résultat confidentiel = true
+resultat: fait
+message: Dépôt des comptes annuels 2026C000001 enregistré dans la base du greffe pour DCA26 ALPHA SARL (2001 B 26001), exercice clos le 31/12/2025, arrivée 2026000007 ; la facture, les éditions et l'annonce BODACC ne sont pas reprises par la V3. Attention : Il existe un exercice non déposé à +/- 2 mois (31/01/2026)
+controle: SELECT CONCAT(CONVERT(int, EXRCC_DEPOSE), '|', CONVERT(varchar(8), EXRCC_DATE_LIMITE_AGO, 112), '|', CONVERT(varchar(8), EXRCC_LIMITE_DEPOT, 112), '|', ISNULL(CONVERT(varchar(10), EXRCC_ID_DMND_RECLA), 'NULL')) FROM v2.EXERCICE WHERE EXRCC_ID_EXRCC = 2601101 => 1|20260630|20260831|NULL
+controle: SELECT CONCAT(p.DPTRC_CATEGORIE_DEPOT, '|', CONVERT(int, p.DPTRC_ENVOI_INPI), '|', CONVERT(int, p.DPTRC_SAISIE_SIMPLIFIEE), '|', p.DPTRC_ETAT_VAX, '|', p.DPTRC_ID_EXRCC, '|', CONVERT(int, p.DPTRC_DIFFUSABILITE_CONFIDENTIELLE), CONVERT(int, p.DPTRC_RESULTAT_CONFIDENTIEL), '|', p.DPTRC_NUM_DEPOT_ANNULE) FROM v2.DEPOT_RCS AS p WHERE p.DPTRC_NUM_DEPOT = '2026C000001' => B|0|1|0101|2601101|01|2025B26301
+controle: SELECT DPTRC_NUM_DEPOT_REMPLACE FROM v2.DEPOT_RCS WHERE DPTRC_ID_DPTRC = 2601301 => 2026C000001
+controle: SELECT CONVERT(varchar(8), a.DateArrivee, 112) FROM v2.DEPOT_RCS AS p JOIN rec.ActionRegistre AS a ON a.IdDepot = p.DPTRC_ID_DPTRC WHERE p.DPTRC_NUM_DEPOT = '2026C000001' => 20261102
+controle: SELECT STRING_AGG(CONCAT(ad.ACTDP_ABREGE_PIECE, ad.ACTDP_NUM_ORDRE, ':', CONVERT(int, ad.ACTDP_COMMANDABLE)), ',') WITHIN GROUP (ORDER BY ad.ACTDP_NUM_ORDRE, ad.ACTDP_ID_ACDPS) FROM v2.ACTE_DEPOSE AS ad JOIN v2.DEPOT_RCS AS p ON p.DPTRC_ID_DPTRC = ad.ACTDP_ID_DPTRC WHERE p.DPTRC_NUM_DEPOT = '2026C000001' => BILA1:1,CONFI2:1,RESUL3:0
+controle: SELECT CONCAT(a.CodeProcessus, a.EtatAction, a.EtatInfo, '|', a.IdDossier, '|', e.EVNRC_CODE_EVENEMENT_RCS, '|', d.DMND_CODE_PROSS, d.DMND_ETAT_DEMANDE, '|', d.DMND_LES_NUMEROS) FROM v2.DEPOT_RCS AS p JOIN rec.ActionRegistre AS a ON a.IdDepot = p.DPTRC_ID_DPTRC JOIN v2.EVENEMENT_RCS AS e ON e.EVNRC_ID_ACTRC = a.Id JOIN v2.DEMANDE AS d ON d.DMND_ID_ACTRC = a.Id WHERE p.DPTRC_NUM_DEPOT = '2026C000001' => DCA22|2601001|DCA|DCAV|2026C000001
+controle: SELECT CONCAT(DLGRC_ETAT_DILIGENCE, '|', CASE WHEN DLGRC_DATE_REGULARISATION IS NULL THEN 'non' ELSE 'oui' END) FROM v2.DILIGENCE_RCS WHERE DLGRC_ID_DLGRC = 2601201 => 9|oui
+controle: SELECT COUNT(*) FROM soc.Journal WHERE Ecran = 'Comptes annuels' AND Famille = 'dossier' AND Objet = 'l''exercice clos le 31/12/2025 du dossier 2001 B 26001' AND Verbe = 'a modifie' => 1
+---
+# 12. Accepte : GAMMA, le 31/12/2024 sans confidentialite -- son dernier DCA de cette date etait a bilan confidentiel : la duplication est
+#    permise (ETP_EXERCICES.cs:173). Un exercice NEUF de la meme date (la ligne vide de la grille, PROC_DCA.cs:837) : type 2 (le dossier
+#    en a deja un), ordre 1, etat DCA 00, etat info 1 ; rien a annuler (l'exercice neuf n'a pas de DCA) ; la seule piece BILA.
+geste: Creer
+valeur: Dossier RCS › Numéro de gestion = 2001B26003
+valeur: Exercices › Date de clôture = 2024-12-31
+valeur: Exercices › Date d'arrivée = 2026-11-03
+valeur: Exercices › Bilan confidentiel = false
+resultat: fait
+message: Dépôt des comptes annuels 2026C000002 enregistré dans la base du greffe pour DCA26 GAMMA SAS (2001 B 26003), exercice clos le 31/12/2024, arrivée 2026000008 ; la facture, les éditions et l'annonce BODACC ne sont pas reprises par la V3.
+controle: SELECT CONCAT(x.EXRCC_TYPE_EXERCICE, '|', x.EXRCC_NUM_ORDRE, '|', CONVERT(int, x.EXRCC_DEPOSE), '|', x.EXRCC_ETAT_DCA, x.EXRCC_ETAT_INFO, '|', CONVERT(varchar(8), x.EXRCC_DATE_LIMITE_AGO, 112), '|', CONVERT(varchar(8), x.EXRCC_LIMITE_DEPOT, 112), '|', ISNULL(p.DPTRC_NUM_DEPOT_ANNULE, 'aucun')) FROM v2.DEPOT_RCS AS p JOIN v2.EXERCICE AS x ON x.EXRCC_ID_EXRCC = p.DPTRC_ID_EXRCC WHERE p.DPTRC_NUM_DEPOT = '2026C000002' => 2|1|1|001|20250630|20250831|aucun
+controle: SELECT COUNT(*) FROM v2.EXERCICE WHERE EXRCC_ID_DSRCS = 2601003 AND EXRCC_DATE_CLOTURE = '20241231' => 2
+controle: SELECT STRING_AGG(CONCAT(ad.ACTDP_ABREGE_PIECE, ad.ACTDP_NUM_ORDRE), ',') FROM v2.ACTE_DEPOSE AS ad JOIN v2.DEPOT_RCS AS p ON p.DPTRC_ID_DPTRC = ad.ACTDP_ID_DPTRC WHERE p.DPTRC_NUM_DEPOT = '2026C000002' => BILA1
+controle: SELECT COUNT(*) FROM soc.Journal WHERE Ecran = 'Comptes annuels' AND Objet = 'l''exercice clos le 31/12/2024 du dossier 2001 B 26003' AND Verbe = 'a cree' => 1
+---
+# 13. Accepte : EPSILON, sans exercice : un exercice neuf de type 1 (le premier du dossier, regle 01EREXE) ; delai de tenue de l'AGO de
+#    9 mois, sa forme juridique ayant le delai variable (InscritPM.GetDelaiTenueAgo) : AGO au 31/03/2026, depot au 31/05/2026.
+#    L'arrivee du 15/01/2026, a plus de trois mois du jour, est signalee sans bloquer (OPE_ACTES.cs:159-163, avertissement).
+geste: Creer
+valeur: Dossier RCS › Numéro de gestion = 2001B26005
+valeur: Exercices › Date de clôture = 2025-06-30
+valeur: Exercices › Date d'arrivée = 2026-01-15
+resultat: fait
+message: Dépôt des comptes annuels 2026C000003 enregistré dans la base du greffe pour DCA26 EPSILON SAS (2001 B 26005), exercice clos le 30/06/2025, arrivée 2026000009 ; la facture, les éditions et l'annonce BODACC ne sont pas reprises par la V3. Attention : Veuillez contrôler la date d'arrivée qui semble erronée.
+controle: SELECT CONCAT(x.EXRCC_TYPE_EXERCICE, '|', x.EXRCC_NUM_ORDRE, '|', CONVERT(int, x.EXRCC_DEPOSE), '|', x.EXRCC_ETAT_DCA, x.EXRCC_ETAT_INFO, '|', CONVERT(varchar(8), x.EXRCC_DATE_LIMITE_AGO, 112), '|', CONVERT(varchar(8), x.EXRCC_LIMITE_DEPOT, 112)) FROM v2.DEPOT_RCS AS p JOIN v2.EXERCICE AS x ON x.EXRCC_ID_EXRCC = p.DPTRC_ID_EXRCC WHERE p.DPTRC_NUM_DEPOT = '2026C000003' => 1|1|1|001|20260331|20260531

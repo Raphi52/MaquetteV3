@@ -106,7 +106,23 @@ internal static class DepotsRcsV2
     /// <summary>Ce qu'un depot valide ecrit (ETP_DEPOT.cs:343-455, PROC_DASBEN.cs:1034-1077).</summary>
     internal sealed record DepotSaisi(string CodeProcessus, EntiteRcs Entite, DateTime DateArrivee, DateTime DateDepot,
         string Categorie, string Serie, bool EnvoiInpi, bool Gratuit, bool SaisieSimplifiee, string? EtatVax,
-        string CodeEvenement, DateTime? DateEffet, string? TexteEvenement, string Piece, DateTime DateActe, string? DescriptionActe);
+        string CodeEvenement, DateTime? DateEffet, string? TexteEvenement, string Piece, DateTime? DateActe, string? DescriptionActe)
+    {
+        /// <summary>Les colonnes du depot qu'un depot de comptes annuels ecrit en plus (exercice, confidentialite :
+        /// ActionRcs.AddDepotRcs, ActionRcs.cs:220-245 -- EcrivainComptesAnnuels.cs) ; aucune pour un depot d'actes.</summary>
+        public IReadOnlyDictionary<string, object?>? DepotEnPlus { get; init; }
+
+        /// <summary>Les pieces deposees, dans l'ordre, a la place de la seule <see cref="Piece"/> : celles d'un depot de comptes
+        /// annuels (BILA, CONFI, RESUL : DossierRCS.AddDCA, DossierRCS.cs:243-258). Null : la piece saisie, ordre 1.</summary>
+        public IReadOnlyList<PieceDeposee>? Pieces { get; init; }
+    }
+
+    // fix-ok: extension, pas un correctif -- le depot de comptes annuels de RIG v2 (DossierRCS.AddDCA, DossierRCS.cs:205-258 ;
+    // ActionRcs.AddDepotRcs, ActionRcs.cs:189-245) lie le depot a l'exercice, porte sa confidentialite et 1 a 3 pieces sans date ;
+    // DepotSaisi n'avait qu'une piece datee. Les depots d'actes (DAS, DASBEN) gardent exactement leur ecriture (Pieces et
+    // DepotEnPlus nuls). Lot 16 du plan « RIG v3 100 % fonctionnel », 27/11/2026.
+    /// <summary>Une piece deposee sans date ni description (DepotRcs.AddActeDepose, DepotRcs.cs:100-108) : abrege, ordre, commandable.</summary>
+    internal sealed record PieceDeposee(string Abrege, int Ordre, bool Commandable);
 
     /// <summary>Le depot ecrit : ses numeros et sa demande.</summary>
     internal sealed record DepotEcrit(int IdDepot, string NumeroDepot, string NumeroArrivee, int IdDemande);
@@ -134,6 +150,7 @@ internal static class DepotsRcsV2
             ["DPTRC_SAISIE_SIMPLIFIEE"] = s.SaisieSimplifiee, ["DPTRC_ETAT_INFO"] = "1",
         };
         if (s.EtatVax is not null) colonnesDepot["DPTRC_ETAT_VAX"] = s.EtatVax;
+        foreach (var (colonne, valeur) in s.DepotEnPlus ?? new Dictionary<string, object?>()) colonnesDepot[colonne] = valeur;
         var depot = await InsererAsync(geste, "v2.DEPOT_RCS", "DPTRC_ID_DPTRC", colonnesDepot, ct);
         var action = await geste.InsererAsync("rec.ActionRegistre", "Id", new Dictionary<string, object?>
         {
@@ -147,11 +164,20 @@ internal static class DepotsRcsV2
             ["EVNRC_DATE_EFFET"] = s.DateEffet, ["EVNRC_OBJET_DEPOT"] = true,
             ["EVNRC_TEXTE_EVENEMENT"] = string.IsNullOrWhiteSpace(s.TexteEvenement) ? null : s.TexteEvenement,
         }, ct);
-        await InsererAsync(geste, "v2.ACTE_DEPOSE", "ACTDP_ID_ACDPS", new Dictionary<string, object?>
-        {
-            ["ACTDP_ID_DPTRC"] = depot, ["ACTDP_NUM_ORDRE"] = 1, ["ACTDP_ABREGE_PIECE"] = s.Piece, ["ACTDP_DATE"] = s.DateActe,
-            ["ACTDP_DESCRIPTION"] = string.IsNullOrWhiteSpace(s.DescriptionActe) ? null : s.DescriptionActe,
-        }, ct);
+        if (s.Pieces is null)
+            await InsererAsync(geste, "v2.ACTE_DEPOSE", "ACTDP_ID_ACDPS", new Dictionary<string, object?>
+            {
+                ["ACTDP_ID_DPTRC"] = depot, ["ACTDP_NUM_ORDRE"] = 1, ["ACTDP_ABREGE_PIECE"] = s.Piece, ["ACTDP_DATE"] = s.DateActe,
+                ["ACTDP_DESCRIPTION"] = string.IsNullOrWhiteSpace(s.DescriptionActe) ? null : s.DescriptionActe,
+            }, ct);
+        else
+            // AddActeDepose (DepotRcs.cs:100-108) : nombre « 1 », commandable selon l'abrege, etat INPI « 1 » (DEFAULT de CreationV2).
+            foreach (var p in s.Pieces)
+                await InsererAsync(geste, "v2.ACTE_DEPOSE", "ACTDP_ID_ACDPS", new Dictionary<string, object?>
+                {
+                    ["ACTDP_ID_DPTRC"] = depot, ["ACTDP_NUM_ORDRE"] = p.Ordre, ["ACTDP_ABREGE_PIECE"] = p.Abrege, ["ACTDP_NOMBRE"] = "1",
+                    ["ACTDP_COMMANDABLE"] = p.Commandable,
+                }, ct);
         await geste.EcrireAsync("""
             UPDATE v2.DEMANDE SET DMND_NOM = LEFT(@nom, 255), DMND_NUM_INDICATIF = LEFT(@indicatif, 14), DMND_LES_NUMEROS = @numero,
                    DMND_ID_ACTRC = @action, DMND_ID_DSRCS = @dossier, DMND_ID_AUTRE = @autre

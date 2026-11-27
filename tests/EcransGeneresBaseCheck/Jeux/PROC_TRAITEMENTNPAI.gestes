@@ -1,0 +1,35 @@
+# « Courriers revenus NPAI » (EcrivainCourriersNpai) : « Annuler » l'action NPAI restee qualifiee, comme le bouton btAnnule de la V2
+# (FrmProcTraitementNpai.cs:1101-1107 : X, DMND_EN_COURS faux). Lignes du jeu : PROC_TRAITEMENTNPAI.sql et .attendu -- 200313 action
+# ouverte (Q), 200316 etat « A », 200312 traitee (V).
+
+# Refus : rien de coche. Jumeau accepte : bloc 4.
+geste: Agir Annuler
+resultat: refuse
+message: Aucun courrier coché : rien n'est annulé.
+---
+# Refus : 200312 est deja validee ; la V2 n'annule que l'action ouverte (_Quitter teste « Q », l. 261). Jumeau accepte : bloc 4 (Q).
+geste: Agir Annuler
+ids: 200312
+resultat: refuse
+message: La demande n° 26000200312 est déjà traitée : RIG v2 n'annule que l'action en cours.
+---
+# Refus : 200316 est dans un autre etat de l'ancien RIG (« A ») ; le refus vise tout le lot coche, 200313 n'est pas annulee. Jumeau
+# accepte : bloc 4.
+geste: Agir Annuler
+ids: 200313,200316
+resultat: refuse
+message: La demande n° 26000200316 n'est pas une action en cours (état « A » de l'ancien RIG) : RIG v2 n'annule que l'action qualifiée.
+---
+# Annulation acceptee : 200313 passe en X, plus en cours ; le lecteur ne lit pas les X, la ligne quitte la liste.
+geste: Agir Annuler
+ids: 200313
+resultat: fait
+message: Action NPAI annulée : la demande n° 26000200313 passe à « supprimée », comme le bouton « Annuler » de RIG v2.
+lignes:
+NPAI - MOF - SANS DOSSIER | Mention d'Office de cessation · commencé le {J-4} · demande n° 26000200316 · état « A » de l'ancien RIG | Formalités | EnCours | [0]
+NPAI BETA SAS · 2020 B 30302 | Enregistrement du NPAI · traité le {J-2} · demande n° 26000200312 | Relances de comptes annuels | Validee | [0,1,2]
+NPAI GAMMA SARL · 2020 B 30303 | Lettre simple aux dirigeants · courrier d'origine : Surveillances des dépôts de comptes annuels · traité le {J-3} · demande n° 26000200318 | Relances de comptes annuels | Validee | [0,1,2,3]
+NPAI ETA SARL · 2020 B 30307 | Lettre simple aux dirigeants · courrier d'origine : Surveillances des dépôts de comptes annuels · traité le {J-6} · demande n° 26000200317 | Relances de comptes annuels | Validee | [0,1,2,3]
+NPAI ALPHA SARL · 2020 B 30301 | LRAR au siège de la société · courrier d'origine : Surveillance SCI sans Associés · traité le {J-10} · demande n° 26000200311 | Formalités | Validee | [0,1,2,3]
+controle: SELECT DMND_ETAT_DEMANDE + '/' + CONVERT(varchar(1), CONVERT(int, DMND_EN_COURS)) FROM v2.DEMANDE WHERE DMND_ID_DMND = 200313 => X/0
+controle: SELECT COUNT(*) FROM soc.Journal WHERE Ecran = 'Courriers revenus NPAI' AND Famille = 'demande' AND Objet = 'la demande NPAI n° 26000200313' AND Verbe = 'a modifie' => 1

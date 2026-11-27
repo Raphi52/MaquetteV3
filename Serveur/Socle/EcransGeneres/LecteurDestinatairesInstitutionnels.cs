@@ -86,6 +86,13 @@ internal sealed class LecteurDestinatairesInstitutionnels : ILecteurEcran
             adresse.Length == 0 ? "adresse à compléter" : null,
             courriel.Length > 0 ? "courriel" : null,
             coffre.Length > 0 ? (depuis.Length > 0 ? $"coffre-fort {coffre} depuis le {depuis}" : $"coffre-fort {coffre}") : null);
-        return new LigneLue(nom.Length > 0 ? nom : code, precisions, groupe, etat, faites);
+        // L'id et les cellules de la grille (plan « RIG v3 100 % fonctionnel », lot 16) : le code, cle de la V2 (DTINS_CODE), et
+        // les colonnes du descripteur dans leur ordre -- Nom, Code, Type, Adresse, Adresse courriel -- que la grille ouvre en
+        // modification et que l'ecrivain (EcrivainDestinatairesInstitutionnels.cs) relit par leur libelle.
+        return new LigneLue(nom.Length > 0 ? nom : code, precisions, groupe, etat, faites)
+        {
+            Id = code,
+            Valeurs = [nom, code, type, adresse, courriel],
+        };
     }
 }

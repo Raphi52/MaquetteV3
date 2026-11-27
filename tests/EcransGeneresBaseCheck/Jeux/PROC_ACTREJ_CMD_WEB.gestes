@@ -1,46 +1,38 @@
-# « Actes web non transmis » (EcrivainActesWebNonTransmis) : « Annuler » la commande web d'UN acte, comme _tsmiAnnuler_Click de la
-# V2 (OPE_RESULTATS.cs:84-117) : ACTDP_CMDWEB_FLUX_ID = NULL, l'acte sort de la liste. Le flux de la commande dans la base EDI du
-# greffe (hors de la V3) n'est pas appele : simule, le message le dit. Lignes du jeu : PROC_ACTREJ_CMD_WEB.sql et .attendu --
-# 200111 (ALPHA, flux 5001) et 200112 (BETA, flux 5002) a transmettre, 200113 deja dans la GED, 200114 sans commande web.
+# « Actes web non transmis » (EcrivainActesWebNonTransmis) : « Annuler » la commande web d'UN acte, comme _tsmiAnnuler_Click de la V2
+# (OPE_RESULTATS.cs:84-117) : ACTDP_CMDWEB_FLUX_ID = NULL. Le flux EDI (base EDI du greffe, hors V3) n'est pas annulé : le message le
+# dit. Lignes du jeu : PROC_ACTREJ_CMD_WEB.sql et .attendu -- 200111 et 200112 attendent leur commande ; 200113 est déjà dans la GED.
 
-# Refus : rien de coche. Jumeau accepte : dernier bloc.
+# Refus : rien de coché (la V2 exige une seule ligne, l. 85). Jumeau accepté : bloc 4.
 geste: Agir Annuler
 resultat: refuse
-message: Aucun acte coché : rien n'est annulé.
+message: « Annuler » ne vise qu'une commande à la fois : cochez un seul acte, comme RIG v2 (une seule ligne choisie).
 ---
-# Refus : deux actes ; la V2 ne fait rien sur plusieurs lignes (« SelectedRows.Count != 1 », l. 85 ; message sans source V2).
-# Jumeau accepte : dernier bloc, une seule ligne.
+# Refus : deux actes cochés ; aucun n'est annulé. Jumeau accepté : bloc 4 (un seul acte).
 geste: Agir Annuler
 ids: 200111,200112
 resultat: refuse
-message: « Annuler » ne vaut que pour UN acte à la fois, comme dans RIG v2 : cochez une seule ligne.
+message: « Annuler » ne vise qu'une commande à la fois : cochez un seul acte, comme RIG v2 (une seule ligne choisie).
+controle: SELECT COUNT(*) FROM v2.ACTE_DEPOSE WHERE ACTDP_ID_ACDPS IN (200111, 200112) AND ACTDP_CMDWEB_FLUX_ID IS NOT NULL => 2
 ---
-# Refus : 200114 n'a pas de commande web (hors de la liste de la V2, _SqlBase). Jumeau accepte : dernier bloc (200112, commande posee).
-geste: Agir Annuler
-ids: 200114
-resultat: refuse
-message: L'acte 200114 du dépôt W200123 n'a plus de commande web : elle est déjà annulée.
----
-# Refus : 200113 est deja range dans la GED (GUID pose, hors de la liste). Jumeau accepte : dernier bloc (200112, meme depot, hors GED).
+# Refus : 200113 est déjà rangé dans la GED (GUID posé) : il n'est pas dans la liste. Jumeau accepté : bloc 4 (200112, même dépôt,
+# hors GED).
 geste: Agir Annuler
 ids: 200113
 resultat: refuse
-message: L'acte 200113 du dépôt W200122 est déjà rangé dans la GED : sa commande web n'est plus en attente.
-controle: SELECT ACTDP_CMDWEB_FLUX_ID FROM v2.ACTE_DEPOSE WHERE ACTDP_ID_ACDPS = 200113 => 5003
+message: L'acte 200113 n'attend plus de commande web : il est déjà rangé dans la GED, ou sa commande est annulée.
 ---
-# Refus : un acte introuvable. Jumeau accepte : dernier bloc.
-geste: Agir Annuler
-ids: 2699999
-resultat: refuse
-message: Acte introuvable dans la base du greffe (2699999).
----
-# Annulation de la commande de 200112 : la commande quitte l'acte, l'acte quitte la liste relue ; 200111 y reste. La base EDI n'est
-# pas appelee (simule, dit par le message et la trace).
+# Accepté : la commande de 200112 est annulée (flux NULL) ; l'acte quitte la liste relue, 200111 reste.
 geste: Agir Annuler
 ids: 200112
 resultat: fait
-message: Commande web de l'acte du dépôt W200122 annulée : l'acte sort de la liste. Simulé : le flux 5002 n'est pas annulé dans la base EDI du greffe (hors de la V3, non appelée) ; RIG v2 y écrit « Annulé ».
+message: Commande web de l'acte du dépôt W200122 annulée : l'acte quitte la liste. Le flux EDI n° 5002 (base EDI du greffe, hors de la V3) n'est pas annulé d'ici.
 lignes:
 ACTES WEB ALPHA SARL · 2020 B 10101 | Dépôt W200121 · Statuts mis à jour · SIREN 512 000 101 · commande du {J+0} | Commandes du jour | AFaire | []
-controle: SELECT COUNT(*) FROM v2.ACTE_DEPOSE WHERE ACTDP_ID_ACDPS = 200112 AND ACTDP_CMDWEB_FLUX_ID IS NULL AND ACTDP_GUID_VIDIGED IS NULL => 1
-controle: SELECT COUNT(*) FROM soc.Journal WHERE Ecran = 'Actes web non transmis' AND Famille = 'dossier' AND Objet = 'l''acte déposé 200112 du dépôt W200122' AND Verbe = 'a modifie' => 1
+controle: SELECT COUNT(*) FROM v2.ACTE_DEPOSE WHERE ACTDP_ID_ACDPS = 200112 AND ACTDP_CMDWEB_FLUX_ID IS NULL => 1
+controle: SELECT COUNT(*) FROM soc.Journal WHERE Ecran = 'Actes web non transmis' AND Famille = 'dossier' AND Objet = 'l''acte déposé 200112 du dépôt W200122 (2020 B 10102)' AND Verbe = 'a modifie' => 1
+---
+# Refus : 200112 vient d'être annulé : il n'attend plus de commande. Jumeau accepté : bloc 4, le même acte avant l'annulation.
+geste: Agir Annuler
+ids: 200112
+resultat: refuse
+message: L'acte 200112 n'attend plus de commande web : il est déjà rangé dans la GED, ou sa commande est annulée.

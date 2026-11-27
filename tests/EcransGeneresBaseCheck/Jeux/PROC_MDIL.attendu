@@ -5,9 +5,9 @@
 # n'a pas enregistre la diligence.
 MDIL BETA SAS · SIREN 513 130 002 | Dossier RCS 2027 B 13002 · Injonction modification A principal · En cours du banc lot 3 · non relancée | Sans relance | AFaire | []
 MDIL ALPHA SARL · SIREN 513 130 001 | Dossier RCS 2027 B 13001 · Alerte immatriculation A principale · En cours du banc lot 3 · 2 relances | Avec relance | AFaire | []
-# Les 67 lignes suivantes sont les diligences des autres jeux, que MDIL lit aussi (aucun filtre de nature ni d'etat dans la V2) :
+# Les 69 lignes suivantes sont les diligences des autres jeux, que MDIL lit aussi (aucun filtre de nature ni d'etat dans la V2) :
 # PROC_DCA_RELANCE (RELANCE ..., dont les 4 jumeaux du lot 8 : RELANCE SIGMA a OMICRON), PROC_DCA_INJ (INJONCTION ...), PROC_DBE_RELANCE (BENEF ...), PROC_DBE_INJ (ENJOINDRE ...),
-# PROC_GCONV (CONVOC SANS RETOUR SA, la diligence 1706702 du KBIS de la citation, lot 7) et
+# PROC_GCONV (CONVOC SANS RETOUR SA, la diligence 1706702 du KBIS de la citation, lot 7), PROC_DCA (DCA26 ..., lot 16) et
 # Program.cs (BANC ROF ..., radiations d'office). Un jeu qui ajoute des diligences ajoute ses lignes ici. Lot 8 (injonctions) :
 # les diligences SDCA des dossiers a enjoindre (INJ ALPHA a DELTA, PROC_DCA_RELANCE.sql) et la diligence SDBE de ENJOINDRE SANS
 # GERANT (PROC_DBE_INJ.sql).
@@ -74,6 +74,9 @@ ENJOINDRE DELTA SAS · SIREN 511 000 104 | Dossier RCS 2018 B 00104 · SDBE · 2
 ENJOINDRE GAMMA SARL · SIREN 511 000 103 | Dossier RCS 2018 B 00103 · SDBE · 2 relances | Avec relance | AFaire | []
 ENJOINDRE BETA SAS · SIREN 511 000 102 | Dossier RCS 2018 B 00102 · SDBE · 1 relance | Avec relance | AFaire | []
 ENJOINDRE ALPHA SARL · SIREN 511 000 101 | Dossier RCS 2018 B 00101 · SDBE · 1 relance | Avec relance | AFaire | []
+# Lot 16 (PROC_DCA.sql, « Comptes annuels ») : les diligences SDCA de DCA26 DELTA (sous injonction) et DCA26 ALPHA.
+DCA26 DELTA SARL · SIREN 526 010 004 | Dossier RCS 2001 B 26004 · SDCA · 1 relance | Avec relance | AFaire | []
+DCA26 ALPHA SARL · SIREN 526 010 001 | Dossier RCS 2001 B 26001 · SDCA · non relancée | Sans relance | AFaire | []
 CONVOC SANS RETOUR SA · SIREN 517 067 310 | Dossier RCS 2001 B 17631 · CONVOC17 · 1 relance | Avec relance | AFaire | []
 BANC ROF 45 · 2001 B 00045 | Dossier RCS 2001 B 00045 · SSAC2A · 1 relance | Avec relance | AFaire | []
 BANC ROF 44 · 2001 B 00044 | Dossier RCS 2001 B 00044 · SSAC2A · 1 relance | Avec relance | AFaire | []

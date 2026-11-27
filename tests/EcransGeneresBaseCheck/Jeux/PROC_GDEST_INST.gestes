@@ -1,0 +1,131 @@
+# « Destinataires institutionnels » (EcrivainDestinatairesInstitutionnels) : Ajouter, Modifier et Supprimer dans la grille, comme
+# frmAddDestInst._Valider (frmAddDestInst.cs:233-316) et le bouton SUPPRIMER de frmListeDestInst (l. 228-233). Lignes du jeu :
+# PROC_GDEST_INST.sql et .attendu (plus les huissiers H17* du jeu PROC_GCONV, lus sans critere). Codes B16* (lot 16).
+# Les refus de la V2 sont au mot pres, ses retours a la ligne devenus une espace (l'annonce de l'ecran tient sur une ligne).
+
+# Refus : l'adresse vide (frmAddDestInst.cs:253-255). Jumeau accepte : bloc 6, adresse saisie.
+geste: Ajouter
+valeur: Nom = Tribunal de commerce
+valeur: Code = B16NEW
+valeur: Type = PROC
+valeur: Adresse =
+resultat: refuse
+message: Insertion d'un destinataire institutionnel impossible. Le code, le nom, l'adresse et le type sont obligatoires.
+---
+# Refus : une adresse courriel qui ne suit pas RIG.TOOLS.RegEx.Email (TesterEmails, l. 319-340). Jumeau accepte : bloc 6, courriel valide.
+geste: Ajouter
+valeur: Nom = Tribunal de commerce
+valeur: Code = B16NEW
+valeur: Type = PROC
+valeur: Adresse = 1 rue du Greffe 38000 Grenoble
+valeur: Adresse courriel = greffe-sans-arobase
+resultat: refuse
+message: Insertion d'un destinataire institutionnel impossible. L'adresse mail suivante est incorrecte : (greffe-sans-arobase)
+---
+# Refus : deux adresses incorrectes sur trois, la V2 les joint par « ; » et passe au pluriel (l. 327-337). Jumeau accepte : bloc 6.
+geste: Ajouter
+valeur: Nom = Tribunal de commerce
+valeur: Code = B16NEW
+valeur: Type = PROC
+valeur: Adresse = 1 rue du Greffe 38000 Grenoble
+valeur: Adresse courriel = un;greffe@tc-grenoble.test;deux
+resultat: refuse
+message: Insertion d'un destinataire institutionnel impossible. Les adresses mails suivantes sont incorrectes : (un;deux)
+---
+# Refus : le code B3PARQ existe deja (l. 270-275). Jumeau accepte : bloc 6, code B16NEW libre.
+geste: Ajouter
+valeur: Nom = Tribunal de commerce
+valeur: Code = B3PARQ
+valeur: Type = PROC
+valeur: Adresse = 1 rue du Greffe 38000 Grenoble
+resultat: refuse
+message: Insertion d'un destinataire institutionnel impossible. Le code saisi existe déjà.
+---
+# Refus : le type ZZB3 n'a pas d'ENTITE « INST_ZZB3 », la liste deroulante de la V2 ne le propose pas (frmAddDestInst.cs:52 ; message
+# sans source V2, nomme dans l'ecrivain). Jumeau accepte : bloc 6, type PROC (ENTITE INST_PROC).
+geste: Ajouter
+valeur: Nom = Tribunal de commerce
+valeur: Code = B16NEW
+valeur: Type = ZZB3
+valeur: Adresse = 1 rue du Greffe 38000 Grenoble
+resultat: refuse
+message: Le type « ZZB3 » n'est pas proposé : RIG v2 ne propose que les types de destinataire institutionnel (INST_*) de la base.
+---
+# Ajout accepte : champs « trimes » (l. 238-249), actif (ckbActif coche, l. 67), champs facultatifs NULL (l. 278-282), une ligne
+# d'historique « Insertion » au nom du compte Windows de l'agent (l. 298). B16NEW se range en tete (ordre du code).
+geste: Ajouter
+valeur: Nom =   Tribunal de commerce de Grenoble
+valeur: Code = B16NEW
+valeur: Type = PROC
+valeur: Adresse =   1 rue du Greffe 38000 Grenoble
+valeur: Adresse courriel = greffe@tc-grenoble.test
+resultat: fait
+message: Destinataire institutionnel B16NEW « Tribunal de commerce de Grenoble » ajouté.
+lignes:
+Tribunal de commerce de Grenoble | B16NEW · Procureur · courriel | Parquet et juridictions | Validee | [0,2] | valeurs: Tribunal de commerce de Grenoble ; B16NEW ; PROC ; 1 rue du Greffe 38000 Grenoble ; greffe@tc-grenoble.test
+Notaires du ressort | B3AUTRE · ZZB3 · coffre-fort COFFRE_NOTAIRES | Organismes | Validee | [0,2]
+Direction des finances publiques | B3DDFP · Directeur départemental finances · courriel | Administrations | Validee | [0,2]
+Bodacc | B3INACT · Bodacc | Organismes | EnAttente | [0]
+Cour d'appel | B3NOADR · Procureur · adresse à compléter | Parquet et juridictions | EnCours | [1]
+Parquet du tribunal judiciaire | B3PARQ · Procureur · coffre-fort COFFRE_PARQUET depuis le {J-100} | Parquet et juridictions | Validee | [0,1,2]
+Urssaf | B3URSSAF · Enquête prévention | Administrations | Validee | [0]
+Chambre de commerce | B3VIDE · Chambre de Commerce · adresse à compléter | Organismes | AFaire | []
+SCP HUISSIER COFFRE | H17COF · H · courriel · coffre-fort COFFRE_H17 | Organismes | Validee | [0,2]
+SCP HUISSIER FUTUR | H17FUT · H · coffre-fort COFFRE_FUT depuis le {A+1} | Organismes | Validee | [0,2]
+SCP HUISSIER INACTIF | H17INA · H · coffre-fort COFFRE_INA | Organismes | EnAttente | [0,2]
+SCP HUISSIER SIMPLE | H17SIM · H | Organismes | Validee | [0]
+controle: SELECT CONVERT(int, DTINS_ACTIF) FROM v2.DESTINATAIRE_INSTITUTIONNEL WHERE DTINS_CODE = 'B16NEW' => 1
+controle: SELECT COUNT(*) FROM v2.DESTINATAIRE_INSTITUTIONNEL WHERE DTINS_CODE = 'B16NEW' AND DTINS_CIVILITE_DEVELOPPEE IS NULL AND DTINS_FORMULE_POLITESSE IS NULL AND DTINS_NOM_COFFRE IS NULL => 1
+controle: SELECT DIHIS_ACTION FROM v2.DESTINATAIRE_INSTITUTIONNEL_HISTO WHERE DIHIS_CODE = 'B16NEW' => Insertion
+controle: SELECT DIHIS_LOGIN FROM v2.DESTINATAIRE_INSTITUTIONNEL_HISTO WHERE DIHIS_CODE = 'B16NEW' => banc.ecrans
+controle: SELECT COUNT(*) FROM soc.Journal WHERE Ecran = 'Destinataires institutionnels' AND Famille = 'reglage' AND Objet = 'le destinataire institutionnel B16NEW' AND Verbe = 'a cree' => 1
+---
+# Refus : le code ne se modifie pas (txtCode grise en modification, frmAddDestInst.cs:72 ; message sans source V2). Jumeau accepte : bloc 10,
+# le meme destinataire modifie sans toucher au code.
+geste: Modifier
+ids: B16NEW
+valeur: Code = B16AUTRE
+resultat: refuse
+message: Le code d'un destinataire institutionnel ne se modifie pas (B16NEW) : RIG v2 le grise en modification.
+---
+# Refus : le nom vide, en modification (l. 253, 257). Jumeau accepte : bloc 10, nom garde.
+geste: Modifier
+ids: B16NEW
+valeur: Nom =
+resultat: refuse
+message: Modification d'un destinataire institutionnel impossible. Le code, le nom, l'adresse et le type sont obligatoires.
+---
+# Refus : rien ne change (le nom renvoye tel quel) : un geste qui n'ecrit rien est un refus (EcrivainEcran.cs, point 5 ; la V2
+# enregistrerait sans rien changer). Jumeau accepte : bloc 10, adresse et type changes.
+geste: Modifier
+ids: B16NEW
+valeur: Nom = Tribunal de commerce de Grenoble
+resultat: refuse
+message: Aucune modification du destinataire institutionnel B16NEW : rien n'est enregistré.
+---
+# Modification acceptee : l'adresse et le type ; l'historique « Modification : » suivi des changements, au format de
+# constructionTextChangements (l. 355-375), une ligne par changement ; le type change, la V2 demande confirmation (l. 286-290) : le
+# message le rappelle. Les colonnes non envoyees (nom, courriel) gardent la valeur de la base.
+geste: Modifier
+ids: B16NEW
+valeur: Adresse = 2 rue du Greffe 38000 Grenoble
+valeur: Type = DDFP
+resultat: fait
+message: Destinataire institutionnel B16NEW modifié. Attention : le type a changé, ce qui peut avoir des conséquences sur les éditions paramétrées.
+controle: SELECT DTINS_TYPE + ' / ' + DTINS_BLOC_ADRESSE + ' / ' + DTINS_LIBELLE + ' / ' + DTINS_ADRESSE_MAIL FROM v2.DESTINATAIRE_INSTITUTIONNEL WHERE DTINS_CODE = 'B16NEW' => DDFP / 2 rue du Greffe 38000 Grenoble / Tribunal de commerce de Grenoble / greffe@tc-grenoble.test
+controle: SELECT COUNT(*) FROM v2.DESTINATAIRE_INSTITUTIONNEL_HISTO WHERE DIHIS_CODE = 'B16NEW' AND DIHIS_ACTION = 'Modification : Adresse :1 rue du Greffe 38000 Grenoble modifiée en 2 rue du Greffe 38000 Grenoble' + CHAR(13) + CHAR(10) + 'Type :PROC modifié en DDFP' => 1
+---
+# Refus : un code absent de la base (message sans source V2 : le bouton de la V2 agit sur une ligne de sa liste). Jumeau accepte : bloc 12.
+geste: Supprimer
+ids: B16INCONNU
+resultat: refuse
+message: Destinataire institutionnel introuvable dans la base du greffe (B16INCONNU).
+---
+# Suppression acceptee (frmListeDestInst.cs:230-231) : l'historique du code, puis le destinataire ; la V2 ne controle rien.
+geste: Supprimer
+ids: B3VIDE
+resultat: fait
+message: Destinataire institutionnel B3VIDE « Chambre de commerce » supprimé, avec son historique.
+controle: SELECT COUNT(*) FROM v2.DESTINATAIRE_INSTITUTIONNEL WHERE DTINS_CODE = 'B3VIDE' => 0
+controle: SELECT COUNT(*) FROM v2.DESTINATAIRE_INSTITUTIONNEL_HISTO WHERE DIHIS_CODE = 'B3VIDE' => 0
+controle: SELECT COUNT(*) FROM v2.DESTINATAIRE_INSTITUTIONNEL_HISTO WHERE DIHIS_CODE = 'B16NEW' => 2

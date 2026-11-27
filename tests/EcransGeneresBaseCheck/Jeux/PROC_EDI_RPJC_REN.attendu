@@ -8,10 +8,20 @@
 # 300207 audience demain a 0 h (jumeau 300206, aujourd'hui a 23 h) ; 300209 sans etat (jumeau 300210, meme audience).
 # Le nom de l'affaire : la premiere instance du role (300261, pas 300262) ; le role seul sans instance (2026F30002).
 # L'avocat : l'actif des deux mandataires du CNBF 300013 ; « avocat non trouvé » pour 300099.
+# Lot 16 (plan-676a4b19) : 2600101-2600107 (PROC_EDI_RPJC_REN.sql), les demandes des gestes : six a traiter en tete (numero le
+# plus haut d'abord ; 2600104 tenue par agent.l16, EnCours ; 2600103 au CNBF de l'avocat inactif 1300202), et 2600107, deja
+# rejetee, en tete des traitees.
+Rôle 2026F30001 · ALPHA SERVICES SARL c/ BETA INDUSTRIE SAS | ALPHA Irène · audience initiale du {J-2} | À traiter | AFaire | []
+Rôle 2026F30001 · ALPHA SERVICES SARL c/ BETA INDUSTRIE SAS | ALPHA Irène · audience initiale du {J-2} | À traiter | AFaire | []
+Rôle 2026F30001 · ALPHA SERVICES SARL c/ BETA INDUSTRIE SAS | ALPHA Irène · audience initiale du {J-2} · ouverte par agent.l16 | À traiter | EnCours | [0,1]
+Rôle 2026F30001 · ALPHA SERVICES SARL c/ BETA INDUSTRIE SAS | BETA Simon · audience initiale du {J-2} | À traiter | AFaire | []
+Rôle 2026F30001 · ALPHA SERVICES SARL c/ BETA INDUSTRIE SAS | ALPHA Irène · audience initiale du {J+3} | À traiter | AFaire | []
+Rôle 2026F30001 · ALPHA SERVICES SARL c/ BETA INDUSTRIE SAS | ALPHA Irène · audience initiale du {J-2} | À traiter | AFaire | []
 Rôle 2026F30003 · GAMMA CONSEIL SARL | BETA Simon · audience initiale du {J+5} · ouverte par agent.s | À traiter | EnCours | [0,1]
 Rôle 2026F30002 | avocat non trouvé (CNBF 300099) · audience initiale du {J+12} · ouverte par agent.r | À traiter | EnCours | [0]
 Rôle 2026F30001 · ALPHA SERVICES SARL c/ BETA INDUSTRIE SAS | ALPHA Irène · audience initiale du {J+10} · renvoi demandé au {J+40} | À traiter | AFaire | []
 Rôle 2026F30001 · ALPHA SERVICES SARL c/ BETA INDUSTRIE SAS | ALPHA Irène · audience initiale du {M-6} · rejet Extelia du {J-20} | Rejets Extelia | EnAttente | [0,1,2,3]
+Rôle 2026F30001 · ALPHA SERVICES SARL c/ BETA INDUSTRIE SAS | ALPHA Irène · audience initiale du {J-2} · rejeté le {J-1} | Traitées | Rejetee | [0,1,2,3]
 Rôle 2026F30001 · ALPHA SERVICES SARL c/ BETA INDUSTRIE SAS | ALPHA Irène · audience initiale du {J-3} · renvoi accepté le {J-4} | Traitées | Validee | [0,1,2,3]
 Rôle 2026F30003 · GAMMA CONSEIL SARL | ALPHA Irène · audience initiale du {J+0} · rejeté le {J-2} · Motif sans date de prononcé | Traitées | Rejetee | [0,1,2,3]
 Rôle 2026F30001 · ALPHA SERVICES SARL c/ BETA INDUSTRIE SAS | ALPHA Irène · audience initiale du {M-1} · renvoi accepté le {J-40} | Traitées | Validee | [0,1,2,3]

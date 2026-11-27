@@ -15,7 +15,7 @@ import { useState } from 'react'
 import { CartesChiffrees, EnteteListe, ListeModerne, PiedListe, type CarteChiffree } from '../../composants/ListeModerne'
 import type { DescripteurEcranVue } from '../../plan/types'
 import {
-  Annonce, ChampSaisie, NoteRecherche, Provenance, TableLignes, enExemple, figee, gestesDe, parcoursDe, refus, synthese, teinteEtat,
+  Annonce, ChampSaisie, NoteRecherche, Provenance, TableLignes, enExemple, gesteVaut, gestesDe, parcoursDe, refus, synthese, teinteEtat,
   useAnnonce, useGesteEnLot, useLignes, useRecherche, type LigneTenue, type Saisies,
 } from './commun'
 
@@ -53,12 +53,24 @@ export function FormeFile({ d }: { d: DescripteurEcranVue }) {
   const champs = procedures.flatMap((p) => p.parametres).filter((c, k, tous) => tous.findIndex((x) => x.libelle === c.libelle) === k)
   const gestes = [...new Set(procedures.flatMap(gestesDe))]
   const choisies = lignes.filter((l) => cochees.has(l.i))
-  const portee = (geste: string) => choisies.filter((l) => gestesDe(parcoursDe(d, l.groupe)).includes(geste))
-  // Pourquoi une action est grisee : rien de coche, ou des lignes cochees d'une procedure qui ne porte pas ce geste (ecran
-  // reuni : « Imprimer » ne vaut que pour les procedures qui le nomment).
-  const pourquoiGrise = (geste: string) => choisies.length === 0
-    ? 'Cochez au moins une ligne'
-    : `« ${geste} » ne s’applique pas aux lignes cochées : il ne vaut que pour ${procedures.filter((p) => gestesDe(p).includes(geste)).map((p) => `« ${p.titre} »`).join(', ')}`
+  // Un geste vise une ligne de SA procedure, dans un etat qu'il declare (gesteVaut : a faire et en cours par defaut). Une ligne se
+  // coche si au moins un geste de sa procedure la vise : « Désactiver » une demande FNIG envoyee (lot 16).
+  const vaut = (geste: string, l: LigneTenue) => {
+    const p = parcoursDe(d, l.groupe)
+    return gestesDe(p).includes(geste) && gesteVaut(p, geste, l.etat)
+  }
+  const cochable = (l: LigneTenue) => gestesDe(parcoursDe(d, l.groupe)).some((g) => vaut(g, l))
+  const portee = (geste: string) => choisies.filter((l) => vaut(geste, l))
+  // Pourquoi une action est grisee : rien de coche, des lignes cochees d'une procedure qui ne porte pas ce geste (ecran
+  // reuni : « Imprimer » ne vaut que pour les procedures qui le nomment), ou dans un etat qu'il ne vise pas.
+  const pourquoiGrise = (geste: string) => {
+    if (choisies.length === 0) return 'Cochez au moins une ligne'
+    const porteuses = procedures.filter((p) => gestesDe(p).includes(geste))
+    const debut = `« ${geste} » ne s’applique pas aux lignes cochées : il ne vaut que pour`
+    if (!choisies.some((l) => porteuses.includes(parcoursDe(d, l.groupe)))) return `${debut} ${porteuses.map((p) => `« ${p.titre} »`).join(', ')}`
+    const etats = [...new Set(porteuses.flatMap((p) => p.etats.filter((e) => gesteVaut(p, geste, e.code)).map((e) => `« ${e.libelle} »`)))]
+    return `${debut} les lignes ${etats.join(', ')}`
+  }
   const enLot = useGesteEnLot(d, vue, annoncer)
   const jouer = (geste: string, visees: LigneTenue[]) => void enLot('Agir', geste, visees, saisies,
     (n) => refus(geste, `sur ${n} ligne${n > 1 ? 's' : ''} : aucune n’est modifiée dans la base`),
@@ -90,7 +102,7 @@ export function FormeFile({ d }: { d: DescripteurEcranVue }) {
         <NoteRecherche enBase={enBase} />
         <CartesChiffrees cartes={cartes} />
 
-        {/* Les gestes en lot : sur les lignes cochees (une ligne figee ne se coche pas). */}
+        {/* Les gestes en lot : sur les lignes cochees (une ligne qu'aucun geste ne vise ne se coche pas). */}
         <div className="rig-lm-outils rig-eg-lot" role="toolbar" aria-label="Actions sur la sélection">
           <span className="rig-eg-lot__compte"><b>{choisies.length}</b> sélectionnée{choisies.length > 1 ? 's' : ''}</span>
           {gestes.map((g, k) => {
@@ -108,7 +120,7 @@ export function FormeFile({ d }: { d: DescripteurEcranVue }) {
         <Annonce texte={annonce} />
 
         <TableLignes d={d} vue={vue} lignes={visibles} total={lignes.length} filtre={etatChoisi !== null || filtre}
-                     cases={{ cochees, basculer, toutes: (cocher) => poserCochees(cocher ? new Set(visibles.filter((l) => !figee(l.etat)).map((l) => l.i)) : new Set()) }}
+                     cases={{ cochees, basculer, cochable, toutes: (cocher) => poserCochees(cocher ? new Set(visibles.filter(cochable).map((l) => l.i)) : new Set()) }}
                      detail={(l) => {
                        const p = parcoursDe(d, l.groupe)
                        return (
@@ -122,7 +134,7 @@ export function FormeFile({ d }: { d: DescripteurEcranVue }) {
                          </div>
                        )
                      }}
-                     actions={(l) => gestesDe(parcoursDe(d, l.groupe)).map((g) => ({ libelle: g, desactive: figee(l.etat), agir: () => jouer(g, [l]) }))} />
+                     actions={(l) => gestesDe(parcoursDe(d, l.groupe)).map((g) => ({ libelle: g, desactive: !vaut(g, l), agir: () => jouer(g, [l]) }))} />
         <PiedListe aide="Cochez des lignes, puis choisissez l’action.">
           <span><b>{visibles.length}</b> affichée{visibles.length > 1 ? 's' : ''}</span>
           <span>Cochées <b>{choisies.length}</b></span>

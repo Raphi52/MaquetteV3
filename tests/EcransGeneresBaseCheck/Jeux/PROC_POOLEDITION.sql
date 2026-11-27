@@ -61,3 +61,11 @@ INSERT INTO v2.DEMANDE_EDITION (DMNED_ID_DMNED, DMNED_ID_DMND, DMNED_ID_DSRCS, D
     (200420, NULL, NULL, NULL, 'E', NULL, NULL, N'Statistique nantissement', NULL, DATEADD(HOUR, -206, @aujourdhui), NULL, NULL),
     -- creee, SANS date de creation (6 576 dans RIG_DEV) : en dernier (le NULL d'un tri decroissant), sans « creee le »
     (200410, NULL, NULL, NULL, 'C', NULL, N'EDITION SANS DATE', N'Courrier libre', NULL, NULL, NULL, 8);
+
+-- Lot 16 du plan « RIG v3 100 % fonctionnel » : le nombre d'exemplaires, colonne « Ex. » de la liste V2 (PoolEdition.cs:279), que
+-- « Imprimer » reecrit. smallint comme les autres jeux qui l'ajoutent (PROC_EDT_DIFF.sql:21). 200412 : 2 exemplaires, « 2 ex. » ;
+-- 200413 : un negatif, montre « 0 ex. » comme la V2 (l. 1505-1507) ; les autres : sans valeur, sans mention. Par sp_executesql : la
+-- colonne peut naitre dans ce lot meme.
+IF COL_LENGTH('v2.DEMANDE_EDITION', 'DMNED_NOMBRE_EXEMPLAIRE') IS NULL ALTER TABLE v2.DEMANDE_EDITION ADD DMNED_NOMBRE_EXEMPLAIRE smallint NULL;
+EXEC sp_executesql N'UPDATE v2.DEMANDE_EDITION SET DMNED_NOMBRE_EXEMPLAIRE = 2 WHERE DMNED_ID_DMNED = 200412;
+UPDATE v2.DEMANDE_EDITION SET DMNED_NOMBRE_EXEMPLAIRE = -1 WHERE DMNED_ID_DMNED = 200413;';

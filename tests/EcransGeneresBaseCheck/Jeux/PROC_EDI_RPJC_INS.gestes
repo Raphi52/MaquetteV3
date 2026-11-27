@@ -1,0 +1,125 @@
+# « EDI RPJC inscriptions » (EcrivainInscriptionsRpjc) : « Traiter la demande » (les mandataires nommes par leur abrege ou leur
+# numero) et « Rejeter la demande », comme frmTrt.cs (cmdTraiter l. 470-640, Rejeter l. 673-694) apres l'ouverture de frmChoixTrt.cs
+# (l. 248-305). Lignes : PROC_EDI_RPJC_INS.sql (26002xx) ; mandataires de PROC_EDI_RPJC_TRCNC.sql (1300201 ALP13 actif, 1300202 BET13
+# inactif) et de PROC_EDI_RPVAINS.sql (2500103 inactif et 2500104 actif, tous deux L15DBL). Joue avant PROC_EDI_RPVAINS.gestes (meme
+# table) : 2600201 et 2600202 finissent a l'etat 2, hors de sa liste. Rien n'est envoye a Infogreffe.
+
+# Refus : rien de coche (frmChoixTrt.cs:250, au mot pres). Jumeau accepte : bloc 10.
+geste: Agir Traiter la demande
+valeur: Mandataires traités = ALP13
+valeur: Mandataire principal = ALP13
+resultat: refuse
+message: Vous devez sélectionner une demande à traiter
+---
+# Refus : un agent tient la demande (l. 255-257, au mot pres). Jumeau accepte : bloc 10 (2600201, que personne ne tient).
+geste: Agir Traiter la demande
+ids: 2600203
+valeur: Mandataires traités = ALP13
+valeur: Mandataire principal = ALP13
+resultat: refuse
+message: Cette demande d'inscription est en cours de traitement par l'utilisateur agent.l16
+---
+# Refus : une modification deja acceptee ne se retraite pas (l. 266-269, le saut de ligne en espace). Jumeau accepte : bloc 11 (une
+# inscription deja acceptee se retraite).
+geste: Agir Traiter la demande
+ids: 2600204
+valeur: Mandataires traités = ALP13
+valeur: Mandataire principal = ALP13
+resultat: refuse
+message: Cette demande de modification a déjà été traitée. Vous ne pouvez pas re-traiter une demande de modification déjà traitée.
+---
+# Refus : une demande refusee, avec son motif (l. 281-283, les trois sauts de ligne en espaces). Jumeau accepte : bloc 10 (sans decision).
+geste: Agir Traiter la demande
+ids: 2600205
+valeur: Mandataires traités = ALP13
+valeur: Mandataire principal = ALP13
+resultat: refuse
+message: Vous ne pouvez pas traiter une demande d'inscription déjà refusée. Cette demande d'inscription a été refusée pour le motif suivant :  Cnbf inconnu du barreau
+---
+# Refus : une modification en attente n'est pas geree (l. 298-302, au mot pres). Jumeau accepte : bloc 10 (une inscription).
+geste: Agir Traiter la demande
+ids: 2600206
+valeur: Mandataires traités = ALP13
+valeur: Mandataire principal = ALP13
+resultat: refuse
+message: Attention la modification des demandes d'inscriptions n'est pas encore gérée. Veuillez contacter AMITEL
+---
+# Refus : aucun principal (frmTrt.cs:509-511, au mot pres). Jumeau accepte : bloc 10.
+geste: Agir Traiter la demande
+ids: 2600201
+valeur: Mandataires traités = ALP13
+resultat: refuse
+message: Vous devez cocher un mandataire principal.
+---
+# Refus : le principal n'est pas coche a traiter (l. 496-499, au mot pres). Jumeau accepte : bloc 10 (ALP13 traite et principal).
+geste: Agir Traiter la demande
+ids: 2600201
+valeur: Mandataire principal = ALP13
+resultat: refuse
+message: Le mandataire principal doit être remis a traiter.
+---
+# Refus : le principal BET13 est inactif (l. 490-494, au mot pres). Jumeau accepte : bloc 10 (ALP13, actif avec abrege).
+geste: Agir Traiter la demande
+ids: 2600201
+valeur: Mandataires traités = BET13
+valeur: Mandataire principal = BET13
+resultat: refuse
+message: Le mandataire principal doit être actif et avec abrégé.
+---
+# Refus : deux principaux, actifs et avec abrege -- 2500104 par son numero (l. 521-525, au mot pres). Jumeau accepte : bloc 10 (un seul).
+geste: Agir Traiter la demande
+ids: 2600201
+valeur: Mandataires traités = ALP13, 2500104
+valeur: Mandataire principal = ALP13, 2500104
+resultat: refuse
+message: Vous ne pouvez cocher qu'un seul mandataire principal.
+---
+# Accepte : 2600201 traitee, ALP13 traite et principal (l. 540-623) -- la demande a l'etat 2, A, l'agent ; ALP13 garde ce qu'il
+# avait (meme CNBF, rien d'autre a reprendre), actif.
+geste: Agir Traiter la demande
+ids: 2600201
+valeur: Mandataires traités = ALP13
+valeur: Mandataire principal = ALP13
+resultat: fait
+message: Mise à jour effectuée avec succés. Les instances des mandataires traités sont à recentraliser sur Infogreffe : la V3 ne l'appelle pas (envoi simulé).
+controle: SELECT CONCAT(RPJCI_ETAT, '/', RPJCI_ETAT_TRAITEMENT_RIG, '/', RPJCI_USER_TRAITEMENT_RIG, '/', CASE WHEN CONVERT(date, RPJCI_DATE_TRAITEMENT_RIG) = CONVERT(date, GETDATE()) THEN 'du jour' ELSE 'autre date' END) FROM v2.DEMAT_RPJC_INS WHERE RPJCI_ID_RPJCI = 2600201 => 2/A/banc.ecrans/du jour
+controle: SELECT CONCAT(MNDTR_NUMERO_CNBF, '/', CAST(MNDTR_ACTIF AS int)) FROM v2.MANDATAIRE WHERE MNDTR_ID_MNDTR = 1300201 => 130001/1
+---
+# Accepte : 2600201 est maintenant une inscription deja traitee : elle se retraite (frmChoixTrt.cs:270-272) sans que la demande soit
+# reecrite (l. 602-603). Jumeau du refus bloc 3 (modification).
+geste: Agir Traiter la demande
+ids: 2600201
+valeur: Mandataires traités = ALP13
+valeur: Mandataire principal = ALP13
+resultat: fait
+message: Mise à jour effectuée avec succés. Les instances des mandataires traités sont à recentraliser sur Infogreffe : la V3 ne l'appelle pas (envoi simulé).
+controle: SELECT CONCAT(RPJCI_ETAT, '/', RPJCI_ETAT_TRAITEMENT_RIG) FROM v2.DEMAT_RPJC_INS WHERE RPJCI_ID_RPJCI = 2600201 => 2/A
+---
+# Refus : deja traitee et rien de nomme -- la V2 valide sans rien ecrire puis le dit (l. 627-629, au mot pres). Jumeau accepte : bloc 11.
+geste: Agir Traiter la demande
+ids: 2600201
+resultat: refuse
+message: Vous devez sélectionner un ou plusieurs mandataire avant de cliquer sur le bouton traiter.
+---
+# Refus : l'abrege L15DBL designe deux mandataires (2500103, 2500104) : la V3 demande le numero (message sans source V2 : la grille
+# de la V2 montre chacun). Jumeau accepte : bloc 10 (ALP13, un seul mandataire).
+geste: Agir Traiter la demande
+ids: 2600202
+valeur: Mandataires traités = L15DBL
+valeur: Mandataire principal = L15DBL
+resultat: refuse
+message: L'abrégé « L15DBL » désigne plusieurs mandataires : donnez son numéro.
+---
+# Refus : « Rejeter la demande » sans motif (frmRejet.cs:57-58, au mot pres). Jumeau accepte : bloc 15.
+geste: Agir Rejeter la demande
+ids: 2600202
+resultat: refuse
+message: Vous devez saisir un motif de rejet pour valider.
+---
+# Accepte : 2600202 rejetee (l. 684-692) -- etat 2, R, le motif, l'agent.
+geste: Agir Rejeter la demande
+ids: 2600202
+valeur: Motif du rejet = Cnbf absent du tableau de l'ordre
+resultat: fait
+message: Rejet effectué avec succés.
+controle: SELECT CONCAT(RPJCI_ETAT, '/', RPJCI_ETAT_TRAITEMENT_RIG, '/', RPJCI_MOTIF_TRAITEMENT_RIG, '/', RPJCI_USER_TRAITEMENT_RIG) FROM v2.DEMAT_RPJC_INS WHERE RPJCI_ID_RPJCI = 2600202 => 2/R/Cnbf absent du tableau de l'ordre/banc.ecrans

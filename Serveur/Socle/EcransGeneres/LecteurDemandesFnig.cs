@@ -91,6 +91,11 @@ internal sealed class LecteurDemandesFnig : ILecteurEcran
             fin.Length > 0 ? $"interdiction jusqu'au {fin}" : null,
             entreprises > 1 ? $"{entreprise} et {entreprises - 1} autre(s)" : entreprise,
             regle.Statut);
-        return new LigneLue(nom, precisions, groupe, regle.Etat, regle.Faites);
+        // L'id : la demande (CFNIG_ID_CFNIG), que « Désactiver » et « Renvoyer la demande à l'identique » visent
+        // (EcrivainDemandesFnig.cs, lot 16 du plan « RIG v3 100 % fonctionnel »).
+        return new LigneLue(nom, precisions, groupe, regle.Etat, regle.Faites)
+        {
+            Id = Convert.ToInt32(r["CFNIG_ID_CFNIG"]).ToString(System.Globalization.CultureInfo.InvariantCulture),
+        };
     }
 }

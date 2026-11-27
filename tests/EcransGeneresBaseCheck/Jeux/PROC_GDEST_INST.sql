@@ -36,3 +36,13 @@ INSERT INTO v2.DESTINATAIRE_INSTITUTIONNEL (DTINS_CODE, DTINS_LIBELLE, DTINS_BLO
     ('B3INACT', 'Bodacc', '26 rue Desaix 75015 Paris', 'BOD', NULL, NULL, NULL, NULL, NULL, 0),
     -- type cree par le greffe, sans ENTITE : « Organismes », le code du type pour libelle, coffre-fort sans date
     ('B3AUTRE', 'Notaires du ressort', '5 rue des Notaires 38000 Grenoble', 'ZZB3', NULL, NULL, NULL, 'COFFRE_NOTAIRES', NULL, 1);
+
+-- Lot 16 du plan « RIG v3 100 % fonctionnel » (EcrivainDestinatairesInstitutionnels, PROC_GDEST_INST.gestes) : l'historique que
+-- la V2 ecrit a chaque ajout ou modification et efface avec le destinataire (DestinataireInstitutionnelHisto, cle DIHIS_ID_DIHIS
+-- auto-incrementee : HaveAutoIdentity ; longueurs de BASE_GREFFE_DESTINATAIRE_INSTITUTIONNEL_HISTO : code 10, login 50, action
+-- sans limite), et une ligne d'historique de B3VIDE, que le dernier geste supprime avec lui.
+IF OBJECT_ID(N'v2.DESTINATAIRE_INSTITUTIONNEL_HISTO') IS NULL
+    CREATE TABLE v2.DESTINATAIRE_INSTITUTIONNEL_HISTO (DIHIS_ID_DIHIS int IDENTITY(1, 1) NOT NULL PRIMARY KEY,
+        DIHIS_CODE varchar(10) NOT NULL, DIHIS_LOGIN varchar(50) NULL, DIHIS_DATE datetime NULL, DIHIS_ACTION varchar(max) NULL);
+INSERT INTO v2.DESTINATAIRE_INSTITUTIONNEL_HISTO (DIHIS_CODE, DIHIS_LOGIN, DIHIS_DATE, DIHIS_ACTION)
+VALUES ('B3VIDE', 'ancien.agent', DATEADD(DAY, -30, @aujourdhui), 'Insertion');

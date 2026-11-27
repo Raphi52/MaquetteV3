@@ -1,0 +1,110 @@
+# « Demandes FNIG » (EcrivainDemandesFnig) : « Désactiver » une demande envoyee (une demande de desactivation NEUVE, copie de
+# l'envoyee, a envoyer : OPE_EDITION.cs:236-246) et « Renvoyer la demande à l'identique » une demande en erreur (l. 257-266). Lignes du
+# jeu : PROC_FNIG.sql et .attendu. Les blocs sont joues dans l'ordre : les refus d'abord (rien d'ecrit), puis le renvoi, puis les
+# desactivations (les deux demandes neuves prennent les numeros suivants, 300310 et 300311).
+
+# Refus : rien de coche. Jumeau accepte : bloc 11.
+geste: Agir Désactiver
+resultat: refuse
+message: Aucune demande cochée : rien n'est envoyé au FNIG.
+---
+# Refus : une demande absente de la base. Jumeau accepte : bloc 11.
+geste: Agir Désactiver
+ids: 399999
+resultat: refuse
+message: Demande FNIG introuvable dans la base du greffe (399999).
+---
+# Refus : 300303 est en erreur, pas envoyee -- la V2 grise « Désactiver » (EstDesactivationPossible, l. 46-51). Jumeau accepte :
+# bloc 11 (300301, envoyee).
+geste: Agir Désactiver
+ids: 300303
+resultat: refuse
+message: La demande n° 300303 (FNIGBANC Chloé) n'est pas envoyée : RIG v2 ne désactive qu'une demande envoyée au FNIG.
+---
+# Refus : 300305 est deja une desactivation (meme regle). Jumeau accepte : bloc 11 (300301, un ajout).
+geste: Agir Désactiver
+ids: 300305
+resultat: refuse
+message: La demande n° 300305 (FNIGBANC Emma) est déjà une désactivation : RIG v2 ne la désactive pas.
+---
+# Refus : 300302 debute son interdiction la VEILLE du jugement (OPE_EDITION_JUGEMENT.DoVerifier, l. 215-219), au mot pres ; le refus
+# vise tout le lot coche, 300301 n'est pas desactivee. Jumeau accepte : bloc 11 (300301, debut = jugement).
+geste: Agir Désactiver
+ids: 300301,300302
+resultat: refuse
+message: La date de début d'interdiction ne peut pas être inférieur à la date du jugement
+---
+# Refus : 300308, rattachee a un casier du greffe (la fin est affichee), debute APRES sa fin (l. 221-225). Jumeaux acceptes : bloc 11 --
+# 300301 (debut avant la fin) et 300309 (meme dates, demande d'une autre juridiction : la V2 n'affiche ni ne controle la fin).
+geste: Agir Désactiver
+ids: 300308
+resultat: refuse
+message: La date de début d'interdiction ne peut pas être supérieur à la date de fin d'interdiction
+---
+# Refus : un compte sans utilisateur RIG v2 (banc.amitel.l16, cree par PROC_REJETSKBISXML.sql, sans IdV2) -- la desactivation porte
+# l'utilisateur courant (OPE_EDITION.cs:237-240). Jumeau accepte : bloc 11, l'agent du banc (IdV2 pose par PROC_FNIG.sql).
+geste: Agir Désactiver
+ids: 300301
+agent: banc.amitel.l16
+resultat: refuse
+message: Votre compte n'a pas d'utilisateur RIG v2 : la désactivation ne peut pas porter son auteur (CFNIG_UTILISATEUR).
+---
+# Refus : 300301 est envoyee, pas en erreur -- la V2 grise « Renvoyer » (EstCasierFnigEnErreur, l. 56-58). Jumeau accepte : bloc 10.
+geste: Agir Renvoyer la demande à l'identique
+ids: 300301
+resultat: refuse
+message: La demande n° 300301 (FNIGBANC Alice) n'est pas en erreur : RIG v2 ne renvoie à l'identique qu'une demande en erreur.
+---
+# Refus : 300307 juge AVANT la naissance de la personne (l. 227-231), au mot pres. Jumeau accepte : bloc 10 (300303, nee avant).
+geste: Agir Renvoyer la demande à l'identique
+ids: 300307
+resultat: refuse
+message: La date du jugement ne peut pas être supérieur à la date de naissance
+---
+# Renvoi accepte : 300303 repasse « à envoyer », son erreur a NULL (l. 261-263) ; la liste la relit En cours.
+geste: Agir Renvoyer la demande à l'identique
+ids: 300303
+resultat: fait
+message: Demande FNIG n° 300303 (FNIGBANC Chloé) renvoyée à l'identique : à envoyer, son erreur effacée ; le traitement de fond de RIG v2 l'envoie au FNIG. Rien n'est envoyé d'ici.
+lignes:
+FNIGBANC Inès | jugement du {J-12} · interdiction jusqu'au {J-20} · envoyée le {J-1} | Ajout | Validee | [0,1,3]
+FNIGBANC Hugo | jugement du {J-12} · interdiction jusqu'au {J-20} · envoyée le {J-1} | Ajout | Validee | [0,1,3]
+FNIGBANC Gilles | jugement du {J-15} · envoi refusé | Modification | Rejetee | [0,1,3]
+FNIGBANC Fanny | à valider | Ajout | AFaire | []
+FNIGBANC Emma | jugement du {J-400} · SIREN 512 300 314 · désactivation à envoyer | Désactivation | EnAttente | [0,1,2]
+FNIGBANC David | jugement du {J-20} · à envoyer au FNIG | Modification | EnCours | [0,1]
+FNIGBANC Chloé | jugement du {J-25} · à envoyer au FNIG | Ajout | EnCours | [0,1]
+FNIGBANC Bruno | jugement du {J-28} · envoyée le {J-2} | Ajout | Validee | [0,1,3]
+FNIGBANC Alice | jugement du {J-30} · interdiction jusqu'au {A+5} · FNIG ALPHA SARL et 1 autre(s) · envoyée le {J-3} | Ajout | Validee | [0,1,2,3]
+controle: SELECT CFNIG_ETAT_FNIG + '/' + ISNULL(CFNIG_ERREUR_ENVOI_FNIG, 'NULL') + '/' + CFNIG_TYPE_DEMANDE_FNIG FROM v2.CASIER_JUDICIAIRE_FNIG WHERE CFNIG_ID_CFNIG = 300303 => AEnvoyer/NULL/Ajout
+controle: SELECT COUNT(*) FROM soc.Journal WHERE Ecran = 'Demandes FNIG' AND Famille = 'demande' AND Objet = 'la demande FNIG n° 300303 (FNIGBANC Chloé)' AND Verbe = 'a modifie' => 1
+---
+# Desactivations acceptees : 300301 (rattachee, debut avant la fin) et 300309 (autre juridiction, fin non controlee), avec la
+# « Raison annulation » saisie. Deux demandes NEUVES, 300310 et 300311 : type Desactivation, a envoyer, sans date d'envoi, erreur
+# vide, creees maintenant, au nom de l'agent ; les colonnes de l'envoyee (numero FNIG, casier, sanction) recopiees ; ses entreprises
+# NON (Copie ne recopie que la demande, CasierJudiciaireFnig.cs:324-341) ; les demandes d'origine restent envoyees.
+geste: Agir Désactiver
+ids: 300301,300309
+valeur: Raison annulation = Interdiction levée en appel
+resultat: fait
+message: 2 désactivations FNIG créées, à envoyer : le traitement de fond de RIG v2 les envoie au FNIG. Rien n'est envoyé d'ici.
+lignes:
+FNIGBANC Inès | jugement du {J-12} · interdiction jusqu'au {J-20} · à envoyer au FNIG | Désactivation | EnCours | [0,1]
+FNIGBANC Alice | jugement du {J-30} · interdiction jusqu'au {A+5} · à envoyer au FNIG | Désactivation | EnCours | [0,1]
+FNIGBANC Inès | jugement du {J-12} · interdiction jusqu'au {J-20} · envoyée le {J-1} | Ajout | Validee | [0,1,3]
+FNIGBANC Hugo | jugement du {J-12} · interdiction jusqu'au {J-20} · envoyée le {J-1} | Ajout | Validee | [0,1,3]
+FNIGBANC Gilles | jugement du {J-15} · envoi refusé | Modification | Rejetee | [0,1,3]
+FNIGBANC Fanny | à valider | Ajout | AFaire | []
+FNIGBANC Emma | jugement du {J-400} · SIREN 512 300 314 · désactivation à envoyer | Désactivation | EnAttente | [0,1,2]
+FNIGBANC David | jugement du {J-20} · à envoyer au FNIG | Modification | EnCours | [0,1]
+FNIGBANC Chloé | jugement du {J-25} · à envoyer au FNIG | Ajout | EnCours | [0,1]
+FNIGBANC Bruno | jugement du {J-28} · envoyée le {J-2} | Ajout | Validee | [0,1,3]
+FNIGBANC Alice | jugement du {J-30} · interdiction jusqu'au {A+5} · FNIG ALPHA SARL et 1 autre(s) · envoyée le {J-3} | Ajout | Validee | [0,1,2,3]
+controle: SELECT CFNIG_TYPE_DEMANDE_FNIG + '/' + CFNIG_ETAT_FNIG + '/' + COALESCE(CONVERT(varchar(10), CFNIG_DATE_ENVOI, 112), 'sans envoi') + '/[' + CFNIG_ERREUR_ENVOI_FNIG + ']' FROM v2.CASIER_JUDICIAIRE_FNIG WHERE CFNIG_ID_CFNIG = 300310 => Desactivation/AEnvoyer/sans envoi/[]
+controle: SELECT CFNIG_ID_FNIG + '/' + CONVERT(varchar(10), CFNIG_ID_CSRJD) + '/' + CFNIG_SANCTION + '/' + CFNIG_RAISON_ANNULATION FROM v2.CASIER_JUDICIAIRE_FNIG WHERE CFNIG_ID_CFNIG = 300310 => FNIG0300301/300391/Interdiction de gerer/Interdiction levée en appel
+controle: SELECT CASE WHEN f.CFNIG_UTILISATEUR = c.CompteWindows + ' : ' + c.Nom + ' ' + c.Prenom AND f.CFNIG_ID_UTLST = c.IdV2 THEN 'agent' ELSE f.CFNIG_UTILISATEUR END FROM v2.CASIER_JUDICIAIRE_FNIG AS f CROSS JOIN soc.Compte AS c WHERE f.CFNIG_ID_CFNIG = 300310 AND c.CompteWindows = 'banc.ecrans' => agent
+controle: SELECT CASE WHEN CFNIG_DATE_CREATION > DATEADD(DAY, -1, GETDATE()) THEN 'du jour' ELSE 'ancienne' END FROM v2.CASIER_JUDICIAIRE_FNIG WHERE CFNIG_ID_CFNIG = 300310 => du jour
+controle: SELECT COUNT(*) FROM v2.CASIER_JUDICIAIRE_FNIG_ENTREPRISE WHERE CFNET_ID_CFNIG IN (300310, 300311) => 0
+controle: SELECT CFNIG_TYPE_DEMANDE_FNIG + '/' + CFNIG_ETAT_FNIG + '/' + COALESCE(CONVERT(varchar(10), CFNIG_ID_CSRJD), 'sans casier') + '/' + CFNIG_RAISON_ANNULATION FROM v2.CASIER_JUDICIAIRE_FNIG WHERE CFNIG_ID_CFNIG = 300311 => Desactivation/AEnvoyer/sans casier/Interdiction levée en appel
+controle: SELECT CFNIG_TYPE_DEMANDE_FNIG + '/' + CFNIG_ETAT_FNIG + '/' + ISNULL(CFNIG_RAISON_ANNULATION, 'sans raison') FROM v2.CASIER_JUDICIAIRE_FNIG WHERE CFNIG_ID_CFNIG = 300301 => Ajout/Envoye/sans raison
+controle: SELECT COUNT(*) FROM soc.Journal WHERE Ecran = 'Demandes FNIG' AND Famille = 'demande' AND Verbe = 'a cree' => 2

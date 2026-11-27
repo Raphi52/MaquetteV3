@@ -4,6 +4,9 @@
 # sans etat -> AFaire []. La marche 2 (entreprises) s'ajoute avec au moins une entreprise renseignee.
 # Groupe : le type de demande ; sans type, « Ajout ».
 # Aucune demande n'est ecartee. L'entreprise vide de 300304 ne compte pas (jumeau : 300301 et ses deux entreprises).
+# 300309 et 300308 (lot 16, pour les controles de dates des gestes) : deux ajouts envoyes, leur fin d'interdiction lue.
+FNIGBANC Inès | jugement du {J-12} · interdiction jusqu'au {J-20} · envoyée le {J-1} | Ajout | Validee | [0,1,3]
+FNIGBANC Hugo | jugement du {J-12} · interdiction jusqu'au {J-20} · envoyée le {J-1} | Ajout | Validee | [0,1,3]
 FNIGBANC Gilles | jugement du {J-15} · envoi refusé | Modification | Rejetee | [0,1,3]
 FNIGBANC Fanny | à valider | Ajout | AFaire | []
 FNIGBANC Emma | jugement du {J-400} · SIREN 512 300 314 · désactivation à envoyer | Désactivation | EnAttente | [0,1,2]

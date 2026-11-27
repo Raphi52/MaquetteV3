@@ -468,6 +468,17 @@ foreach (var d in descripteurs)
     }
     foreach (var g in d.GroupesModificationSeule.Where(g => !d.Groupes.Contains(g)))
         defauts.Add($"groupe en modification seule « {g} », absent des groupes de l'ecran");
+    // Les etats qu'un geste declare (lot 16 : « Désactiver » une demande FNIG envoyee) : une File seule les lit (FormeFile.tsx) ;
+    // chaque geste nomme est un geste de l'ecran, chaque etat un de ses etats (sinon aucune ligne ne se coche pour lui).
+    if (d.EtatsGestes.Count > 0 && d.Forme != FormeEcran.File)
+        defauts.Add($"etats declares par geste sur une forme {d.Forme} : seule une File les lit");
+    foreach (var (g, etats) in d.EtatsGestes)
+    {
+        if (!d.Gestes.Contains(g)) defauts.Add($"etats declares du geste « {g} », absent des gestes de l'ecran");
+        if (etats.Length == 0) defauts.Add($"le geste « {g} » declare une liste d'etats vide : aucune ligne ne se cocherait");
+        foreach (var e in etats.Where(e => d.Etats.All(x => x.Code != e)))
+            defauts.Add($"etat « {e} » du geste « {g} » absent des etats de l'ecran");
+    }
     // Les regles d'affichage d'un champ (lot 14, 4e reprise : un etat de PC dans Tables de reference) : chacune nomme une CASE de sa
     // section, autre que lui (sinon la grille ne lit aucune case : le champ resterait masque, ou jamais bloque). fix-ok: une regle
     // qui nomme autre chose qu'une case de sa section est un champ masque pour toujours -- banc rouge sur une regle « Régime » injectee.

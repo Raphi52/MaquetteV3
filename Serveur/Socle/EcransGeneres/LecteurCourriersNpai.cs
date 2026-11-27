@@ -131,7 +131,11 @@ internal sealed class LecteurCourriersNpai : ILecteurEcran
         var nom = dossier.Length > 0 ? dossier : FormeLigne.Texte(r, "DMND_NOM");
         var relance = origine?.Code == SurveillanceComptes
                       || (parametres.TryGetValue("LstIdExer", out var exercices) && exercices.Length > 0);
-        return new LigneLue(nom, precisions, relance ? RelancesComptes : Formalites, etat, faites);
+        // L'id : la demande NPAI (DMND_ID_DMND), que « Annuler » vise (EcrivainCourriersNpai.cs, lot 16).
+        return new LigneLue(nom, precisions, relance ? RelancesComptes : Formalites, etat, faites)
+        {
+            Id = Convert.ToInt32(r["DMND_ID_DMND"]).ToString(System.Globalization.CultureInfo.InvariantCulture),
+        };
     }
 
     /// <summary>Le premier courrier d'origine qui n'est pas lui-meme une demande NPAI, en remontant au plus 3 crans ;

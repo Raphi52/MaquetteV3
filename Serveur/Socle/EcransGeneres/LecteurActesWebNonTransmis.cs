@@ -36,7 +36,7 @@ internal sealed class LecteurActesWebNonTransmis : ILecteurEcran
     internal const string DuJour = "Commandes du jour", PlusAnciennes = "Commandes plus anciennes";
 
     private const string Requete = """
-        SELECT TOP (@plafond) ad.ACTDP_CMDWEB_DATE, p.DPTRC_NUM_DEPOT, s.NumeroGestion, s.Siren, e.Denomination,
+        SELECT TOP (@plafond) ad.ACTDP_ID_ACDPS, ad.ACTDP_CMDWEB_DATE, p.DPTRC_NUM_DEPOT, s.NumeroGestion, s.Siren, e.Denomination,
                CASE WHEN ad.ACTDP_DESCRIPTION <> '' THEN ad.ACTDP_DESCRIPTION
                     ELSE (SELECT ap.R_ABREGEPIEC_DEVELOPPE_EDIT FROM v2.ABREGE_PIECE AS ap
                           WHERE ap.R_ABREGEPIEC_VALEUR = ad.ACTDP_ABREGE_PIECE) END AS Description,
@@ -64,7 +64,11 @@ internal sealed class LecteurActesWebNonTransmis : ILecteurEcran
         var precisions = FormeLigne.Joindre($"Dépôt {FormeLigne.Texte(r, "DPTRC_NUM_DEPOT")}", FormeLigne.Texte(r, "Description"),
                                             siren.Length > 0 ? $"SIREN {siren}" : null,
                                             commande is null ? null : $"commande du {FormeLigne.Date(commande)}");
-        // La regle d'etat (en tete du fichier) : toute ligne de la liste est a transmettre, aucune marche franchie.
-        return new LigneLue(nom, precisions, Convert.ToInt32(r["DuJour"]) == 1 ? DuJour : PlusAnciennes, "AFaire", []);
+        // La regle d'etat (en tete du fichier) : toute ligne de la liste est a transmettre, aucune marche franchie. L'id : l'acte
+        // depose (ACTDP_ID_ACDPS, colIdActeDepose de la V2), que « Annuler » vise (EcrivainActesWebNonTransmis.cs, lot 16).
+        return new LigneLue(nom, precisions, Convert.ToInt32(r["DuJour"]) == 1 ? DuJour : PlusAnciennes, "AFaire", [])
+        {
+            Id = Convert.ToInt32(r["ACTDP_ID_ACDPS"], System.Globalization.CultureInfo.InvariantCulture).ToString(System.Globalization.CultureInfo.InvariantCulture),
+        };
     }
 }

@@ -171,6 +171,35 @@ describe('Forme File : une file de travail', () => {
     expect(bouton('Relancer').title).toBe('')
   })
 
+  // Lot 16 du plan « RIG v3 100 % fonctionnel » (27/11/2026, decision du chef) : un geste de RIG v2 qui vise une ligne hors « a
+  // faire » et « en cours » -- « Désactiver » une demande FNIG ENVOYEE, « Renvoyer » une demande EN ERREUR (OPE_EDITION.cs:296-305)
+  // -- declare ses etats (etatsGestes) : la ligne se coche, ce geste part sur elle ; un geste qui ne les declare pas reste fige.
+  it('un geste qui declare ses etats se joue sur une ligne figee ; un geste sans declaration reste fige sur elle', async () => {
+    const d = descripteur({ gestes: ['Désactiver', 'Relancer'], etatsGestes: { Désactiver: ['Validee'] } })
+    const { bouton, ligne, annonce, container } = await monter(d)
+    const gamma = ligne('Gamma SARL').querySelector('input[type=checkbox]') as HTMLInputElement
+    expect(gamma.disabled).toBe(false)
+    fireEvent.click(gamma)
+    expect(bouton('Désactiver').disabled).toBe(false)
+    expect(bouton('Relancer').disabled).toBe(true)
+    expect(bouton('Relancer').title).toBe('« Relancer » ne s’applique pas aux lignes cochées : il ne vaut que pour les lignes « À relancer », « En cours »')
+    fireEvent.click(bouton('Désactiver'))
+    expect(annonce()).toBe('Démonstration : rien n’est enregistré — « Désactiver » sur 1 ligne : aucune n’est modifiée dans la base.')
+    // « Désactiver » ne vaut que pour « Relancé » : cochee avec Gamma, Alpha (« À relancer ») n'est pas visee.
+    fireEvent.click(bouton('Décocher'))
+    fireEvent.click(ligne('Alpha SARL').querySelector('input[type=checkbox]')!)
+    fireEvent.click(gamma)
+    expect(container.querySelector('.rig-eg-lot__compte')!.textContent).toBe('2 sélectionnées')
+    fireEvent.click(bouton('Relancer'))
+    expect(annonce()).toContain('« Relancer » sur 1 ligne')
+    fireEvent.click(bouton('Désactiver'))
+    expect(annonce()).toContain('« Désactiver » sur 1 ligne')
+    // « Tout cocher » prend les trois lignes : chacune a un geste qui vaut pour son etat.
+    fireEvent.click(bouton('Décocher'))
+    fireEvent.click(container.querySelector('input[aria-label="Tout cocher"]')!)
+    expect(container.querySelector('.rig-eg-lot__compte')!.textContent).toBe('3 sélectionnées')
+  })
+
   // Lot 8 (26/11/2026), mesure sur le bureau cache : une relance faite sortait des 200 lignes lues, et la recherche, qui ne
   // filtrait que ces lignes, ne la retrouvait pas. Comme les autres formes (useRecherche) : le texte part dans la base.
   it('la recherche part dans la base quand un lecteur de la file sait chercher ; ses lignes cherchees ne sont pas refiltrees', async () => {

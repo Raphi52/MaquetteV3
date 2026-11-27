@@ -98,6 +98,10 @@ internal sealed class LecteurRenvoisRpjc : ILecteurEcran
             avocat.Length > 0 ? avocat : $"avocat non trouvé (CNBF {FormeLigne.Texte(r, "RPJCR_CNBF_DEMANDE")})",
             initiale.Length > 0 ? $"audience initiale du {initiale}" : null,
             regle.Statut);
-        return new LigneLue(nom, precisions, regle.Groupe, regle.Etat, regle.Faites);
+        // L'id : la demande (RPJCR_ID_RPJCR), que « Accepter » et « Rejeter » visent (EcrivainRenvoisRpjc.cs, lot 16).
+        return new LigneLue(nom, precisions, regle.Groupe, regle.Etat, regle.Faites)
+        {
+            Id = Convert.ToInt32(r["RPJCR_ID_RPJCR"], System.Globalization.CultureInfo.InvariantCulture).ToString(System.Globalization.CultureInfo.InvariantCulture),
+        };
     }
 }

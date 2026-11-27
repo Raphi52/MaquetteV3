@@ -6,8 +6,8 @@
 # Les convocations LRAR de PROC_GCONV.sql (1706411-1706420, émises E, courrier, 2001) : cet écran lit TOUTE demande d'édition,
 # elles y entrent, entre les éditions datées du banc et celle sans date.
 EDITION ALPHA SARL · 2020 B 40401 · demande 26000200421 | Accusé de dépôt · à EDITION ALPHA SARL · créée le {J+0} | Courrier | AFaire | []
-EDITION ALPHA SARL · 2020 B 40401 · demande 26000200421 | Certificat de non-faillite · à Maître Banc · créée le {J-1} | Courriel | EnCours | [0,1]
-EDITION ALPHA SARL · 2020 B 40401 · demande 26000200421 | Lettre de relance · à EDITION ALPHA SARL · créée le {J-2} · file « LRAR » | File différée | EnCours | [0,1,2]
+EDITION ALPHA SARL · 2020 B 40401 · demande 26000200421 | Certificat de non-faillite · à Maître Banc · 2 ex. · créée le {J-1} | Courriel | EnCours | [0,1]
+EDITION ALPHA SARL · 2020 B 40401 · demande 26000200421 | Lettre de relance · à EDITION ALPHA SARL · 0 ex. · créée le {J-2} · file « LRAR » | File différée | EnCours | [0,1,2]
 EDITION ALPHA SARL · 2020 B 40401 · demande 26000200421 | Extrait Kbis · à EDITION ALPHA SARL · créée le {J-3} | Courrier | EnCours | [0,1,2]
 EDITION ALPHA SARL · 2020 B 40401 · demande 26000200421 | Extrait Kbis · à Maître Banc · émise le {J-4} | Courriel | Validee | [0,1,2,3]
 EDITION ALPHA SARL · 2020 B 40401 · demande 26000200421 | Accusé de dépôt · à EDITION ALPHA SARL · créée le {J-5} · en erreur : Adresse du destinataire absente | Courrier | EnCours | [0,1]

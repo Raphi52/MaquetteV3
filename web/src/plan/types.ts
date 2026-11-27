@@ -193,6 +193,9 @@ export interface DescripteurEcranVue {
   /** Les gestes nommes par la fiche RIG v2 (File, Audience, Etat, Document, Consultation ; boutons de confirmation d'une
    * Operation ; menu de ligne d'un Referentiel, en plus de Modifier et Supprimer) ; vide : le bouton « valider » seul. */
   gestes: string[]
+  /** Une File : par geste, les etats des lignes qu'il vise quand RIG v2 l'offre hors « a faire » et « en cours » (« Désactiver »
+   * une demande FNIG envoyee). Geste absent : les lignes a faire et en cours, les autres sont figees. */
+  etatsGestes?: Record<string, string[]>
   lignes: LigneEcranVue[]
   /** Un ecran REUNI : les procedures qu'il reunit, une par groupe (titre = groupe). Chaque ligne
    * suit les parties et le bouton de SA procedure ; vide pour l'ecran d'une seule procedure. */
