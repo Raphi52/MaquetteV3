@@ -412,7 +412,7 @@ List<int> Ids(CriteresCommandes cr, bool directs) => OrdreTemoin(cr, directs).Se
 string OngletsTemoin(EtatCommande actif) => string.Join(", ", TraitementCommandes.Onglets(temoin, defaut)
     .Select(o => $"{TraitementCommandes.Libelle(o.Etat)} {o.Nombre}{(o.Etat == actif ? "*" : "")}"));
 
-var vue = EcranCommandesWeb.Ouvrir();
+var vue = await EcranCommandesWeb.Ouvrir();
 VueCommandesWeb Geste(string geste, object? valeur = null) =>
     vue = EcranCommandesWeb.Agir(vue.Session, geste, JsonSerializer.SerializeToElement(valeur));
 // Proue : un onglet d'etat = une tuile, qui filtre la liste sur son etat.
@@ -598,7 +598,7 @@ Exiger(vue.Coordonnees is null, "joue : « Fermer » referme les coordonnees");
 // marches (dossier, choix, edition) qui sont les morceaux de la regle qui ferme
 // Valider. Une session NEUVE : le jeu d'exemple tel qu'a l'ouverture.
 EcranCommandesWeb.Fermer(vue.Session);
-vue = EcranCommandesWeb.Ouvrir();
+vue = await EcranCommandesWeb.Ouvrir();
 // a) Pour chaque commande de la liste : le compte affiche AVANT de l'ouvrir est celui
 //    de son escalier A L'OUVERTURE, et Valider se ferme sur le manque de la premiere
 //    marche non faite, mot pour mot (une seule regle, pas deux qui divergent).
@@ -660,7 +660,7 @@ Exiger(LignesLues().Length > 0 && LignesLues().All(l => l.Avancement is null && 
 // et le SIREN. Une session NEUVE, comparee a un jeu NEUF filtre par Metier
 // directement (le temoin du haut a deja rejete IG-90601 et saisi MAN-0001).
 EcranCommandesWeb.Fermer(vue.Session);
-vue = EcranCommandesWeb.Ouvrir();
+vue = await EcranCommandesWeb.Ouvrir();
 var neuf = TraitementCommandes.JeuDemoCommandes();
 List<int> IdsNeufs(CriteresCommandes cr) =>
     TraitementCommandes.Regrouper(TraitementCommandes.Filtrer(neuf, cr), false).SelectMany(g => g.Commandes).Select(c => c.Id).ToList();

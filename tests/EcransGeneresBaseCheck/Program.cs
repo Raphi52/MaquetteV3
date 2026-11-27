@@ -862,6 +862,27 @@ foreach (var (code, ecrivain) in ecrivains.ParProcedure.OrderBy(p => p.Key, Stri
         $"PROC_LISTEEXCEL : 65 536 lignes comptees ; 65 537 -> « Bloquée : trop de lignes » (OPE_RECHERCHE.cs:467) ({Texte(auSeuil)} / {Texte(auDela)})");
 }
 
+// ============================================================ 6. L'APERCU KBIS D'UN VRAI DOSSIER (PROC_XEX, lot 13)
+// Pont/ApercuKbisDossier.cs contre ce serveur : la fiche de 2300601 (PROC_XEX.sql) devient l'extrait de Pont/ApercuKbis.cs, mise en
+// forme comprise (capital N2 fr, dates jj/mm/aaaa, greffe de l'en-tete par le code greffe du siege) ; sans serveur, aucun extrait.
+{
+    var kbis = await ApercuKbisDossier.DossierAsync(client, Greffe, "PROC_XEX", "Dossiers RCS", "2300601");
+    string Ligne(string titre) => kbis.Kbis?.Sections.SelectMany(s => s.Lignes).FirstOrDefault(l => l.Titre == titre)?.Libelle ?? "absente";
+    Exiger(kbis is { Mode: "base", Kbis: { GreffeLibelle: "Greffe du Tribunal de Commerce de Grenoble", VilleRcs: "GRENOBLE", Gestion: "2013B60001" } }
+           && Ligne("Immatriculation au RCS, numero") == "523 006 010 R.C.S. GRENOBLE" && Ligne("Date d'immatriculation") == "01/01/2013"
+           && Ligne("Forme juridique") == "Société à responsabilité limitée" && Ligne("Capital social") == "15 000,50 EUR (variable)"
+           && Ligne("Adresse du siege") == "12 RUE DU BANC KBIS 38000 GRENOBLE" && Ligne("Qualite") == "Président"
+           && Ligne("Activite(s) exercee(s)") == "Édition de logiciels" && Ligne("Code NAF") == "5829C" && Ligne("Origine du fonds ou de l'activite") == "Création",
+        $"apercu Kbis PROC_XEX : la fiche du dossier 2300601 mise en extrait par Pont/ApercuKbis.cs (greffe {kbis.Kbis?.GreffeLibelle}, capital "
+        + $"« {Ligne("Capital social")} », forme « {Ligne("Forme juridique")} », adresse « {Ligne("Adresse du siege")} »)");
+    var sansSiege = await ApercuKbisDossier.DossierAsync(client, Greffe, "PROC_XEX", "Dossiers RCS", "2300602");
+    Exiger(sansSiege.Kbis is { VilleRcs: var ville } && ville == RigV3Desktop.Greffes.Trouver(Greffe).Ville
+           && !sansSiege.Kbis.Sections.Any(s => s.Titre.StartsWith("GESTION", StringComparison.Ordinal)),
+        $"apercu Kbis PROC_XEX, jumeau sans siege ni dirigeant : le greffe de la session, aucune section de direction ({sansSiege.Kbis?.VilleRcs})");
+    Exiger((await ApercuKbisDossier.DossierAsync(null, null, "PROC_XEX", "Dossiers RCS", "2300601")) is { Mode: "exemple", Kbis: null, Message: not null },
+        "apercu Kbis PROC_XEX sans serveur : aucun extrait, le motif");
+}
+
 await app.StopAsync();
 Console.WriteLine();
 Console.WriteLine(echecs.Count == 0 ? "EcransGeneresBaseCheck : VERT" : $"EcransGeneresBaseCheck : ROUGE ({echecs.Count} echec(s))");

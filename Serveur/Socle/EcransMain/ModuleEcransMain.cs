@@ -87,9 +87,36 @@ internal sealed class ModuleEcransMain : IModuleServeur
         routes.MapPost(RoutesStatistiques.Statistiques, (string greffe, RechercheStatistiques recherche, CatalogueGreffes c, CancellationToken ct)
             => SurLaBase(c, greffe, ct, async cn => Results.Ok(await LectureStatistiques.LireAsync(cn, recherche, ct))))
             .RequireAuthorization(PolitiquesSocle.AgentAdmis);
+        // Lot 13 : « Comptabilisation » (LectureComptabilisation.cs), les journées à comptabiliser, règles de RIG v2.
+        routes.MapGet(RoutesComptabilisation.Journees, (string greffe, CatalogueGreffes c, CancellationToken ct)
+            => SurLaBase(c, greffe, ct, async cn => Results.Ok(await LectureComptabilisation.LireAsync(cn, ct))))
+            .RequireAuthorization(PolitiquesSocle.AgentAdmis);
         // Lot 6 : « Réquisitions », la recherche des entreprises (LectureEntreprisesRequi.cs).
         routes.MapPost(RoutesRequisitions.Entreprises, (string greffe, RechercheEntreprises recherche, CatalogueGreffes c, CancellationToken ct)
             => SurLaBase(c, greffe, ct, async cn => Results.Ok(await LectureEntreprisesRequi.LireAsync(cn, recherche, ct))))
+            .RequireAuthorization(PolitiquesSocle.AgentAdmis);
+        // Lot 20 : la recherche BODACC de la palette Ctrl K (LectureBodacc.ChercherAsync), puis Clôture, Archivage, Coffre-fort,
+        // Commandes web (LectureCloture/Archivage/CoffreFort/CommandesWeb.cs) et les réglages d'accueil de l'agent appelant.
+        routes.MapPost(RoutesBodaccRecherche.Recherche, (string greffe, RechercheBodacc recherche, CatalogueGreffes c, CancellationToken ct)
+            => SurLaBase(c, greffe, ct, async cn => Results.Ok(await LectureBodacc.ChercherAsync(cn, recherche.Texte, ct))))
+            .RequireAuthorization(PolitiquesSocle.AgentAdmis);
+        routes.MapPost(RoutesCloture.Affaires, (string greffe, RechercheCloture recherche, CatalogueGreffes c, CancellationToken ct)
+            => SurLaBase(c, greffe, ct, async cn => Results.Ok(await LectureCloture.LireAsync(cn, recherche, ct))))
+            .RequireAuthorization(PolitiquesSocle.AgentAdmis);
+        routes.MapPost(RoutesArchivage.Dossiers, (string greffe, RechercheArchivage recherche, CatalogueGreffes c, CancellationToken ct)
+            => SurLaBase(c, greffe, ct, async cn => Results.Ok(await LectureArchivage.LireAsync(cn, recherche, ct))))
+            .RequireAuthorization(PolitiquesSocle.AgentAdmis);
+        routes.MapGet(RoutesCoffreFort.Depots, (string greffe, CatalogueGreffes c, CancellationToken ct)
+            => SurLaBase(c, greffe, ct, async cn => Results.Ok(await LectureCoffreFort.LireAsync(cn, ct))))
+            .RequireAuthorization(PolitiquesSocle.AgentAdmis);
+        routes.MapGet(RoutesCommandesWeb.Commandes, (string greffe, CatalogueGreffes c, CancellationToken ct)
+            => SurLaBase(c, greffe, ct, async cn => Results.Ok(await LectureCommandesWeb.LireAsync(cn, ct))))
+            .RequireAuthorization(PolitiquesSocle.AgentAdmis);
+        routes.MapGet(RoutesParametresAccueil.Parametres, (string greffe, HttpContext http, CatalogueGreffes c, ServiceDroits droits, BaseRig commune,
+                                                           CancellationToken ct)
+            => SurLaBase(c, greffe, ct, async cn => await droits.AppelantAsync(http, commune, cn, ct) is { } moi
+                ? Results.Ok(await LectureParametresAccueil.LireAsync(cn, moi.Id, moi.EstAdministrateur, moi.EstAmitel, ct))
+                : Results.Json(new { motif = "Agent inconnu dans la base de ce greffe." }, statusCode: StatusCodes.Status403Forbidden)))
             .RequireAuthorization(PolitiquesSocle.AgentAdmis);
     }
 

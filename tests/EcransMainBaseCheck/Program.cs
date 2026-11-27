@@ -1459,6 +1459,119 @@ Exiger((await EcranDocDemat.PiecesAsync(null, null)) is { Mode: "demo", Pieces.L
 Exiger((await EcranDocDemat.PiecesAsync(client, GreffeAbsent)) is { Mode: "erreur", Pieces.Length: 0, Message: not null },
     "pont Documents dematerialises, greffe absent : le motif, AUCUNE piece");
 
+// ============================================================ 13. COMPTABILISATION (LectureComptabilisation.cs, lot 13)
+// « Comptabilisation » (PROC_COMPTABILISATION), branchee au lot 13 du plan : l'arbre des journees de RIG v2 (OPE_COMPTABILISATION,
+// TreeViewJoursCompta). La lecture prend TOUTES les factures et tous les encaissements non comptabilises de la base : les factures
+// des sections precedentes sont marquees comptabilisees le 01/01/1900 le temps de la section, puis rendues. Journees isolees en mars
+// 1971. Identifiants 2313xxx (lot 13 : 2 300 000 a 2 399 999). Chaque regle a son jumeau ecarte.
+// fix-ok: mesure au premier passage du banc (27/11/2026) -- la comparaison formatait les montants dans la culture du poste
+// (« 50,00 » contre « 50.00 » attendu) et l'UPDATE de soc.Reglage sans AuteurModif/DateModif levait « SOC-003 CA07 ».
+await Sql("""
+    IF COL_LENGTH('v2.FACTURE', 'FACTU_MONTANT_TTC') IS NULL ALTER TABLE v2.FACTURE ADD FACTU_MONTANT_TTC money NULL;
+    IF COL_LENGTH('v2.FACTURE', 'FACTU_DATE_COMPTABILISATION') IS NULL ALTER TABLE v2.FACTURE ADD FACTU_DATE_COMPTABILISATION datetime NULL;
+    IF COL_LENGTH('v2.AFFAIRE', 'AFFRE_ID_UTLST_EN_COURS') IS NULL ALTER TABLE v2.AFFAIRE ADD AFFRE_ID_UTLST_EN_COURS int NULL;
+    IF COL_LENGTH('v2.VENTILATION', 'VENTI_ID_ENCMT') IS NULL ALTER TABLE v2.VENTILATION ADD VENTI_ID_ENCMT int NULL;
+    IF COL_LENGTH('v2.ARTICLE_UTILISE', 'ARTUT_NUMERO_FACTURE') IS NULL ALTER TABLE v2.ARTICLE_UTILISE ADD ARTUT_NUMERO_FACTURE varchar(25) NULL;
+    IF OBJECT_ID(N'v2.ENCAISSEMENT') IS NULL
+        CREATE TABLE v2.ENCAISSEMENT (ENCMT_ID_ENCMT int NOT NULL PRIMARY KEY, ENCMT_DATE_ENCAISSEMENT datetime NOT NULL,
+            ENCMT_MODE_PAIEMENT varchar(8) NULL, ENCMT_MONTANT money NULL, ENCMT_REMIS int NULL, ENCMT_DATE_COMPTABILISATION datetime NULL);
+    IF OBJECT_ID(N'v2.MODE_PAIEMENT') IS NULL
+        CREATE TABLE v2.MODE_PAIEMENT (R_MODEPAIEME_VALEUR varchar(8) NOT NULL PRIMARY KEY, R_MODEPAIEME_LIBELLE_ECRAN varchar(35) NOT NULL,
+            R_MODEPAIEME_TYPE varchar(2) NULL);
+    """);
+await Sql("""
+    UPDATE v2.FACTURE SET FACTU_DATE_COMPTABILISATION = '19000101' WHERE FACTU_DATE_COMPTABILISATION IS NULL;
+    INSERT INTO v2.MODE_PAIEMENT (R_MODEPAIEME_VALEUR, R_MODEPAIEME_LIBELLE_ECRAN, R_MODEPAIEME_TYPE)
+    SELECT v, l, t FROM (VALUES ('CH13', 'Chèque du banc', 'CH'), ('ES13', 'Espèces du banc', 'ES'), ('VI13', 'Virement du banc', 'VI'),
+                                ('REG', 'Régularisation', 'RG')) AS m(v, l, t)
+    WHERE NOT EXISTS (SELECT 1 FROM v2.MODE_PAIEMENT AS x WHERE x.R_MODEPAIEME_VALEUR = m.v);
+    -- 2313001 en cours (tenue par un agent) ; 2313002 non.
+    INSERT INTO v2.AFFAIRE (AFFRE_ID_AFFRE, AFFRE_LIBELLE, AFFRE_ID_UTLST_EN_COURS) VALUES
+        (2313001, 'Compta - AFF ALPHA', 5), (2313002, 'Compta - AFF BETA', NULL);
+    INSERT INTO v2.DEMANDE (DMND_ID_DMND, DMND_NUM_DEMANDE, DMND_ETAT_DEMANDE, DMND_EN_COURS, DMND_CODE_PROSS, DMND_ID_AFFRE) VALUES
+        (2313101, 'D2313101', 'V', 0, 'IMMAT', 2313001), (2313102, 'D2313102', 'V', 0, 'IMMAT', 2313002),
+        (2313103, 'D2313103', 'V', 0, 'IMMAT', NULL);
+    -- 01/03/1971 : deux factures (100,10 + 50,05 TTC, une affaire en cours) ; jumeau ecarte F2313203 deja comptabilisee.
+    -- 03/03/1971 : F2313204, sa demande SANS affaire -- jumeau ecarte : son jour n'est pas une journee (INNER JOIN AFFAIRE).
+    INSERT INTO v2.FACTURE (FACTU_NUMERO_FACTURE, FACTU_NUM_DEMANDE, FACTU_DATE_CREATION, FACTU_MONTANT_TTC, FACTU_DATE_COMPTABILISATION) VALUES
+        ('F2313201', 'D2313101', '19710301 09:00', 100.10, NULL), ('F2313202', 'D2313102', '19710301 17:30', 50.05, NULL),
+        ('F2313203', 'D2313101', '19710301 10:00', 999.99, '19710401'), ('F2313204', 'D2313103', '19710303', 12.00, NULL);
+    -- 01/03/1971 : remis 77 en cheque (30,00 + 20,00) ; non remis : cheque 10,00 (un remis du meme mode le meme jour : observation),
+    -- REG 5,00 (pas d'observation pour REG/PV), especes 1,23 ; jumeaux ecartes : 2313306 deja comptabilise, 2313307 sans mode.
+    -- 02/03/1971 : un virement non remis 7,77, ventile sur 2313002 : la journee existe par son seul encaissement.
+    -- 04/03/1971 : remis 78 (virement 8,00) SANS ventilation sur une affaire -- jumeau ecarte : son jour n'est pas une journee.
+    INSERT INTO v2.ENCAISSEMENT (ENCMT_ID_ENCMT, ENCMT_DATE_ENCAISSEMENT, ENCMT_MODE_PAIEMENT, ENCMT_MONTANT, ENCMT_REMIS, ENCMT_DATE_COMPTABILISATION) VALUES
+        (2313301, '19710301 09:10', 'CH13', 30.00, 77, NULL), (2313302, '19710301 11:00', 'CH13', 20.00, 77, NULL),
+        (2313303, '19710301 12:00', 'CH13', 10.00, NULL, NULL), (2313304, '19710301 12:30', 'REG', 5.00, NULL, NULL),
+        (2313305, '19710301 13:00', 'ES13', 1.23, NULL, NULL), (2313306, '19710301 14:00', 'ES13', 40.00, NULL, '19710305'),
+        (2313307, '19710301 15:00', NULL, 3.00, NULL, NULL), (2313308, '19710302 10:00', 'VI13', 7.77, NULL, NULL),
+        (2313309, '19710304 10:00', 'VI13', 8.00, 78, NULL);
+    INSERT INTO v2.VENTILATION (VENTI_ID_VENTI, VENTI_ID_AFFRE, VENTI_MONTANT, VENTI_ID_ENCMT) VALUES
+        (2313401, 2313001, 30.00, 2313301), (2313402, 2313002, 7.77, 2313308);
+    """);
+await using (var cn = new SqlConnection(greffe.Connexion))
+{
+    await cn.OpenAsync();
+    var compta = await LectureComptabilisation.LireAsync(cn, CancellationToken.None);
+    Exiger(compta is { Anomalie: null, EncaissementsSeuls: false, Total: 2 }
+           && compta.Journees.Select(j => j.Date).SequenceEqual([new DateTime(1971, 3, 1), new DateTime(1971, 3, 2)]),
+        "comptabilisation : les journees = jours des factures (demande ET affaire) UNION jours des encaissements ventiles, de la plus "
+        + $"ancienne a la plus recente ; le 03/03 (demande sans affaire) et le 04/03 (sans ventilation) ecartes ({string.Join(",", compta.Journees.Select(j => j.Date.ToString("dd/MM")))})");
+    var mars1 = compta.Journees[0];
+    Exiger(mars1 is { Factures: 2, MontantTtc: 150.15m, AffairesEnCours: 1, SansDemande: 0 },
+        $"comptabilisation : l'agregat FactureJour du 01/03 -- 2 factures, 150,15 TTC exact, 1 affaire en cours ; la facture deja comptabilisee ecartee ({mars1})");
+    // Montant en ecriture invariante : « 50.00 », quelle que soit la culture du poste.
+    Exiger(mars1.Encaissements.Select(e => $"{e.Remis?.ToString() ?? "-"}|{e.Mode}|{e.Libelle}|{e.TypeMode}|{e.Nombre}|{e.Montant.ToString("0.00", System.Globalization.CultureInfo.InvariantCulture)}|{e.Observation}")
+               .SequenceEqual(["77|CH13|Chèque du banc|CH|2|50.00|", "-|REG|Régularisation|RG|1|5.00|",
+                               $"-|CH13|Chèque du banc|CH|1|10.00|{LectureComptabilisation.RemisDejaPresents}", "-|ES13|Espèces du banc|ES|1|1.23|"]),
+        "comptabilisation : sous le 01/03, le remis 77 (2 cheques, 50,00), puis les non remis REG, puis les autres modes par code, le cheque "
+        + "non remis avec l'observation de RIG v2 ; l'encaissement comptabilise et celui sans mode ecartes ("
+        + string.Join(" ; ", mars1.Encaissements.Select(e => $"{e.Remis}|{e.Mode}|{e.Nombre}|{e.Montant}")) + ")");
+    Exiger(compta.Journees[1] is { Factures: 0, MontantTtc: 0m } && compta.Journees[1].Encaissements is [{ Remis: null, Mode: "VI13", Montant: 7.77m }],
+        "comptabilisation : le 02/03, une journee par son seul encaissement (virement non remis 7,77)");
+    var une = await LectureComptabilisation.LireAsync(cn, CancellationToken.None, plafond: 1);
+    Exiger(une.Journees.Length == 1 && une.Total == 2, $"comptabilisation : plafond 1 -> une journee, total 2 ({une.Total})");
+}
+// Le reglage EXPRESSO_FIGERFACTAUTO (« 1 » par defaut) : « 0 » affiche le libelle du parametre ; jumeau « 1 » : non.
+await Sql("INSERT INTO soc.Reglage (Code, Libelle, Valeur) VALUES ('EXPRESSO_FIGERFACTAUTO', 'Banc EcransMainBase lot 13', '0')");
+await using (var cn = new SqlConnection(greffe.Connexion))
+{
+    await cn.OpenAsync();
+    Exiger((await LectureComptabilisation.LireAsync(cn, CancellationToken.None)).EncaissementsSeuls, "comptabilisation : EXPRESSO_FIGERFACTAUTO a « 0 » -> encaissements seuls");
+    // SOC-003 CA07 : modifier un reglage pose son auteur et sa date.
+    await Sql("UPDATE soc.Reglage SET Valeur = '1', AuteurModif = 'banc', DateModif = SYSDATETIME() WHERE Code = 'EXPRESSO_FIGERFACTAUTO'");
+    Exiger(!(await LectureComptabilisation.LireAsync(cn, CancellationToken.None)).EncaissementsSeuls, "comptabilisation : jumeau, « 1 » -> non");
+}
+var comptaRoute = await http.GetFromJsonAsync<ComptabilisationLue>(RoutesEcransMain.Pour(RoutesComptabilisation.Journees, Greffe), json);
+Exiger(comptaRoute is { Total: 2, Anomalie: null } && comptaRoute.Journees[0].MontantTtc == 150.15m, "route de la comptabilisation : les journees de la lecture");
+Exiger((await http.GetAsync(RoutesEcransMain.Pour(RoutesComptabilisation.Journees, GreffeAbsent))).StatusCode == HttpStatusCode.NotFound,
+    "route de la comptabilisation : greffe absent -> 404, sans repli");
+var comptaPont = await EcranComptabilisation.JourneesAsync(client, Greffe);
+Exiger(comptaPont is { Mode: "serveur", Total: 2, Anomalie: null } && comptaPont.Journees[0] is { Date: "1971-03-01", MontantTotalTTC: 15015, NbFactures: 2 }
+       && comptaPont.Journees[0].Remis[0] is { NumeroRemis: 77, ModePaiement: "Chèque du banc", TypeMode: "CH", SommeEncaissement: 5000, DateEncaissement: "1971-03-01" }
+       && comptaPont.Journees[0].Remis[2] is { NumeroRemis: 0, Observation: LectureComptabilisation.RemisDejaPresents }
+       && !comptaPont.Journees.Any(j => EcranComptabilisation.Exemple().Journees.Any(e => e.Date == j.Date)),
+    "pont Comptabilisation branche : les journees de la base (aaaa-mm-jj, montants en centimes, non remis = 0), aucune de la demonstration");
+// Une facture non comptabilisee sans demande bloque l'arbre (RIG v2), son affaire par ARTICLE_UTILISE ; retiree ensuite.
+await Sql("""
+    INSERT INTO v2.FACTURE (FACTU_NUMERO_FACTURE, FACTU_NUM_DEMANDE, FACTU_DATE_CREATION, FACTU_MONTANT_TTC) VALUES ('F2313205', 'D2313999', '19710301', 1.00);
+    INSERT INTO v2.ARTICLE_UTILISE (ARTUT_ID_ARTUT, ARTUT_ID_AFFRE, ARTUT_NUMERO_FACTURE) VALUES (2313501, 2313001, 'F2313205');
+    """);
+var anomalie = await EcranComptabilisation.JourneesAsync(client, Greffe);
+Exiger(anomalie is { Mode: "serveur", Journees.Length: 0, Total: 0 }
+       && anomalie.Anomalie == "ANOMALIE : 1 facture(s) ne sont rattachées à aucune demande. Merci de contacter Amitel.\n\nFacture N° F2313205 (affaire N° 2313001)",
+    $"comptabilisation : une facture sans demande -> le message de RIG v2 et AUCUNE journee ({anomalie.Anomalie})");
+await Sql("DELETE FROM v2.ARTICLE_UTILISE WHERE ARTUT_ID_ARTUT = 2313501; DELETE FROM v2.FACTURE WHERE FACTU_NUMERO_FACTURE = 'F2313205';");
+Exiger((await EcranComptabilisation.JourneesAsync(client, Greffe)) is { Anomalie: null, Total: 2 }, "comptabilisation : jumeau, la facture retiree -> les journees reviennent");
+Exiger((await EcranComptabilisation.JourneesAsync(null, null)) is { Mode: "demo", Journees.Length: 3, EncaissementsSeuls: true },
+    "pont Comptabilisation sans serveur : la demonstration, mode « demo »");
+Exiger((await EcranComptabilisation.JourneesAsync(client, GreffeAbsent)) is { Mode: "erreur", Journees.Length: 0, Message: not null },
+    "pont Comptabilisation, greffe absent : le motif, AUCUNE journee");
+await Sql("UPDATE v2.FACTURE SET FACTU_DATE_COMPTABILISATION = NULL WHERE FACTU_DATE_COMPTABILISATION = '19000101';");
+
+// ============================================================ 20. LOT 20 : recherche BODACC, Cloture, Archivage, Coffre-fort, Commandes web, Mon accueil (Lot20.cs)
+await new BancLot20((sql, p) => Sql(sql, p), Exiger, greffe.Connexion, client, http, json, Greffe, GreffeAbsent, jour).JouerAsync();
+
 Console.WriteLine();
 if (echecs.Count == 0) { Console.WriteLine("Ecrans faits main branches sur la base : VERT."); return 0; }
 Console.WriteLine(echecs.Count + " echec(s) : " + string.Join(" | ", echecs));
