@@ -142,6 +142,13 @@ describe('EcranComptabilisation : provenance des journees', () => {
     const { container } = render(<EcranComptabilisation />)
     expect((await screen.findByRole('alert')).textContent).toContain('Facture N° F1 (affaire non identifiée)')
     expect(container.querySelectorAll('.rig-bascule')).toHaveLength(0)
+    // Le panneau de gauche (replie au depart) se rouvre par le bouton « Criteres » de la tete, meme sans journee.
+    // fix-ok: mesure sur la copie de dev le 27/11/2026 (capture k4.png, arbre d'accessibilite) : l'anomalie seule, sans tete
+    // de liste, laissait le panneau replie sans bouton pour le rouvrir (.rig-lm--criteres-replies, ListeModerne.tsx:140).
+    const criteres = screen.getByRole('button', { name: /Criteres/ })
+    fireEvent.click(criteres)
+    expect(criteres.getAttribute('aria-expanded')).toBe('true')
+    expect(container.querySelector('.rig-lm--criteres-replies')).toBeNull()
   })
 
   it('le libelle du parametre ne s\'affiche que si le greffe a EXPRESSO_FIGERFACTAUTO a « 0 »', async () => {

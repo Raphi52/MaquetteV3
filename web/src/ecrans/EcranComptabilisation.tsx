@@ -147,6 +147,9 @@ export function EcranComptabilisation() {
 
       {jour ? <JourneeChoisie jour={jour} filtre={filtre} setFiltre={setFiltre} /> : (
         <ListeModerne etiquette="Journees a comptabiliser">
+          {/* La tete porte le bouton « Criteres » : sans elle, le panneau de gauche, replie au depart (ListeModerne), ne se
+              rouvrirait plus (mesure le 27/11/2026 sur la copie de dev : anomalie seule, panneau invisible). */}
+          <EnteteListe titre="Journees a comptabiliser" synthese={<>{vue?.total ?? 0}{' jour(s) a comptabiliser'}</>} />
           {vue?.anomalie ? (
             // RIG v2 : DialogBox.Show(« ANOMALIE : ... »), puis l'arbre vide (OPE_COMPTABILISATION.cs:186-193).
             <p className="rig-eg-note" role="alert" style={{ whiteSpace: 'pre-line' }}>

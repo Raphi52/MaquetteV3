@@ -29,7 +29,14 @@ export function ApercuKbisLu({ d, objet }: { d: DescripteurEcranVue; objet: Lign
   if (!vue) return null
   return (
     <section className="rig-eg-recap" aria-label={d.apercuKbis ?? 'Extrait Kbis'}>
-      {vue.kbis ? <ApercuKbis vue={vue.kbis} /> : vue.message && <p className="rig-eg-note" role="note">{vue.message}</p>}
+      {/* La feuille A4 de l'apercu du plan de travail (plan/Apercu.tsx) : .rig-kbis est place en absolu et dimensionne en
+          unites de SA feuille (rig-accueil.css, .rig-apercu__feuille--kbis). fix-ok: mesure a l'ecran le 27/11/2026 (copie de
+          dev, dossier 2001D00693) -- sans la feuille, l'extrait recouvrait tout l'ecran, en tres grands caracteres. */}
+      {vue.kbis ? (
+        <div className="rig-apercu__pages">
+          <div className="rig-apercu__feuille rig-apercu__feuille--kbis"><ApercuKbis vue={vue.kbis} /></div>
+        </div>
+      ) : vue.message && <p className="rig-eg-note" role="note">{vue.message}</p>}
     </section>
   )
 }

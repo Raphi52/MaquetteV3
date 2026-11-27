@@ -1151,6 +1151,9 @@ describe('socle fonctionnel : recherche et fiche sur Referentiel, Audience et Op
       expect(pont.appels).toHaveBeenCalledWith('ApercuKbis.Dossier', 'ECRAN_TEST', 'Fond', '2300601')
       expect(container.querySelector('.rig-kbis')!.textContent).toContain('Société à responsabilité limitée')
       expect(container.querySelector('.rig-kbis')!.textContent).toContain('Numero de gestion 2013B60001')
+      // Dans SA feuille A4, comme l'apercu du plan de travail : .rig-kbis s'y place en absolu (rig-accueil.css).
+      // fix-ok: mesure a l'ecran le 27/11/2026 (copie de dev, 2001D00693, capture k11) : sans la feuille, l'extrait recouvrait l'ecran.
+      expect(container.querySelector('.rig-kbis')!.parentElement!.className).toBe('rig-apercu__feuille rig-apercu__feuille--kbis')
       // Les autres sections gardent leurs champs lus ; celle de l'extrait n'a plus de champ.
       expect(container.querySelector('[aria-label="Désignation"]')?.textContent).toBe('KBIS ALPHA')
       expect(container.querySelector('[aria-label="Forme juridique"]')).toBeNull()
