@@ -31,6 +31,9 @@ namespace RigV3Desktop.Pont.EcransGeneres;
 //   - PROC_IPSUIVI : une Fiche a trois etats (A signifier, Signifiee, Close), lus des evenements de
 //     l'IP (LecteurSuiviIp.cs) ; les dix etats de la partie haute de la fiche V2 ne sont pas dans le code
 //     (proc_ipsuivi.md:165-171). Lot 8, 27/11/2026.
+// fix-ok: lot 1 du plan-f4fb097f (28/11/2026) -- trois commentaires (PROC_ACTRET, PROC_DBEN_ALERT, PROC_SUIVI_IMPRESSION) disent la
+// cause mesuree de leur ligne rouge au banc du parcours : aucun geste d'ecriture dans RIG v2 (code lu), table absente des 30 bases
+// de SQL-DEV\DEV (sys.tables lu) ; aucun code ne change.
 // fix-ok: les descripteurs du lot 8 sont retouches en plusieurs passes parce que chaque geste branche
 // (relances, injonctions, puis traitements des IP et desistement, 26-27/11/2026) change ce que leur
 // commentaire et leurs Parametres disent : aucune retouche n'est une correction a l'aveugle.
@@ -270,7 +273,9 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             Code = "PROC_LISTE_DELIBERES", Titre = "Deliberes", Sujet = "délibérés",
             // Un ÉTAT, pas une audience : RIG v2 n'a pas de fiche, mais son code (Source\Judiciaire\Exe\PROC_LISTE_DELIBERES\
             // frmListeDelibere.cs) est une liste en lecture seule, éditée en Word, sans aucune écriture (lot 7). Lecteur, qui cherche
-            // dans la base avec ces paramètres : Serveur/Socle/EcransGeneres/LecteurListeDeliberes.cs.
+            // dans la base avec ces paramètres : Serveur/Socle/EcransGeneres/LecteurListeDeliberes.cs. Gestes (lot 1 du plan-f4fb097f, 28/11/2026) :
+            // EcrivainListeDeliberes.cs -- « Editer le résultat » place le document Word dans la file des éditions ; « Délibérés
+            // repoussés non rendus » (un classeur Excel du poste) est refusé, dit.
             // fix-ok: lot 7, mesure par grep -- l'edition scriptee de ce descripteur avait colle deux lignes de commentaire (une
             // barre oblique inverse en fin de ligne lue comme une continuation) ; les deux lignes sont separees, rien d'autre ne change.
             Forme = FormeEcran.Etat,
@@ -322,7 +327,8 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             // le Détail OPE fait foi). Le tableau EST leur contenu, lu dans la base : les tours de rôle des mandataires (4D_TOURS.rpt)
             // et leurs acomptes et taxes (4D_TAXES_ACOMPTES.rpt), sur la période par défaut de RIG v2 (du 1er janvier à aujourd'hui,
             // OPE_PERIODE.cs:31-32), ou celle des paramètres saisis, que le lecteur cherche dans la base avec les cases cochées.
-            // Lecteur : Serveur/Socle/EcransGeneres/LecteurTaxesEtTours.cs (lot 7).
+            // Lecteur : Serveur/Socle/EcransGeneres/LecteurTaxesEtTours.cs (lot 7). « Éditer » (lot 1 du plan-f4fb097f, 28/11/2026) :
+            // EcrivainTaxesEtTours.cs place chaque état affiché (4D_TOURS, 4D_TAXES_ACOMPTES) dans la file des éditions.
             Forme = FormeEcran.Etat,
             // OPE_PERIODE (deux dates) et OPE_TYPE_EDITION (trois cases), proc_taxesettours.md:144-150.
             Parametres = [Champ.Date("Date de début"), Champ.Date("Date de fin"), Champ.Case("Tours"), Champ.Case("Acomptes"), Champ.Case("Taxes")],
@@ -533,13 +539,13 @@ public sealed class DomaineSurveiller : IDomaineEcrans
 
         new DescripteurEcran
         {
-            // Lot 8 (26/11/2026) : lue dans la base (LecteurRappelsRbe.cs) ; pas d'ecrivain, l'ecran dit « Demonstration ». Le geste de
-            // RIG v2 (« Édition » : une demande SRBE validee et son courrier par dossier, PROC_SRBE_RAPPEL.cs:109-203) porte sur les
-            // dossiers de SA recherche, qui n'existe plus : ses trois requetes (DossierRCS.GetNRBEPourRappel, ...PourRelance,
-            // ...PourRappelOuRelance, OPE_RECHERCHE_CRITERES.cs:153-162) sont absentes de RigMetier (grep : 0 occurrence), le projet ne
-            // compile plus (Source\CompilationFull\PowerShell\buildErrors.txt:110) et le traitement « SRBE » est masque du menu
-            // (PROCF_VISIBLE_DANS_MENU 0, RIG_DEV lu le 26/11/2026). Les lignes de cet ecran sont les demandes SRBE passees ; RIG v2 n'a
-            // aucun geste sur elles. La relance des beneficiaires qui tourne est PROC_DBE_RELANCE (PROC_RSURV, nature SDBE), branchee.
+            // Lot 8 (26/11/2026) : lue dans la base (LecteurRappelsRbe.cs). La recherche de RIG v2 qui proposait les dossiers A ENVOYER
+            // n'existe plus : ses trois requetes (DossierRCS.GetNRBEPourRappel, ...PourRelance, ...PourRappelOuRelance,
+            // OPE_RECHERCHE_CRITERES.cs:153-162) sont absentes de RigMetier (grep : 0 occurrence), le projet ne compile plus
+            // (Source\CompilationFull\PowerShell\buildErrors.txt:110) et le traitement « SRBE » est masque du menu (PROCF_VISIBLE_DANS_MENU 0,
+            // RIG_DEV lu le 26/11/2026) : les lignes de cet ecran sont les demandes SRBE passees. Le geste de RIG v2, lui (« Édition » : une
+            // demande SRBE validee et son courrier par dossier, PROC_SRBE_RAPPEL.cs:109-204), s'applique au dossier de chaque ligne cochee
+            // (lot 1 du plan-f4fb097f, 28/11/2026) : EcrivainRappelsRbe.cs. La relance des beneficiaires qui tourne est PROC_DBE_RELANCE.
             Code = "PROC_SRBE_RAPPEL", Titre = "Rappels RBE", Sujet = "dossiers RCS",
             Forme = FormeEcran.File,
             Recherche = "Rechercher un dossier, une date d'immatriculation, un numéro de gestion…",
@@ -581,6 +587,10 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             // Le menu de la ligne de la V2 offre « Renvoyer à Infogreffe », mais son geste ne fait RIEN : le corps de
             // _RenvoyerAInfogreffe est en commentaire (PROC_ACTRET\RESULTATS\OPE_RESULTATS.cs:89-97). Aucun écrivain, donc :
             // l'écran le dit (« Démonstration »). Lot 8 (26/11/2026) : lu dans la base -- LecteurRetentionActes.cs.
+            // Relu au lot 1 du plan-f4fb097f (28/11/2026) : l'entrée n'est même jamais montrée (cms_Opening la masque, :43) ; le
+            // processus est sans demande (PROC_ACTRET.cs:5, base(param, false)), VALIDER est masqué (FORM_ACTRET.cs:26) et les
+            // autres gestes ne font que lire (Copier, Voir dans la GED, Kbis -> VKBIS, FORM_ACTRET.cs:31-38) : aucun geste
+            // d'écriture à reprendre, la ligne du banc du parcours complet reste rouge pour cette raison.
             Valider = "Renvoyer à Infogreffe",
             Rang = 5,
             // Les trois anomalies que la recherche V2 filtre (Metier.cs:191-205) : piece absente ou non numerisee, piece marquee
@@ -665,7 +675,9 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             // La V2 ne liste QUE les divergences ouvertes (DIVER_STATUS = 0, PROC_DBEN_ALERT.cs:60) et n'a pas d'etat
             // « visualisee » : toute ligne est « Ouverte ». Les deux autres tuiles restent a 0 (une divergence traitee sort de
             // la liste). Lot 8 (26/11/2026) : lu dans la base -- LecteurDivergencesBen.cs ; « Visualiser » ouvre un autre
-            // ecran (PROC_DBEN) et n'ecrit rien : pas d'ecrivain.
+            // ecran (PROC_DBEN) et n'ecrit rien : pas d'ecrivain. Relu au lot 1 du plan-f4fb097f (28/11/2026) : DBEN s'ouvre par
+            // l'accueil (OPE_DIVERGENCES.cs:143) SANS demande (PROC_DBEN.cs:118-122, base(param, false) puisque
+            // DbenHelper.SkipVersionRabillon = true, DbenHelper.cs:3) : aucun geste d'écriture, la ligne du banc du parcours reste rouge.
             Etats = EtatsEcran.Trois("Ouverte", "En cours", "Traitée"),
             Groupes = ["Dossiers actifs", "Dossiers radiés"],
             Sections =
@@ -871,8 +883,9 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             Code = "PROC_SURVBOD", Titre = "Surveillance BODACC", Sujet = "annonces",
             Forme = FormeEcran.File,
             // Le contrôle qualité des annonces BODACC (proc_survbod.md, Détail OPE : la vraie requête est
-            // OPE_REJETS_BODACC.cs:12-32) : lu par Serveur/Socle/EcransGeneres/LecteurRejetsBodacc.cs (lot 9). Sans écrivain :
-            // « Modifier » ouvre le processus VB6 XACTION, Word et Imprimer produisent un document (LecteurRejetsBodacc.cs).
+            // OPE_REJETS_BODACC.cs:12-32) : lu par Serveur/Socle/EcransGeneres/LecteurRejetsBodacc.cs (lot 9). Gestes (lot 1 du plan-f4fb097f, 28/11/2026) :
+            // EcrivainSurveillanceBodacc.cs -- « Modifier » crée la demande XACTION qualifiée du dossier (l'ancien processus VB6 qu'elle
+            // ouvre n'existe pas dans la V3), « Word » et « Imprimer » placent la liste des contrôles qualité dans la file des éditions.
             Recherche = "Rechercher une annonce, un numéro de gestion…",
             Criteres = ["Numéro de gestion RCS", "Numéro chronologique", "Date de publication", "Type d'annonce"], // colonnes de la grille, DataGridViewResultats.cs.
             Valider = "Modifier l'annonce", // Le bouton « M » de la ligne (colXaction) et le double clic : LaunchXAction, OPE_REJETS_BODACC.cs:82-95.
@@ -964,6 +977,10 @@ public sealed class DomaineSurveiller : IDomaineEcrans
         // d'impression (ClientImpression.ImprimeLot, OPE_RESULTAT.cs:217-232 : jamais appelé d'ici), « Supprimer » détruit la ligne
         // de TRAVAIL_IMPRESSION (:205-213). États = TRVIMPR_STATUS (EnumStatusTravail, IServiceImpression.cs:121) ; une ligne en
         // erreur est rouge (_IsEnErreur, OPE_RESULTAT.cs:180-182). Une seule liste, sans groupe (le badge « n impressions »).
+        // Relu au lot 1 du plan-f4fb097f (28/11/2026) : TravailImpressionBD lit la base COMMUNE (RigGreffe.CodeGreffeCommon,
+        // TravailImpressionBD.cs:208-256), et TRAVAIL_IMPRESSION n'est dans AUCUNE des 30 bases de SQL-DEV\DEV (COMMUN_RIG et RIG_DEV
+        // compris, sys.tables lu le 28/11/2026) : pas de lecteur possible ; « Relancer » appelle le service d'impression (hors
+        // périmètre du plan : l'impression réelle). La ligne du banc du parcours complet reste rouge pour cette raison.
         // fix-ok: mesuré au contrôle final du lot 9 (27/11/2026) -- ce descripteur portait les libellés de PROC_PAPERCUT
         // (« Imprimer », « Vider la file », critères Imprimante / Titre / Période), absents de ce programme.
         new DescripteurEcran
@@ -1104,7 +1121,8 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             // Le tableau « Activité commerciale » de RIG v2 (proc_statca.md, Détail OPE ; OPE_GENERER.cs:132-593), calculé dans
             // la base par Serveur/Socle/EcransGeneres/LecteurStatistiquesCourAppel.cs (lot 9) : quatre catégories (le numéro de
             // rôle J, F, R, IP), sept colonnes aux en-têtes de la grille V2 (:48-81) ; le pied totalise, comme la ligne « totaux ».
-            // La période cherche dans la base ; « Word » (PrintWord) n'a pas d'édition dans la V3.
+            // La période cherche dans la base ; « Word » (PrintWord) place le tableau de bord dans la file des éditions (lot 1 du plan-f4fb097f, 28/11/2026) :
+            // EcrivainStatistiquesCourAppel.cs.
             Parametres = [Champ.Periode("Période")],
             Colonnes =
             [
@@ -1153,7 +1171,8 @@ public sealed class DomaineSurveiller : IDomaineEcrans
             // Le tableau de pilotage de RIG v2 (proc_xpilotage.md, Détail OPE ; OPE_GENERER.cs) : une ligne par cellule de la table
             // PILOTAGE_REQUETES, sa requête calculée dans la base sur la période et un an plus tôt, par
             // Serveur/Socle/EcransGeneres/LecteurPilotage.cs (lot 9). Une requête qui lit une table reprise en fiche, ou un
-            // calcul d'encaissement, est « Non calculé » avec sa cause. Le classeur Excel et les archives n'ont pas d'édition V3.
+            // calcul d'encaissement, est « Non calculé » avec sa cause. « Visualiser » (lot 1 du plan-f4fb097f, 28/11/2026) : EcrivainPilotage.cs écrit la demande
+            // XPILOTAGE de RIG v2 et place le classeur dans la file des éditions ; « Archives » (un dossier du poste) est refusé, dit.
             Parametres = [Champ.Date("Date minimale"), Champ.Date("Date maximale"), Champ.Liste("Feuille", "RCS", "Judiciaire")],
             Colonnes = ["Indicateur", "Cellule", "Valeur sur la période", "Valeur un an plus tôt", "Calcul"],
             Gestes = ["Visualiser", "Archives"], // OPE_GENERER.cs:74 : APERCU renommé « Visualiser » (le classeur Excel) ; ARCHIVES (:416-425).

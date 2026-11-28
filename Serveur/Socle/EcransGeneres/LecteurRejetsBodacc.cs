@@ -21,10 +21,10 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// sans action), le bouton est masque (MasquerBoutonsVides, :270-272) et LaunchXAction ne fait rien (:181) : « Sans dossier RCS »,
 /// Rejetee.
 ///
-/// CE QUE LA V3 NE FAIT PAS (nomme, aucun ecrivain) : « Modifier » cree une Demande XACTION (CreateDemande, qui cree l'affaire),
-/// la qualifie et ouvre l'ancien processus VB6 XACTION en modale (_LaunchOldProcessViaDemandeForDossierRCS, :192-252) -- un autre
-/// ecran de RIG v2, sans equivalent V3 ; « Word » et « Imprimer » produisent un document des lignes cochees : pas d'edition dans la
-/// V3. Rien, dans ce processus, ne pose BDCCR_CONTROLE_QUALITE_VERIFIE : c'est le traitement XACTION qui le fait.
+/// LES GESTES : EcrivainSurveillanceBodacc.cs (lot 1 du plan-f4fb097f) -- « Modifier » cree la Demande XACTION qualifiee du dossier ;
+/// l'ancien processus VB6 XACTION qu'elle ouvre en modale (:192-252) n'a pas d'equivalent V3 ; « Word » et « Imprimer » placent la liste
+/// des controles qualite dans la file des editions. Rien, dans ce processus, ne pose BDCCR_CONTROLE_QUALITE_VERIFIE : c'est le traitement
+/// XACTION qui le fait.
 /// </summary>
 internal sealed class LecteurRejetsBodacc : ILecteurEcran
 {

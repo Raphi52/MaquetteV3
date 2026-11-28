@@ -36,8 +36,9 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///   - « Date d'enrôlement min » (dtpEnrolement, :176-178) : enrolee ce jour ou apres ;
 ///   - le texte : le numero de role ou le nom de l'affaire.
 ///
-/// CE QUE LA V3 NE REPREND PAS : « Editer le résultat » (un document Word, AfficherWord, :263-322) et « Délibérés repoussés non rendus »
-/// (un classeur Excel, _GenererExcelDeliberer, :482-503) produisent un fichier sur le poste : la V3 n'a pas encore d'edition de ce genre.
+/// LES GESTES (EcrivainListeDeliberes.cs, lot 1 du plan-f4fb097f) : « Editer le résultat » (le document Word de RIG v2, AfficherWord,
+/// :263-322) est une demande dans la file des editions ; « Délibérés repoussés non rendus » (un classeur Excel sur le poste,
+/// _GenererExcelDeliberer, :568-590) n'est pas produit par la V3.
 /// </summary>
 internal sealed class LecteurListeDeliberes : IRechercheEcran
 {
@@ -122,12 +123,24 @@ internal sealed class LecteurListeDeliberes : IRechercheEcran
             filtres.Ajouter("i.INSTN_DATE_ENROLEMENT >= @enrolement", ("@enrolement", enrolement.Date));
         var sql = Requete.Replace("/*types*/", string.Join(", ", types.Select((_, k) => $"@type{k}")), StringComparison.Ordinal)
                          .Replace("/*filtres*/", filtres.EnSuite, StringComparison.Ordinal);
-        return LectureEcran.LireAsync(baseGreffe, sql, Ligne, ct, filtres.Parametres(
+        return LectureEcran.LireAsync(baseGreffe, sql, r => Ligne(r, reference.Date, duree, types), ct, filtres.Parametres(
             [new SqlParameter("@plafond", plafond), new SqlParameter("@ref", reference.Date), new SqlParameter("@duree", duree),
              .. types.Select((t, k) => new SqlParameter($"@type{k}", t))]));
     }
 
-    private static LigneLue Ligne(SqlDataReader r)
+    /// <summary>
+    /// L'identifiant d'une ligne : « instance|aaaammjj|duree|types » -- l'instance, puis la date de reference, la duree et les types
+    /// d'instance de la recherche qui l'a trouvee. La forme Etat n'envoie au geste que les identifiants des lignes affichees, pas ses
+    /// parametres (FormeEtat.tsx, useGesteEnLot) : « Editer le résultat » titre son document avec eux, comme RIG v2 (frmListeDelibere.cs:277,
+    /// EcrivainListeDeliberes.cs).
+    /// </summary>
+    internal static string IdLigne(string instance, DateTime reference, int duree, IEnumerable<string> types)
+        => FormattableString.Invariant($"{instance}|{reference:yyyyMMdd}|{duree}|{string.Join(",", types)}");
+
+    /// <summary>Les types d'instance de RIG v2 et le libelle de leur case (frmListeDelibere.Designer.cs:491-521), pour le titre Word.</summary>
+    internal static string LibelleType(string type) => Types.FirstOrDefault(t => t.Type == type).Case ?? type;
+
+    private static LigneLue Ligne(SqlDataReader r, DateTime reference, int dureeCherchee, IEnumerable<string> types)
     {
         var role = FormeLigne.Texte(r, "Role");
         var dateDelib = FormeLigne.DateDe(r, "DateDelib");
@@ -144,7 +157,7 @@ internal sealed class LecteurListeDeliberes : IRechercheEcran
             FormeLigne.Texte(r, "Juge") is { Length: > 0 } j ? $"juge {j}" : null);
         return new LigneLue(nom, precisions, Groupe, "AFaire", [])
         {
-            Id = FormeLigne.Texte(r, "Id"),
+            Id = IdLigne(FormeLigne.Texte(r, "Id"), reference, dureeCherchee, types),
             Valeurs =
             [
                 role, FormeLigne.Texte(r, "Joints"), nom, FormeLigne.DateFiche(dateDelib), FormeLigne.Texte(r, "CodePlumitif"),

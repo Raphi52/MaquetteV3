@@ -1,0 +1,31 @@
+# Gestes de « Taxes et tours de rôle » (EcrivainTaxesEtTours.cs), lot 1 du plan-f4fb097f, sur le jeu PROC_TAXESETTOURS.sql.
+# Une ligne porte « T|A|X + mandataire (+ fonction) |debut|fin » (EditionsV2.IdSurPeriode). « Éditer » = EDITER de RIG v2
+# (OPE_RECHERCHE.cs:41-82) : un etat Crystal par groupe, ici une demande d'edition FUSION_CRYSTAL_NET dans la file (decision du plan).
+# RIG v2 n'ecrit rien en base : les lignes de l'etat ne changent pas -- d'ou les controles SQL.
+#
+# Refus 1 : le mandataire de la ligne n'est plus dans la base : RIG v2 n'a rien a editer pour cet etat (:61-64, au mot pres) -- jumeau
+# accepte : bloc 3, les mandataires du jeu.
+geste: Agir Éditer
+ids: T1709999-ADJ|20260101|20260131
+resultat: refuse
+message: Il n'y a pas de résultat pour l'édition Tours dans la période demandée.
+---
+# Refus 2 : le debut apres la fin (:50-51, au mot pres) -- jumeau accepte : bloc 3, la meme periode dans l'ordre.
+geste: Agir Éditer
+ids: T1707502-ADJ|20260131|20260101
+resultat: refuse
+message: La date de début doit être inférieure à la date de fin
+---
+# Les trois lignes « Tours de rôle » : UNE edition 4D_TOURS (FUSION_CRYSTAL_NET), titre a la periode des lignes, sans demande V2.
+geste: Agir Éditer
+ids: T1707501-LIQ|20260101|20260131,T1707501-MDJ|20260101|20260131,T1707502-ADJ|20260101|20260131
+resultat: fait
+message: « Tours de rôle du 01/01/2026 au 31/01/2026 » : placé dans la file des éditions.
+controle: SELECT CONCAT(DMNED_CODE_MAQUETTE, '|', DMNED_TYPE_GENERATION, '|', DMNED_LIBELLE_SOURCE, '|', CASE WHEN DMNED_ID_DMND IS NULL THEN 'sans demande' ELSE 'avec demande' END) FROM v2.DEMANDE_EDITION WHERE DMNED_LIBELLE_DOCUMENT = N'Tours de rôle du 01/01/2026 au 31/01/2026' => 4D_TOURS|FUSION_CRYSTAL_NET|Taxes et tours de rôle|sans demande
+---
+# Les deux lignes « Taxes » : l'etat 4D_TAXES_ACOMPTES (PlumitifPcTaxes.cs:166).
+geste: Agir Éditer
+ids: X1707501|20260101|20260131,X1707502|20260101|20260131
+resultat: fait
+message: « Taxes du 01/01/2026 au 31/01/2026 » : placé dans la file des éditions.
+controle: SELECT DMNED_CODE_MAQUETTE FROM v2.DEMANDE_EDITION WHERE DMNED_LIBELLE_DOCUMENT = N'Taxes du 01/01/2026 au 31/01/2026' => 4D_TAXES_ACOMPTES

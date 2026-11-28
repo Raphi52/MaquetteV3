@@ -31,7 +31,8 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///   - les gardes de LoadData (OPE_RECHERCHE.cs:79-98) : debut <= fin, l'une et l'autre au plus aujourd'hui -- sinon RIG v2 ne
 ///     calcule rien, la V3 non plus (aucune ligne).
 /// GROUPE : « Activité commerciale » (le titre de l'etape, :585). ETAT : « Généré » (Validee).
-/// CE QUE LA V3 NE REPREND PAS (nomme) : l'export Word du tableau (PrintWord, :610-771) -- la V3 n'a pas encore d'edition Word.
+/// L'export Word du tableau (PrintWord, :610-771) est une demande dans la file des editions : EcrivainStatistiquesCourAppel.cs (lot 1 du
+/// plan-f4fb097f), par l'Id de la ligne (la categorie et la periode : EditionsV2.IdSurPeriode).
 /// </summary>
 internal sealed class LecteurStatistiquesCourAppel : IRechercheEcran
 {
@@ -142,6 +143,8 @@ internal sealed class LecteurStatistiquesCourAppel : IRechercheEcran
                 var precisions = N("Rang") == 1 ? FormeLigne.Joindre(titre, compteurs) : titre;
                 lignes.Add(new LigneLue(libelle, precisions, Groupe, "Validee", [])
                 {
+                    // La categorie (son rang) et la periode du tableau : ce que « Word » edite (EcrivainStatistiquesCourAppel.cs).
+                    Id = EditionsV2.IdSurPeriode(N("Rang").ToString(CultureInfo.InvariantCulture), debut, fin),
                     Valeurs = [libelle, .. new[] { b, c, d, e, b + c - (d + e), N("Deliberes"), N("ADelivrer") }
                                           .Select(n => n.ToString(CultureInfo.InvariantCulture))],
                 });

@@ -39,8 +39,9 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// -- nommees ; une requete qui n'est pas un SELECT seul (« declare ... ») -- LectureV2 la refuse. fix-ok: mesure au controle
 /// final du lot 9 (27/11/2026) -- 56 cellules RCS sur 91 restaient « non calcule » parce que la V3 refusait toute table reprise
 /// en fiche, alors que FichesV3.cs donne la correspondance de chacune de leurs colonnes ; ENCAISS (7 cellules) n'etait pas
-/// repris. Le classeur Excel (le modele XPILOTAGE.XLT, les feuilles, ARCHIVES) et la Demande XPILOTAGE
-/// du travail de fond (:108-121) ne sont pas produits : la V3 n'a pas encore d'edition de ce genre.
+/// repris. « Visualiser » (EcrivainPilotage.cs, lot 1 du plan-f4fb097f) ecrit la Demande XPILOTAGE du travail de fond (:108-121) et
+/// place le classeur dans la file des editions ; le classeur lui-meme (le modele XPILOTAGE.XLT, ses feuilles) et ARCHIVES ne sont pas
+/// produits.
 /// </summary>
 internal sealed partial class LecteurPilotage : IRechercheEcran
 {
@@ -133,6 +134,7 @@ internal sealed partial class LecteurPilotage : IRechercheEcran
             {
                 lignes.Add(new LigneLue(nom, $"non calculé : {cause}", groupe, "Rejetee", [])
                 {
+                    Id = EditionsV2.IdSurPeriode(c.Id.ToString(CultureInfo.InvariantCulture), debut, fin),
                     Valeurs = [nom, place, "", "", $"non calculé : {cause}"],
                 });
                 continue;
@@ -156,6 +158,8 @@ internal sealed partial class LecteurPilotage : IRechercheEcran
                                                 $"un an plus tôt {(n1.Length > 0 ? n1 : "vide")}", erreur is null ? null : calcul);
             lignes.Add(new LigneLue(nom, precisions, groupe, erreur is null ? "Validee" : "Rejetee", [])
             {
+                // La cellule (PILOT_ID_PILOT) et la periode calculee : ce que « Visualiser » edite (EcrivainPilotage.cs).
+                Id = EditionsV2.IdSurPeriode(c.Id.ToString(CultureInfo.InvariantCulture), debut, fin),
                 Valeurs = [nom, place, erreur is null ? valeur : "erreur", n1, calcul],
             });
         }

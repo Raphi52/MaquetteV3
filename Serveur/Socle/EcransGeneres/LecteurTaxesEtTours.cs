@@ -37,7 +37,8 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///     valeurs de SQL). Une condition hors de cette grammaire fait echouer la lecture, son code nomme.
 ///
 /// CE QUE LA V3 NE REPREND PAS : l'etat Crystal lui-meme (son titre, le nom du tribunal, l'impression) -- le tableau EST l'edition.
-/// Aucun geste : « Éditer » ne produit rien de plus (RIG v2 n'ecrit rien).
+/// « Éditer » (RIG v2 n'ecrit rien) place chaque etat affiche dans la file des editions : EcrivainTaxesEtTours.cs (lot 1 du plan-f4fb097f),
+/// par l'Id de la ligne (l'etat, le mandataire, la periode : EditionsV2.IdSurPeriode).
 /// </summary>
 internal sealed partial class LecteurTaxesEtTours : IRechercheEcran
 {
@@ -96,8 +97,10 @@ internal sealed partial class LecteurTaxesEtTours : IRechercheEcran
     {
         var colonne = type == "TAXES" ? "R_CODECHIFFR_TAXE" : "R_CODECHIFFR_ACOMPTE";
         var parMandataire = new SortedDictionary<string, decimal?[]>(StringComparer.Create(Francais, false));
+        var idDe = new Dictionary<string, int>(StringComparer.Ordinal);   // le mandataire de la ligne (le plus petit id de ce nom)
         await using (var r = await LectureV2.LireAsync(cn, $"""
-            SELECT SUM(ac.ACHFF_MONTANT) AS Montant, m.MNDPC_NOM + ' ' + ISNULL(m.MNDPC_COMPLEMENT_NOM, '') AS Nom, ac.ACHFF_FONCTION_PC AS Fonction
+            SELECT SUM(ac.ACHFF_MONTANT) AS Montant, m.MNDPC_NOM + ' ' + ISNULL(m.MNDPC_COMPLEMENT_NOM, '') AS Nom, ac.ACHFF_FONCTION_PC AS Fonction,
+                   MIN(m.MNDPC_ID_MNDPC) AS IdMandataire
             FROM v2.AUTRE_CHIFFRE AS ac
             JOIN v2.CODE_CHIFFRE AS cc ON ac.ACHFF_CODE_CHIFFRE = cc.R_CODECHIFFR_VALEUR
             JOIN v2.MANDATAIRE_PC AS m ON m.MNDPC_ABREGE = ac.ACHFF_ABREGE_ORGANE
@@ -108,6 +111,8 @@ internal sealed partial class LecteurTaxesEtTours : IRechercheEcran
             {
                 var nom = FormeLigne.Texte(r, "Nom");
                 if (!parMandataire.TryGetValue(nom, out var montants)) parMandataire[nom] = montants = new decimal?[4];
+                var idMandataire = Convert.ToInt32(r["IdMandataire"], CultureInfo.InvariantCulture);
+                idDe[nom] = idDe.TryGetValue(nom, out var deja) ? Math.Min(deja, idMandataire) : idMandataire;
                 var rang = FormeLigne.Texte(r, "Fonction") switch { "ADJ" => 0, "CEP" => 1, "LIQ" => 2, "MDJ" or "MJ" => 3, _ => -1 };
                 if (rang >= 0 && r["Montant"] is not DBNull) montants[rang] = Convert.ToDecimal(r["Montant"], CultureInfo.InvariantCulture);
             }
@@ -116,6 +121,8 @@ internal sealed partial class LecteurTaxesEtTours : IRechercheEcran
         return [.. parMandataire.Select(p => new LigneLue(p.Key,
             FormeLigne.Joindre([.. p.Value.Select((m, k) => m is { } v ? $"{fonctions[k]} {v.ToString("N2", Francais)} €" : null), periode]), groupe, "Validee", [])
         {
+            // L'etat (A acomptes, X taxes), le mandataire et la periode : ce que « Éditer » edite (EcrivainTaxesEtTours.cs).
+            Id = EditionsV2.IdSurPeriode($"{(type == "TAXES" ? 'X' : 'A')}{idDe[p.Key].ToString(CultureInfo.InvariantCulture)}", debut, fin),
             Valeurs = [p.Key, "", "", "", "", "", "", .. p.Value.Select(Montant)],
         })];
     }
@@ -173,14 +180,16 @@ internal sealed partial class LecteurTaxesEtTours : IRechercheEcran
             }
 
         // Une ligne par mandataire et fonction dont un tour est non nul, triee par nom (PlumitifPcTours.cs:84-117).
-        var lignes = new List<(string Nom, string Fonction, int[] Tours)>();
+        var lignes = new List<(int Id, string Nom, string Fonction, int[] Tours)>();
         foreach (var m in mandataires.Values)
             foreach (var fonction in new[] { "ADJ", "LIQ", "MDJ" })
-                if (compteurs.TryGetValue((m.Id, fonction), out var t) && t.Sum() > 0) lignes.Add((m.Nom, fonction, t));
+                if (compteurs.TryGetValue((m.Id, fonction), out var t) && t.Sum() > 0) lignes.Add((m.Id, m.Nom, fonction, t));
         return [.. lignes.OrderBy(l => l.Nom, StringComparer.Create(Francais, false)).Select(l => new LigneLue(l.Nom,
             FormeLigne.Joindre(l.Fonction, $"tour N {l.Tours[0]}", $"tour 1 {l.Tours[1]}", $"tour 2 {l.Tours[2]}", $"tour 3 {l.Tours[3]}",
                                $"tour 4 {l.Tours[4]}", periode), Tours, "Validee", [])
         {
+            // L'etat (T tours), le mandataire et sa fonction, la periode : ce que « Éditer » edite (EcrivainTaxesEtTours.cs).
+            Id = EditionsV2.IdSurPeriode($"T{l.Id.ToString(CultureInfo.InvariantCulture)}-{l.Fonction}", debut, fin),
             Valeurs = [l.Nom, l.Fonction, .. l.Tours.Select(n => n.ToString(CultureInfo.InvariantCulture)), "", "", "", ""],
         })];
     }

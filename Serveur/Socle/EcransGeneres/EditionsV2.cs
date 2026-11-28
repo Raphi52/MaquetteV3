@@ -86,15 +86,18 @@ internal static class EditionsV2
 
     /// <summary>La demande DU PROCESSUS (Processus.demande de RIG v2 : sans dossier ni affaire, nommee par le processus), validee : la
     /// demande mere des demandes par entite (DMND_ID_DMND_MERE, OPE_LISTE_ORDONNANCES.cs:3348-3349, :3390). Rend son id et son numero, ou
-    /// le refus de la numerotation DMD.</summary>
-    internal static async Task<(int Id, string? Numero, string? Refus)> DemandeProcessusValideeAsync(GesteEnCours geste, string codeProcessus, string nom,
+    /// le refus de la numerotation DMD. Un <paramref name="nom"/> null laisse DMND_NOM vide, comme la demande que le moteur de RIG v2 cree a
+    /// l'ouverture d'un processus « avec demande » (Processus(param, true) : les demandes SURVBOD de RIG_DEV n'ont pas de nom, lu le
+    /// 28/11/2026).</summary>
+    internal static async Task<(int Id, string? Numero, string? Refus)> DemandeProcessusValideeAsync(GesteEnCours geste, string codeProcessus, string? nom,
         CancellationToken ct)
     {
         var (numero, refus) = await CreationV2.NumeroAsync(geste, "DMD", geste.Maintenant.Year, ct);
         if (numero is null) return (0, null, refus);
         var id = await CreationV2.InsererAsync(geste, "v2.DEMANDE", "DMND_ID_DMND", new Dictionary<string, object?>
         {
-            ["DMND_NUM_DEMANDE"] = numero, ["DMND_ETAT_DEMANDE"] = "V", ["DMND_CODE_PROSS"] = codeProcessus, ["DMND_NOM"] = nom.Length > 255 ? nom[..255] : nom,
+            ["DMND_NUM_DEMANDE"] = numero, ["DMND_ETAT_DEMANDE"] = "V", ["DMND_CODE_PROSS"] = codeProcessus,
+            ["DMND_NOM"] = nom is null ? null : nom.Length > 255 ? nom[..255] : nom,
             ["DMND_DATE_CREATION"] = geste.Maintenant, ["DMND_DATE_VALIDATION"] = geste.Maintenant, ["DMND_EN_COURS"] = false,
             ["DMND_NOM_UTILISATEUR"] = geste.Agent.NomAffiche,
         }, ct);
@@ -153,6 +156,87 @@ internal static class EditionsV2
             valeurs.Where(v => presentes.Contains(v.Key)).ToDictionary(v => v.Key, v => v.Value), ct);
     }
 
+    /// <summary>
+    /// Une edition que RIG v2 produit SUR LE POSTE, sans parametre d'edition ni file : un document Word (RigWord), un etat Crystal
+    /// affiche, un classeur Excel. Decision du plan « RIG v3 complet, mesure par le banc du parcours complet » (lot 1, plan-f4fb097f,
+    /// 28/11/2026, fil chef conv-2206) : une edition de la V3 est une DEMANDE DANS LA FILE DES EDITIONS, comme toute edition de RIG v2
+    /// (EcrivainFileEditions.cs) ; <paramref name="typeGeneration"/> est le type de RIG v2 du meme genre de document
+    /// (DemandeEdition.eTypeGeneration, DemandeEdition.cs:160-205 : FUSION_ASPOSE pour un Word de donnees, FUSION_CRYSTAL_NET pour un etat
+    /// Crystal .NET, REPORT_SQL pour une requete mise en tableau). Le libelle du document est son titre dans RIG v2.
+    /// </summary>
+    internal static ParametreEdition SansParametre(string libelle, string typeGeneration) => new("", libelle, typeGeneration, null, null);
+
+    /// <summary>
+    /// DemandeEdition.CreateDemandeEditionForDocWord (Edition\DemandeEdition.cs:728-761) : la demande d'edition d'un document Word du
+    /// parametre <paramref name="code"/>, sur la demande <paramref name="idDemande"/>. Le parametre doit exister et porter une maquette, sinon
+    /// RIG v2 leve -- ses deux messages, au mot pres (:730, :738), sont rendus en refus. La demande reprend le parametre
+    /// (CreateDemandeEditionWithParametreEdition, :682-717 : libelle, lot, affichage avant impression, agrafage, entite source, maquette,
+    /// processus, groupage, impression, imprimante, nature, exemplaires, non supprimable, lecture seule, recto verso, papier, nature
+    /// Tribunal digital ; « USER » du lot remplace par le compte de l'agent, :689), puis FUSION_ASPOSE, sans courriel, phase C (:756-758).
+    /// NON REPRIS (nomme) : le fichier de donnees XML de la fusion (AsposeHelper.ToXML, SetFichierFlux, :743-750), que le service d'edition
+    /// lit -- RIG v3 n'ecrit aucun fichier sur le partage des editions ; il reste a ecrire quand la V3 aura sa fusion de documents.
+    /// </summary>
+    internal static async Task<(int Id, string? Refus)> DemandeEditionWordAsync(GesteEnCours geste, int? idDemande, string code, CancellationToken ct,
+        IReadOnlyDictionary<string, object?>? autres = null)
+    {
+        var colonnes = await ColonnesAsync(geste, "v2.PARAMETRE_EDITION", ct);
+        string Colonne(string nom) => colonnes.Contains(nom) ? nom : $"NULL AS {nom}";
+        // Le parametre de RIG v2 -> la colonne de la demande d'edition (CreateDemandeEditionWithParametreEdition, :689-714).
+        (string Parametre, string Edition)[] reprises =
+        [
+            ("PRMED_LOT", "DMNED_LOT"), ("PRMED_AFFICHER_AVANT_IMPRESSION", "DMNED_AFF_AVANT_IMPRESSION"), ("PRMED_AGRAFAGE", "DMNED_AGRAFAGE"),
+            ("PRMED_CODE_ENTITE_SOURCE", "DMNED_CODE_ENTITE_SOURCE"), ("PRMED_CODE_MAQUETTE", "DMNED_CODE_MAQUETTE"),
+            ("PRMED_CODE_PROCESSUS", "DMNED_CODE_PROCESSUS"), ("PRMED_GROUPAGE_AUTOMATIQUE", "DMNED_GROUPAGE_AUTOMATIQUE"),
+            ("PRMED_IMPRESSION", "DMNED_IMPRESSION"), ("PRMED_IMPRIMANTE", "DMNED_IMPRIMANTE"), ("PRMED_NATURE_EDITION", "DMNED_NATURE_EDITION"),
+            ("PRMED_NOMBRE_EXEMPLAIRES", "DMNED_NOMBRE_EXEMPLAIRE"), ("PRMED_NON_SUPPRESSIBLE", "DMNED_IS_NON_SUPPRESSIBLE"),
+            ("PRMED_READ_ONLY", "DMNED_READ_ONLY"), ("PRMED_RECTO_VERSO", "DMNED_RECTO_VERSO"), ("PRMED_TYPE_PAPIER", "DMNED_TYPE_PAPIER"),
+            ("PRMED_TRIBUNAL_DIGITAL_NATURE_DOC", "DMNED_TRIBUNAL_DIGITAL_NATURE_DOC"),
+        ];
+        string libelle;
+        var valeurs = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase);
+        await using (var r = colonnes.Count == 0 ? null : await geste.LireAsync($"""
+            SELECT PRMED_CODE, PRMED_LIBELLE, {Colonne("PRMED_LIBELLE_DOCUMENT")}, {string.Join(", ", reprises.Select(x => Colonne(x.Parametre)))}
+            FROM v2.PARAMETRE_EDITION WHERE PRMED_CODE = @code
+            """, ct, new SqlParameter("@code", code)))
+        {
+            if (r is null || !await r.ReadAsync(ct)) return (0, "Erreur CreateDemandeEditionForDocWord: Le paramètre édition ne peut être null.");
+            if (r["PRMED_CODE_MAQUETTE"] is DBNull)
+                return (0, $"Erreur CreateDemandeEditionForDocWord: Aucune maquette n'est associée au paramètre édition {code}.");
+            libelle = FormeLigne.Texte(r, "PRMED_LIBELLE_DOCUMENT") is { Length: > 0 } doc ? doc : FormeLigne.Texte(r, "PRMED_LIBELLE");
+            foreach (var (parametre, edition) in reprises)
+                if (r[parametre] is not DBNull) valeurs[edition] = r[parametre];
+        }
+        if (valeurs.TryGetValue("DMNED_LOT", out var lot) && lot is string l)
+            valeurs["DMNED_LOT"] = l.Replace("USER", geste.Agent.CompteWindows.ToUpperInvariant(), StringComparison.Ordinal);
+        if (valeurs.TryGetValue("DMNED_NOMBRE_EXEMPLAIRE", out var n) && n is not null)
+            valeurs["DMNED_NOMBRE_EXEMPLAIRE"] = Convert.ToInt16(n, CultureInfo.InvariantCulture);
+        valeurs["DMNED_ENVOI_PAR_MAIL"] = false;
+        foreach (var (colonne, valeur) in autres ?? new Dictionary<string, object?>()) valeurs[colonne] = valeur;
+        var id = await DemandeEditionAsync(geste, idDemande, SansParametre(libelle, "FUSION_ASPOSE"), libelle,
+            valeurs.TryGetValue("DMNED_CODE_ENTITE_SOURCE", out var entite) ? entite as string : null, null,
+            valeurs.TryGetValue("DMNED_LOT", out var lu) ? lu as string : null, valeurs.TryGetValue("DMNED_IMPRIMANTE", out var imp) ? imp as string : null,
+            ct, valeurs);
+        return (id, null);
+    }
+
     /// <summary>Un identifiant en texte invariant.</summary>
     internal static string Texte(int id) => id.ToString(CultureInfo.InvariantCulture);
+
+    /// <summary>
+    /// L'identifiant d'une ligne d'un ETAT qui s'edite sur une periode (taxes et tours, pilotage, statistiques cour d'appel) :
+    /// « cle|aaaammjj|aaaammjj ». La forme Etat n'envoie au geste que les identifiants des lignes affichees (FormeEtat.tsx, useGesteEnLot),
+    /// pas ses parametres : la periode que le lecteur a calculee voyage avec la ligne, et l'edition porte la periode du tableau affiche.
+    /// </summary>
+    internal static string IdSurPeriode(string cle, DateTime debut, DateTime fin)
+        => FormattableString.Invariant($"{cle}|{debut:yyyyMMdd}|{fin:yyyyMMdd}");
+
+    /// <summary>La cle et la periode d'un identifiant <see cref="IdSurPeriode"/> ; null s'il n'en est pas un.</summary>
+    internal static (string Cle, DateTime Debut, DateTime Fin)? LirePeriode(string? id)
+    {
+        var parts = (id ?? "").Split('|');
+        return parts.Length == 3 && parts[0].Length > 0
+               && DateTime.TryParseExact(parts[1], "yyyyMMdd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var debut)
+               && DateTime.TryParseExact(parts[2], "yyyyMMdd", CultureInfo.InvariantCulture, DateTimeStyles.None, out var fin)
+            ? (parts[0], debut, fin) : null;
+    }
 }

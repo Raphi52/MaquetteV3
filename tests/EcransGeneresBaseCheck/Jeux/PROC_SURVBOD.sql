@@ -37,3 +37,40 @@ INSERT INTO v2.BODACC (BDCCR_ID_BDCCR, BDCCR_ID_BDCRC, BDCCR_TYPE_BODACC, BDCCR_
     (1900807, 1900807, ''B9A'', DATEADD(hour, 15, @aujourdhui), N''Annonce du jour'', 0),
     (1900808, 1900808, ''B9Z'', DATEADD(day, -10, @aujourdhui), N''Type sans bordereau'', 0);',
     N'@aujourdhui datetime', @aujourdhui;
+
+-- LES GESTES (EcrivainSurveillanceBodacc.cs, lot 1 du plan-f4fb097f, identifiants 31008xx) :
+--   - « Word » et « Imprimer » : la liste Word du parametre LOT2_SURVBOD_LST_CQ (OPE_REJETS_BODACC.cs:158), aux valeurs de RIG_DEV
+--     (libelle, maquette, FUSION_RIG, afficher avant impression, lu le 28/11/2026) ;
+--   - « Modifier l'annonce » : l'annonce 3100811 est rattachee, par son action RCS 3100801, au dossier 3100801 (« À corriger ») --
+--     le jumeau accepte des annonces sans dossier ci-dessus. Le dossier est RADIE et de type B2 (personne morale, sans BE ni comptes) :
+--     il n'entre pas dans les files des autres ecrans (relances, injonctions, radiations d'office ne lisent que des dossiers non radies).
+IF OBJECT_ID(N'v2.PARAMETRE_EDITION') IS NULL
+    CREATE TABLE v2.PARAMETRE_EDITION (PRMED_CODE varchar(40) NOT NULL PRIMARY KEY, PRMED_LIBELLE varchar(100) NOT NULL,
+        PRMED_RECTO_VERSO bit NOT NULL DEFAULT 0, PRMED_AFFICHER_AVANT_IMPRESSION bit NOT NULL DEFAULT 0, PRMED_CODE_CFECP varchar(50) NULL,
+        PRMED_LISTE varchar(4000) NOT NULL DEFAULT '', PRMED_CODE_ENTITE_SOURCE varchar(16) NULL, PRMED_CODE_PROCESSUS varchar(40) NULL,
+        PRMED_CODE_MAQUETTE varchar(40) NULL, PRMED_TYPE_GENERATION varchar(15) NULL, PRMED_NOMBRE_EXEMPLAIRES int NOT NULL DEFAULT 1,
+        PRMED_READ_ONLY bit NOT NULL DEFAULT 0, PRMED_NUM_GROUPE_IMPRESSION varchar(30) NULL, PRMED_TRIBUNAL_DIGITAL_NATURE_DOC varchar(50) NULL);
+IF NOT EXISTS (SELECT 1 FROM v2.PARAMETRE_EDITION WHERE PRMED_CODE = 'LOT2_SURVBOD_LST_CQ')
+    EXEC sp_executesql N'
+    INSERT INTO v2.PARAMETRE_EDITION (PRMED_CODE, PRMED_LIBELLE, PRMED_CODE_MAQUETTE, PRMED_TYPE_GENERATION, PRMED_AFFICHER_AVANT_IMPRESSION,
+        PRMED_RECTO_VERSO, PRMED_NOMBRE_EXEMPLAIRES)
+    VALUES (''LOT2_SURVBOD_LST_CQ'', N''Liste des contrôles qualité'', ''LOT2_SURVBOD_LST_CQ'', ''FUSION_RIG'', 1, 0, 1);';
+
+SET IDENTITY_INSERT rec.Entreprise ON;
+INSERT INTO rec.Entreprise (Id, Siren, Civilite, Denomination, EtatInfo, FicheSommaire)
+VALUES (3100801, '531008011', '', N'SURVBOD ALPHA SARL', 'C', 0);
+SET IDENTITY_INSERT rec.Entreprise OFF;
+SET IDENTITY_INSERT rec.DossierRcs ON;
+INSERT INTO rec.DossierRcs (Id, IdEntreprise, TypeRcs, NumeroGestion, Siren, DateImmatriculation, DateRadiation, MotifImmatriculation,
+    ProvisoirementSans, CompteurMaj, DateMaj, EtatDossier, EtatInfo, InscritRegistreMetiers, ModificationInterne,
+    SirenProvisoire, Accre, AutoEntrepreneur, Eirl, AutoEntrepreneurRegularise)
+VALUES (3100801, 3100801, 'B2', '2010B31081', '531008011', '20100315', '20150101', 'C', 0, 0, '20150101', 'R', 'C', 0, 0, 0, 0, 0, 0, 0);
+SET IDENTITY_INSERT rec.DossierRcs OFF;
+SET IDENTITY_INSERT rec.ActionRegistre ON;
+INSERT INTO rec.ActionRegistre (Id, IdDossier, IdAnnonceBodacc, CodeProcessus, EtatInfo, EtatAction, SurNotification)
+VALUES (3100801, 3100801, 3100811, 'BANC31', 'C', 'V', 0);
+SET IDENTITY_INSERT rec.ActionRegistre OFF;
+EXEC sp_executesql N'
+INSERT INTO v2.BODACC (BDCCR_ID_BDCCR, BDCCR_ID_BDCRC, BDCCR_TYPE_BODACC, BDCCR_DATE_PUBLICITE, BDCCR_CONTROLE_QUALITE, BDCCR_CONTROLE_QUALITE_VERIFIE)
+VALUES (3100811, 3100811, ''B9A'', DATEADD(day, -5, @aujourdhui), N''Dirigeant sans date de naissance'', 0);',
+    N'@aujourdhui datetime', @aujourdhui;

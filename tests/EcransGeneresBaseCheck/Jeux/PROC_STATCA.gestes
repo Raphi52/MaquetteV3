@@ -1,0 +1,23 @@
+# Gestes de « Statistiques cour d'appel » (EcrivainStatistiquesCourAppel.cs), lot 1 du plan-f4fb097f, sur le jeu PROC_STATCA.sql.
+# Une ligne porte « rang de la categorie|debut|fin » (EditionsV2.IdSurPeriode). « Word » = PrintWord de RIG v2 (OPE_GENERER.cs:610) : un
+# document Word sur le poste, ici une demande d'edition FUSION_ASPOSE dans la file (decision du plan). RIG v2 n'ecrit rien en base : les
+# lignes ne changent pas -- d'ou le controle SQL.
+#
+# Refus 1 : une periode apres aujourd'hui (LoadData, OPE_RECHERCHE.cs:89-91, au mot pres) -- jumeau accepte : bloc 3, janvier 2026.
+geste: Agir Word
+ids: 0|20991201|20991231
+resultat: refuse
+message: La date de début et la date de fin doivent être inférieure à la date du jour
+---
+# Refus 2 : sans tableau genere, RIG v2 grise Word (EnableWord, OPE_GENERER.cs:588) -- jumeau accepte : bloc 3, les quatre categories.
+geste: Agir Word
+ids:
+resultat: refuse
+message: « Word » n'est actif qu'après la génération du tableau : RIG v2 le grise sans résultat.
+---
+# Les quatre categories de janvier 2026 : le tableau de bord, titre et libelle source de RIG v2 (OPE_GENERER.cs:586, :590), sans demande V2.
+geste: Agir Word
+ids: 0|20260101|20260131,1|20260101|20260131,2|20260101|20260131,3|20260101|20260131
+resultat: fait
+message: « Tableau de bord de l'activité commerciale du 01/01/2026 au 31/01/2026 » : placé dans la file des éditions.
+controle: SELECT CONCAT(DMNED_TYPE_GENERATION, '|', DMNED_LIBELLE_SOURCE, '|', CASE WHEN DMNED_ID_DMND IS NULL THEN 'sans demande' ELSE 'avec demande' END) FROM v2.DEMANDE_EDITION WHERE DMNED_LIBELLE_DOCUMENT = N'Tableau de bord de l''activité commerciale du 01/01/2026 au 31/01/2026' => FUSION_ASPOSE|Activité commerciale du 01/01/2026 au 31/01/2026|sans demande

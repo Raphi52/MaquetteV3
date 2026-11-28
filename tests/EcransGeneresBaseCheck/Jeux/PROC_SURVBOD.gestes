@@ -1,0 +1,46 @@
+# Gestes de « Surveillance BODACC » (EcrivainSurveillanceBodacc.cs), lot 1 du plan-f4fb097f, sur le jeu PROC_SURVBOD.sql.
+# « Word » et « Imprimer » valident le processus de RIG v2 (FORM_SURVBOD.cs:58-71) : la demande SURVBOD validee et la liste Word des
+# controles qualite (LOT2_SURVBOD_LST_CQ, CreateDemandeEditionForDocWord). « Modifier l'annonce » cree la demande XACTION qualifiee du
+# dossier de l'annonce (OPE_REJETS_BODACC.cs:192-231). Rien ne verifie l'annonce : les lignes ne changent pas, d'ou les controles SQL.
+# Les messages des gestes faits portent le numero de la demande (serie DMD) : non compares.
+#
+# Refus 1 : aucune annonce cochee (_Verifier, OPE_REJETS_BODACC.cs:162-166) -- jumeau accepte : bloc 2, deux annonces cochees.
+geste: Agir Word
+ids:
+resultat: refuse
+message: Vous devez sélectionner au moins un dossier à traiter.
+---
+# « Word » sur une annonce sans dossier et une annonce d'un dossier : une demande SURVBOD validee, UNE edition (la liste) qui reprend le
+# parametre LOT2_SURVBOD_LST_CQ du jeu (maquette, affichage avant impression), FUSION_ASPOSE, phase C, sans courriel.
+geste: Agir Word
+ids: 1900801,3100811
+resultat: fait
+controle: SELECT COUNT(*) FROM v2.DEMANDE_EDITION AS e JOIN v2.DEMANDE AS d ON d.DMND_ID_DMND = e.DMNED_ID_DMND WHERE d.DMND_CODE_PROSS = 'SURVBOD' AND d.DMND_ETAT_DEMANDE = 'V' AND e.DMNED_LIBELLE_DOCUMENT = N'Liste des contrôles qualité' => 1
+controle: SELECT CONCAT(e.DMNED_TYPE_GENERATION, '|', e.DMNED_CODE_MAQUETTE, '|', e.DMNED_PHASE_TRAITEMENT, '|', CAST(e.DMNED_AFF_AVANT_IMPRESSION AS int), CAST(e.DMNED_ENVOI_PAR_MAIL AS int)) FROM v2.DEMANDE_EDITION AS e JOIN v2.DEMANDE AS d ON d.DMND_ID_DMND = e.DMNED_ID_DMND WHERE d.DMND_CODE_PROSS = 'SURVBOD' => FUSION_ASPOSE|LOT2_SURVBOD_LST_CQ|C|10
+---
+# « Imprimer » : la meme validation (MetierTableauEdition seul change) -- une seconde demande et sa liste.
+geste: Agir Imprimer
+ids: 1900805
+resultat: fait
+controle: SELECT COUNT(*) FROM v2.DEMANDE_EDITION AS e JOIN v2.DEMANDE AS d ON d.DMND_ID_DMND = e.DMNED_ID_DMND WHERE d.DMND_CODE_PROSS = 'SURVBOD' AND e.DMNED_LIBELLE_DOCUMENT = N'Liste des contrôles qualité' => 2
+---
+# Refus 2 : « Modifier l'annonce » sur une annonce sans dossier RCS (bouton masque, MasquerBoutonsVides :270-272) -- jumeau accepte :
+# bloc 6, l'annonce 3100811 de son dossier.
+geste: Agir Modifier l'annonce
+ids: 1900801
+resultat: refuse
+message: XAction non possible pour les non inscrits : l'annonce n'est rattachée à aucun dossier RCS.
+---
+# Refus 3 : deux annonces a la fois (le bouton « M » vise la ligne, :82-95) -- jumeau accepte : bloc 6, une seule.
+geste: Agir Modifier l'annonce
+ids: 3100811,1900805
+resultat: refuse
+message: « Modifier l'annonce » corrige UNE annonce, celle de la ligne (le bouton « M » de RIG v2) : cochez-en une seule.
+---
+# « Modifier l'annonce » sur 3100811 : la demande XACTION qualifiee (Q) du dossier 2010B31081, sur une affaire neuve, nommee par la
+# designation, indicatif = numero de gestion, l'action de l'annonce, son sequenceur R = le dossier.
+geste: Agir Modifier l'annonce
+ids: 3100811
+resultat: fait
+controle: SELECT CONCAT(DMND_ETAT_DEMANDE, '|', DMND_ID_DSRCS, '|', DMND_ID_ACTRC, '|', DMND_NUM_INDICATIF, '|', DMND_NOM, '|', CASE WHEN DMND_ID_AFFRE IS NULL THEN 'sans affaire' ELSE 'affaire' END) FROM v2.DEMANDE WHERE DMND_CODE_PROSS = 'XACTION' => Q|3100801|3100801|2010B31081|SURVBOD ALPHA SARL|affaire
+controle: SELECT COUNT(*) FROM v2.DOSSIER_DEMANDE AS dd JOIN v2.DEMANDE AS d ON d.DMND_ID_DMND = dd.DSSDM_ID_DMND WHERE d.DMND_CODE_PROSS = 'XACTION' AND dd.DSSDM_CODE_SEQUENCEUR = 'R' AND dd.DSSDM_VALEUR_SEQUENCEUR = '3100801' => 1

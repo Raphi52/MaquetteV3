@@ -1,0 +1,40 @@
+# Gestes de « Rappels RBE » (EcrivainRappelsRbe.cs), lot 1 du plan-f4fb097f, sur le jeu PROC_SRBE_RAPPEL.sql.
+# « Éditer les courriers » = le bouton EDITION de RIG v2 (PROC_SRBE_RAPPEL.cs:109-204) sur le DOSSIER de chaque ligne cochee : une
+# demande SRBE validee (affaire neuve, sequenceur R), son courrier (rappel avant le 01/08/2017, relance 1 ensuite) dans la file des
+# editions, puis la liste des dossiers relances sur la demande du processus. Les messages des gestes faits portent un numero de demande
+# (serie DMD) : non compares.
+#
+# Refus 1 : aucun dossier coche (OPE_RECHERCHE_RESULTATS.cs:352-353) -- jumeau accepte : bloc 3, une ligne cochee.
+geste: Agir Éditer les courriers
+ids:
+resultat: refuse
+message: Vous devez sélectionner au moins un dossier à traiter.
+---
+# Refus 2 : une demande supprimee (1100516, X) n'est pas une ligne de la liste -- jumeau accepte : bloc 3, 1100511 (V).
+geste: Agir Éditer les courriers
+ids: 1100516
+resultat: refuse
+message: La demande SRBE n° 1100516 n'est plus dans la base du greffe : relisez la liste.
+---
+# La ligne 1100511 : son dossier 2018B00501, immatricule le 10/05/2016 -> un RAPPEL (LOT1_LRNRBE_3_IMP). Une nouvelle demande SRBE
+# validee sur ce dossier, nommee « Rappel RBE RBE ALPHA SARL », entre en tete des courriers generes ; son edition reprend le parametre
+# (maquette LRNRBE_3_IMP, recto verso), l'entite DOSSIER_RCS et le dossier en source, le numero de gestion en libelle source ; puis la
+# liste (LRNRBE_1_LIST_IMP, Word) sur la demande du processus, sans dossier (hors de la liste).
+geste: Agir Éditer les courriers
+ids: 1100511
+resultat: fait
+lignes:
+RBE GAMMA SARL · 2018 B 00503 | Immatriculée le 31/07/2017 · rappel à envoyer depuis le {J-2} | Rappel | AFaire | []
+RBE DELTA SAS · 2018 B 00504 | Immatriculée le 15/03/2019 · relance 1 commencée le {J-5} | Relance 1 | EnCours | [0,1]
+RBE ALPHA SARL · 2018 B 00501 | Immatriculée le 10/05/2016 · rappel généré le {J+0} | Rappel | Validee | [0,1,2]
+RBE BETA SAS · 2018 B 00502 | Immatriculée le 01/08/2017 · relance 1 générée le {J-380} | Relance 1 | Validee | [0,1,2]
+RBE ALPHA SARL · 2018 B 00501 | Immatriculée le 10/05/2016 · rappel généré le {J-400} | Rappel | Validee | [0,1,2]
+RBE EPSILON SARL · 2018 B 00505 | Immatriculée le 01/01/2020 · relance 1 générée le {J-499} | Relance 1 | Validee | [0,1,2]
+controle: SELECT CONCAT(e.DMNED_LIBELLE_DOCUMENT, '|', e.DMNED_CODE_MAQUETTE, '|', e.DMNED_CODE_ENTITE_SOURCE, '|', e.DMNED_VALEUR_ID_SOURCE, '|', e.DMNED_LIBELLE_SOURCE, '|', CAST(e.DMNED_RECTO_VERSO AS int), '|', d.DMND_NOM, '|', d.DMND_ETAT_DEMANDE) FROM v2.DEMANDE_EDITION AS e JOIN v2.DEMANDE AS d ON d.DMND_ID_DMND = e.DMNED_ID_DMND WHERE d.DMND_CODE_PROSS = 'SRBE' AND d.DMND_ID_DSRCS = 1100501 => Courrier de rappel pour dépôt RBE|LRNRBE_3_IMP|DOSSIER_RCS|1100501|2018B00501|1|Rappel RBE RBE ALPHA SARL|V
+controle: SELECT COUNT(*) FROM v2.DEMANDE_EDITION AS e JOIN v2.DEMANDE AS d ON d.DMND_ID_DMND = e.DMNED_ID_DMND WHERE d.DMND_CODE_PROSS = 'SRBE' AND d.DMND_ID_DSRCS IS NULL AND e.DMNED_CODE_MAQUETTE = 'LOT2_SRBE_1_LST_DOSS' AND e.DMNED_TYPE_GENERATION = 'FUSION_ASPOSE' => 1
+---
+# La ligne 1100512 : son dossier 2018B00502, immatricule LE 01/08/2017 -> une RELANCE 1 (LOT1_LRNRBE_1_IMP, sans recto verso).
+geste: Agir Éditer les courriers
+ids: 1100512
+resultat: fait
+controle: SELECT CONCAT(e.DMNED_CODE_MAQUETTE, '|', CAST(e.DMNED_RECTO_VERSO AS int), '|', d.DMND_NOM) FROM v2.DEMANDE_EDITION AS e JOIN v2.DEMANDE AS d ON d.DMND_ID_DMND = e.DMNED_ID_DMND WHERE d.DMND_CODE_PROSS = 'SRBE' AND d.DMND_ID_DSRCS = 1100502 => LRNRBE_1_IMP|0|Relance 1 RBE RBE BETA SAS

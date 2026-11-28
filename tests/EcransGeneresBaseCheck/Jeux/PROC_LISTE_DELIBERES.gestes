@@ -1,0 +1,31 @@
+# Gestes de « Délibérés » (EcrivainListeDeliberes.cs), lot 1 du plan-f4fb097f, sur le jeu PROC_LISTE_DELIBERES.sql.
+# Une ligne porte « instance|date de reference|duree|types » (LecteurListeDeliberes.IdLigne) : le titre du document de RIG v2
+# (frmListeDelibere.cs:277). RIG v2 n'ecrit rien en base : l'edition est une demande dans la file des editions (decision du plan), les
+# lignes de l'etat ne changent pas -- d'ou les controles SQL.
+#
+# Refus 1 : « Délibérés repoussés non rendus » ouvre un classeur Excel sur le poste (EXECUTE_EXCEL, :568-590) -- jumeau accepte : bloc 3,
+# « Editer le résultat » sur les memes lignes.
+geste: Agir Délibérés repoussés non rendus
+ids: 1701004|20260930|60|07,1701001|20260930|60|07
+resultat: refuse
+message: « Délibérés repoussés non rendus » ouvre un classeur Excel sur le poste (EXECUTE_EXCEL de RIG v2) : RIG v3 ne produit pas de classeur, rien n'est édité.
+---
+# Refus 2 : sans ligne a l'ecran, RIG v2 grise EDITER (:135-139) -- jumeau accepte : bloc 3, deux lignes.
+geste: Agir Editer le résultat
+ids:
+resultat: refuse
+message: « Editer le résultat » n'est actif qu'avec au moins un délibéré à l'écran : RIG v2 le grise sans résultat.
+---
+# Les deux deliberes du jeu, recherche par defaut (contentieux, 60 jours) a la reference du 30/09/2026 : une demande d'edition
+# FUSION_ASPOSE au titre de RIG v2, sans demande V2, « Liste des délibérés » en libelle source.
+geste: Agir Editer le résultat
+ids: 1701004|20260930|60|07,1701001|20260930|60|07
+resultat: fait
+message: « Liste affaires (Contentieux) en cours au 30/09/2026 et en délibéré depuis plus de 60 jours » (2 affaires) : placé dans la file des éditions.
+controle: SELECT CONCAT(DMNED_TYPE_GENERATION, '|', DMNED_LIBELLE_SOURCE, '|', DMNED_PHASE_TRAITEMENT, '|', CASE WHEN DMNED_ID_DMND IS NULL THEN 'sans demande' ELSE 'avec demande' END) FROM v2.DEMANDE_EDITION WHERE DMNED_LIBELLE_DOCUMENT = N'Liste affaires (Contentieux) en cours au 30/09/2026 et en délibéré depuis plus de 60 jours' => FUSION_ASPOSE|Liste des délibérés|C|sans demande
+---
+# Refus 3 : une affaire qui n'est plus dans la base (1709999) -- jumeau accepte : bloc 3.
+geste: Agir Editer le résultat
+ids: 1709999|20260930|60|07
+resultat: refuse
+message: Une affaire de la liste n'est plus dans la base du greffe : relancez la recherche.

@@ -14,7 +14,8 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// l. 20 ; arbitrage par dossier, l. 136 ; regle R1 de la fiche). Les codes de ces demandes sont ceux que PROC_IDBE
 /// reconnait comme « vieux proc SRBE RAPPEL » : SRBE, SRBE_RAPPEL, SRBE_OLD (PROC_SRBE\PROC_DBE_INJ\PROC_IDBE.cs:62) ;
 /// RIG_DEV n'a que « SRBE » (lu le 25/11/2026).
-/// Une ligne = une de ces demandes, hors demande supprimee (X). La recherche des dossiers A ENVOYER n'est pas reprise :
+/// Une ligne = une de ces demandes, hors demande supprimee (X) ; son Id = la demande, dont le dossier recoit le courrier de « Éditer les
+/// courriers » (EcrivainRappelsRbe.cs). La recherche des dossiers A ENVOYER n'est pas reprise :
 /// ses trois requetes (DossierRCS.GetNRBEPourRappel / ...PourRelance / ...PourRappelOuRelance, OPE_RECHERCHE_CRITERES.cs:
 /// 153-162) n'existent plus dans le code de l'ancien RIG (CompilationFull\PowerShell\buildErrors.txt:110, CS0117) ; la V2
 /// cherche aujourd'hui ces entreprises par la relance des beneficiaires (PROC_DBE_RELANCE, nature SDBE), qui ecarte
@@ -39,7 +40,7 @@ internal sealed class LecteurRappelsRbe : ILecteurEcran
 
     private const string Requete = """
         SELECT TOP (@plafond)
-               d.DMND_ETAT_DEMANDE, d.DMND_DATE_CREATION, d.DMND_DATE_VALIDATION,
+               d.DMND_ID_DMND, d.DMND_ETAT_DEMANDE, d.DMND_DATE_CREATION, d.DMND_DATE_VALIDATION,
                s.NumeroGestion, s.Siren, s.DateImmatriculation, e.Denomination,
                COUNT(*) OVER () AS Total
         FROM v2.DEMANDE AS d
@@ -70,8 +71,12 @@ internal sealed class LecteurRappelsRbe : ILecteurEcran
             _ => $"{courrier} commencé{accord} le {FormeLigne.Date(creee)}",
         };
         var nom = FormeLigne.Joindre(FormeLigne.Texte(r, "Denomination"), FormeLigne.NumeroGestion(FormeLigne.Texte(r, "NumeroGestion")));
+        // Id = la demande SRBE : « Éditer les courriers » vise son dossier (EcrivainRappelsRbe.cs, lot 1 du plan-f4fb097f).
         return new LigneLue(nom, FormeLigne.Joindre(immat is null ? null : $"Immatriculée le {FormeLigne.Date(immat)}", quand),
-                            groupe, etat, faites);
+                            groupe, etat, faites)
+        {
+            Id = Convert.ToInt32(r["DMND_ID_DMND"], System.Globalization.CultureInfo.InvariantCulture).ToString(System.Globalization.CultureInfo.InvariantCulture),
+        };
     }
 
     /// <summary>La regle d'etat (en tete du fichier) : etat du descripteur et marches franchies.</summary>

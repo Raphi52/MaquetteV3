@@ -1,0 +1,30 @@
+# Gestes de « Pilotage » (EcrivainPilotage.cs), lot 1 du plan-f4fb097f, sur le jeu PROC_XPILOTAGE.sql.
+# Une ligne porte « cellule|debut|fin » (EditionsV2.IdSurPeriode). « Visualiser » = GenererDocument de RIG v2 (OPE_GENERER.cs:156-213) :
+# la demande XPILOTAGE au nom du tableau, validee (:108-121), et le tableau en demande d'edition REPORT_SQL dans la file (decision du
+# plan). Les lignes (les cellules calculees) ne changent pas -- d'ou les controles SQL. Le message porte le numero de la demande : non compare.
+#
+# Refus 1 : « Archives » ouvre un dossier du poste (AfficherArchives, :416-425) -- jumeau accepte : bloc 3, « Visualiser » sur les memes
+# cellules.
+geste: Agir Archives
+ids: 1900601|20260101|20260131,1900603|20260101|20260131
+resultat: refuse
+message: « Archives » ouvre, sur le poste, le dossier des tableaux de pilotage déjà générés (le répertoire commun du greffe) : RIG v3 n'a pas ce dossier, rien n'est ouvert.
+---
+# Refus 2 : une periode apres aujourd'hui (:161-162, au mot pres) -- jumeau accepte : bloc 3, janvier 2026.
+geste: Agir Visualiser
+ids: 1900601|20991201|20991231
+resultat: refuse
+message: La date de début et la date de fin doivent être inférieure à la date du jour
+---
+# Deux cellules de la feuille RCS (« 1 »), janvier 2026 : « Tableau pilotage RCS du 01-01-2026 au 31-01-2026 » (:183), la demande
+# XPILOTAGE validee a ce nom, et son edition REPORT_SQL rattachee, « Tableau de pilotage » en libelle source (:240).
+geste: Agir Visualiser
+ids: 1900601|20260101|20260131,1900603|20260101|20260131
+resultat: fait
+controle: SELECT CONCAT(d.DMND_ETAT_DEMANDE, '|', e.DMNED_LIBELLE_DOCUMENT, '|', e.DMNED_TYPE_GENERATION, '|', e.DMNED_LIBELLE_SOURCE) FROM v2.DEMANDE AS d JOIN v2.DEMANDE_EDITION AS e ON e.DMNED_ID_DMND = d.DMND_ID_DMND WHERE d.DMND_CODE_PROSS = 'XPILOTAGE' AND d.DMND_NOM = 'Tableau pilotage RCS du 01-01-2026 au 31-01-2026' => V|Tableau pilotage RCS du 01-01-2026 au 31-01-2026|REPORT_SQL|Tableau de pilotage
+---
+# Une cellule de chaque feuille : « RCS et Judiciaire » (:181).
+geste: Agir Visualiser
+ids: 1900601|20260101|20260131,1900602|20260101|20260131
+resultat: fait
+controle: SELECT COUNT(*) FROM v2.DEMANDE WHERE DMND_CODE_PROSS = 'XPILOTAGE' AND DMND_NOM = 'Tableau pilotage RCS et Judiciaire du 01-01-2026 au 31-01-2026' AND DMND_ETAT_DEMANDE = 'V' => 1

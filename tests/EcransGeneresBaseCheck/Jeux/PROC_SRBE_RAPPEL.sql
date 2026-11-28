@@ -42,3 +42,23 @@ INSERT INTO v2.DEMANDE (DMND_ID_DMND, DMND_ID_DSRCS, DMND_NUM_DEMANDE, DMND_ETAT
     (1100517, 1100507, '2601100517', 'V', 'RDBE', DATEADD(DAY, -10, @aujourdhui), DATEADD(DAY, -10, @aujourdhui)),
     -- sans dossier : ecartee -- jumeau retenu 1100511
     (1100518, NULL, '2601100518', 'V', 'SRBE', DATEADD(DAY, -10, @aujourdhui), DATEADD(DAY, -10, @aujourdhui));
+
+-- LES GESTES (EcrivainRappelsRbe.cs, lot 1 du plan-f4fb097f) : « Éditer les courriers » edite par dossier le parametre LOT1_LRNRBE_3_IMP
+-- (rappel) ou LOT1_LRNRBE_1_IMP (relance 1), puis la liste des dossiers LRNRBE_1_LIST_IMP (PROC_SRBE_RAPPEL.cs:123-126, :234), aux
+-- valeurs de RIG_DEV (libelle, maquette, type, recto verso, affichage avant impression, entite source ; lu le 28/11/2026). Aucun reglage
+-- SRBE_EDITION_* dans le banc : les defauts de ParametrageRBE.cs (rappels chez Amitel, sans file, liste editee).
+IF OBJECT_ID(N'v2.PARAMETRE_EDITION') IS NULL
+    CREATE TABLE v2.PARAMETRE_EDITION (PRMED_CODE varchar(40) NOT NULL PRIMARY KEY, PRMED_LIBELLE varchar(100) NOT NULL,
+        PRMED_RECTO_VERSO bit NOT NULL DEFAULT 0, PRMED_AFFICHER_AVANT_IMPRESSION bit NOT NULL DEFAULT 0, PRMED_CODE_CFECP varchar(50) NULL,
+        PRMED_LISTE varchar(4000) NOT NULL DEFAULT '', PRMED_CODE_ENTITE_SOURCE varchar(16) NULL, PRMED_CODE_PROCESSUS varchar(40) NULL,
+        PRMED_CODE_MAQUETTE varchar(40) NULL, PRMED_TYPE_GENERATION varchar(15) NULL, PRMED_NOMBRE_EXEMPLAIRES int NOT NULL DEFAULT 1,
+        PRMED_READ_ONLY bit NOT NULL DEFAULT 0, PRMED_NUM_GROUPE_IMPRESSION varchar(30) NULL, PRMED_TRIBUNAL_DIGITAL_NATURE_DOC varchar(50) NULL);
+EXEC sp_executesql N'
+INSERT INTO v2.PARAMETRE_EDITION (PRMED_CODE, PRMED_LIBELLE, PRMED_CODE_MAQUETTE, PRMED_TYPE_GENERATION, PRMED_RECTO_VERSO,
+    PRMED_AFFICHER_AVANT_IMPRESSION, PRMED_CODE_ENTITE_SOURCE, PRMED_CODE_PROCESSUS, PRMED_NOMBRE_EXEMPLAIRES)
+SELECT v.Code, v.Libelle, v.Maquette, v.TypeGen, v.Recto, 0, v.Entite, v.Processus, 1
+FROM (VALUES (''LOT1_LRNRBE_3_IMP'', N''Courrier de rappel pour dépôt RBE'', ''LRNRBE_3_IMP'', ''RIG_LOT_UN'', 1, ''DOSSIER_RCS'', ''LRNRBE''),
+             (''LOT1_LRNRBE_1_IMP'', N''Lettre de relance pour non dépôt RBE'', ''LRNRBE_1_IMP'', ''RIG_LOT_UN'', 0, NULL, ''LRNRBE''),
+             (''LRNRBE_1_LIST_IMP'', N''Liste des dossiers pour relance pour non dépôt RBE'', ''LOT2_SRBE_1_LST_DOSS'', ''FUSION_ASPOSE'', 0, NULL, NULL))
+     AS v (Code, Libelle, Maquette, TypeGen, Recto, Entite, Processus)
+WHERE v.Code NOT IN (SELECT PRMED_CODE FROM v2.PARAMETRE_EDITION);';
