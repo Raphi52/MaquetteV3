@@ -169,6 +169,22 @@ describe('EcranArchivage branche sur la base', () => {
     expect(screen.getByText('ALPHA BASE SARL')).not.toBeNull()
   })
 
+  // Capture 14 du lot 11 (28/11/2026) : le refus du bordereau sur 1960A00017 restait affiché sous la liste relue d'autres dates,
+  // où ce dossier n'était plus. Un compte rendu vaut pour les critères qui l'ont produit : en changer l'efface.
+  it('un refus disparait quand les criteres changent : il ne parle plus de la liste affichee', async () => {
+    installerFauxPont({
+      'EcranArchivage.Dossiers': () => Base({ lignes: [lue], total: 1 }),
+      'EcranArchivage.Bordereau': () => ({ fait: false, sansEcrivain: false, ids: [],
+        message: "Le dossier 1960A00017 n'a aucune action au registre : RIG v2 s'arrête sur lui sans bordereau. Rien n'est enregistré." }),
+    })
+    render(<EcranArchivage ouvrirDossier={vi.fn()} />)
+    await screen.findByText('ALPHA BASE SARL')
+    fireEvent.click(screen.getByRole('button', { name: 'Preparer le bordereau' }))
+    expect((await screen.findByRole('alert')).textContent).toContain('1960A00017')
+    fireEvent.change(screen.getByLabelText('Date mini.'), { target: { value: '2011-01-01' } })
+    await vi.waitFor(() => expect(screen.queryByRole('alert')).toBeNull())
+  })
+
   it('150 dossiers ou plus : RIG v2 refuse le bordereau, l ecran le dit', async () => {
     installerFauxPont({ 'EcranArchivage.Dossiers': () => Base({ lignes: [lue], total: 150 }) })
     render(<EcranArchivage ouvrirDossier={vi.fn()} />)

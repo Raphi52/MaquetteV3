@@ -1,5 +1,6 @@
 // fix-ok: pas un correctif -- lot 11 du plan-f4fb097f (28/11/2026) : le geste « Courrier aux débiteurs » (mesuré au 28/11 : PROC_CLOT
-// « geste non prouvé ») et ce qu'il relit (Id de la PC, dernier courrier) ; trois retouches d'un même ajout.
+// « geste non prouvé ») et ce qu'il relit (Id de la PC, dernier courrier) ; puis, refus du chef du 28/11 (« le courrier est secondaire »),
+// le geste principal « Enrôlement sur saisine d'office » et sa relecture (records, doc, méthodes) : trois retouches d'un même ajout.
 using System.Globalization;
 using RigV3.Contrats.EcransGeneres;
 using RigV3.Contrats.EcransMain;
@@ -15,6 +16,16 @@ public sealed record LigneCloture(string Role, string Affaire, string Demandeur,
                                   string Huissier, string CodePostalVille, string ActeSaisine, string Depot, string Facturation,
                                   bool? AuForfait, int? Id = null);
 
+/// <summary>Une instance de clôture enrôlée (onglet « Enrolement / requete », web/src/ecrans/EcranCloture.tsx, LigneEnrol) ; dates
+/// aaaa-mm-jj, vide = non lu. Les colonnes de l'étape « Résultats » de RIG v2 (OPE_RESULTATS.cs:267-299) et ce que l'enrôlement a posé.</summary>
+public sealed record LigneEnrolementCloture(int IdInstance, string Role, string Repertoire, int IdPc, string NumPc, string Demandeur,
+                                            string Defendeur, string ActeSaisine, string Enrolement, string Audience, string HeureAudience,
+                                            string Chambre, string Classement, string HeureAppel, string Convocation, string DateConvocation,
+                                            string ExamenSurvenu);
+
+/// <summary>Les instances de clôture enrôlées lues, et d'où (Pont/LectureEcranMain.cs) ; vide en démonstration.</summary>
+public sealed record VueEnrolementsCloture(string Mode, string? Message, LigneEnrolementCloture[] Lignes, int Total);
+
 /// <summary>Ce que l'ecran Cloture affiche, et d'ou (Pont/LectureEcranMain.cs).</summary>
 /// <param name="Aujourdhui">La date qui dit si une limite d'examen est depassee : la vraie en base, celle du jeu sinon.</param>
 public sealed record VueCloture(string Mode, string? Message, LigneCloture[] Lignes, int Total, string Aujourdhui);
@@ -29,10 +40,14 @@ public sealed record VueCloture(string Mode, string? Message, LigneCloture[] Lig
 /// aux debiteurs (CLOT_EVE_PRO_INCITR, LectureCloture.cs). SANS serveur : mode « demo », aucune ligne (l'ecran garde ses
 /// affaires d'exemple, marquees). En panne : le motif et aucune ligne.
 ///
-/// LE GESTE (plan « RIG v3 complet, mesuré par le banc du parcours complet », lot 11, 28/11/2026) : le mode de cloture « Courrier aux
-/// debiteurs » de RIG v2 (OPE_SELECT_PC.cs:1761-1775) sur les PC cochees -- <see cref="EnvoyerCourrierDebiteursAsync"/>, ecrit par le
-/// serveur (Serveur/Socle/EcransMain/EcritureCloture.cs) ; l'enrolement sur saisine d'office (mode 1 : instance, audience, convocations)
-/// n'est pas repris. Sans serveur, rien n'est ecrit (« Démonstration »).
+/// LES GESTES (plan « RIG v3 complet, mesuré par le banc du parcours complet », lot 11, 28/11/2026), écrits par le serveur
+/// (Serveur/Socle/EcransMain/EcritureCloture.cs) sur les PC cochees :
+///   - le PRINCIPAL, l'« Enrôlement sur saisine d'office » (mode 1, celui que RIG v2 présélectionne depuis l'alerte, OPE_EXAMEN_CLOT.cs:
+///     57-59 ; OPE_SELECT_PC.cs:1776-1899) -- <see cref="CreerEnrolementsAsync"/> : une instance de clôture par PC, son appel à l'audience
+///     choisie pour le liquidateur, sa convocation, le 4CLO de la PC survenu ; relu par <see cref="EnrolementsAsync"/> (l'onglet
+///     « Enrolement / requete ») ;
+///   - le second, « Courrier aux debiteurs » (mode 5, OPE_SELECT_PC.cs:1761-1775) -- <see cref="EnvoyerCourrierDebiteursAsync"/>.
+/// Sans serveur, rien n'est ecrit (« Démonstration »).
 /// </summary>
 public static partial class EcranCloture
 {
@@ -68,6 +83,48 @@ public static partial class EcranCloture
         return await EcranGenere.EnvoyerGesteAsync(serveur, greffe, RoutesEcransMain.Pour(RoutesCloture.CourrierDebiteurs, greffe),
             new GesteEcran(TypeGeste.Agir, [.. ids.Select(i => i.ToString(CultureInfo.InvariantCulture))],
                            new Dictionary<string, string> { [RoutesCloture.ChampFacturer] = facturer ? "oui" : "non" }) { Nom = "Courrier aux débiteurs" });
+    }
+
+    /// <summary>« Enrôlement sur saisine d'office » des PC <paramref name="ids"/> (les lignes cochees), a l'audience du
+    /// <paramref name="dateAudience"/> (aaaa-mm-jj) et <paramref name="heureAudience"/> (vide : la seule de ce jour), au
+    /// <paramref name="classement"/> (vide : le réglage CLOT_SO_TYPECLA) et a <paramref name="heureAppel"/> ; <paramref name="facturer"/> :
+    /// le bouton FACTURATION de RIG v2. Le resultat porte les instances creees (Ids).</summary>
+    [JSInvokable("EcranCloture.EnrolerSurSaisineOffice")]
+    public static Task<ResultatGeste> EnrolerSurSaisineOffice(int[] ids, string? dateAudience, string? heureAudience, string? classement,
+                                                              string? heureAppel, bool facturer)
+        => CreerEnrolementsAsync(ClientServeur.Actif, SessionAgent.CodeGreffe, ids, dateAudience, heureAudience, classement, heureAppel, facturer);
+
+    /// <summary>Le geste sur <paramref name="serveur"/> et le greffe <paramref name="greffe"/> : sans eux, « Démonstration ».</summary>
+    public static async Task<ResultatGeste> CreerEnrolementsAsync(ClientServeur? serveur, string? greffe, int[] ids, string? dateAudience,
+                                                                 string? heureAudience, string? classement, string? heureAppel, bool facturer)
+    {
+        if (serveur is null || string.IsNullOrWhiteSpace(greffe))
+            return new ResultatGeste(false, $"{EcranGenere.Demonstration} : RIG n'est pas branché sur la base d'un greffe.") { SansEcrivain = true };
+        return await EcranGenere.EnvoyerGesteAsync(serveur, greffe, RoutesEcransMain.Pour(RoutesCloture.EnrolementSo, greffe),
+            new GesteEcran(TypeGeste.Creer, [.. ids.Select(i => i.ToString(CultureInfo.InvariantCulture))], new Dictionary<string, string>
+            {
+                [RoutesCloture.ChampDateAudience] = dateAudience?.Trim() ?? "", [RoutesCloture.ChampHeureAudience] = heureAudience?.Trim() ?? "",
+                [RoutesCloture.ChampClassement] = classement?.Trim() ?? "", [RoutesCloture.ChampHeureAppel] = heureAppel?.Trim() ?? "",
+                [RoutesCloture.ChampFacturer] = facturer ? "oui" : "non",
+            }) { Nom = "Enrôlement sur saisine d'office" });
+    }
+
+    /// <summary>Les instances de clôture enrôlées (onglet « Enrolement / requete ») : <paramref name="du"/> et <paramref name="au"/> bornent
+    /// la date d'enrôlement (aaaa-mm-jj ; vides : toutes).</summary>
+    [JSInvokable("EcranCloture.Enrolements")]
+    public static Task<VueEnrolementsCloture> Enrolements(string? du, string? au)
+        => EnrolementsAsync(ClientServeur.Actif, SessionAgent.CodeGreffe, Jour(du), Jour(au));
+
+    /// <summary>Les instances de clôture du greffe <paramref name="greffe"/> (null serveur : la demonstration, aucune ligne).</summary>
+    public static async Task<VueEnrolementsCloture> EnrolementsAsync(ClientServeur? serveur, string? greffe, DateOnly? du, DateOnly? au)
+    {
+        var lu = await LectureEcransMain.LireAsync(serveur, greffe, "les instances de clôture enrôlées", (s, g) =>
+            s.EnvoyerAsync<RechercheCloture, EnrolementsClotureLus>(RoutesEcransMain.Pour(RoutesCloture.Enrolements, g), new RechercheCloture(du, au)));
+        if (lu.Valeur is not { } v) return new VueEnrolementsCloture(lu.Mode, lu.Mode == LectureEcransMain.Demo ? null : lu.Message, [], 0);
+        static string J(DateTime? d) => d?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "";
+        return new VueEnrolementsCloture(lu.Mode, null, [.. v.Lignes.Select(e => new LigneEnrolementCloture(e.IdInstance, e.NumRole,
+            e.NumRepGeneral, e.IdPc, e.NumPc, e.Demandeur, e.Defendeur, e.ActeSaisine, J(e.Enrolement), J(e.Audience), e.HeureAudience,
+            e.Chambre, e.TypeClassement, e.HeureAppel, e.Convocation, J(e.DateConvocation), J(e.ExamenSurvenu)))], v.Total);
     }
 
     private static LigneCloture Ligne(AffaireClotureLue a) => new(

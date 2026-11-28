@@ -38,10 +38,16 @@
 // aucune ligne. Ce que la base ne porte pas (chambre, audience, classement, huissier : les choix de l'enrolement) reste
 // vide ; « Forfait » est alors la case de RIG v2 (au forfait : jamais facture), pas un montant.
 //
-// LE GESTE (plan « RIG v3 complet, mesuré par le banc du parcours complet », lot 11, 28/11/2026) : « Courrier aux débiteurs », le mode
-// de clôture 5 de RIG v2 (OPE_SELECT_PC.cs:1761-1775 ; écrit par Serveur/Socle/EcransMain/EcritureCloture.cs) sur les PC affichées --
-// les cases que RIG v2 coche par défaut dans ce mode (:962-968) ; « Dernier courrier envoyé » (ligne dépliée) se relit à sa date.
-// fix-ok: pas un correctif -- trois retouches d'un même ajout (bouton, annonce, relecture), mesuré au 28/11 : PROC_CLOT sans geste.
+// LES GESTES (plan « RIG v3 complet, mesuré par le banc du parcours complet », lot 11, 28/11/2026), écrits par
+// Serveur/Socle/EcransMain/EcritureCloture.cs sur les PC affichées :
+//   - le PRINCIPAL, « Enrôler sur saisine d'office » (mode 1 de RIG v2, celui qu'il présélectionne depuis l'alerte : OPE_EXAMEN_CLOT.cs:
+//     57-59 ; OPE_SELECT_PC.cs:1776-1899) : l'audience se choisit par sa date et son heure, comme la grille d'enrôlement de RIG v2
+//     (colDateAudience / colHeureAudience, :1180-1300), avec le type de classement (vide : le réglage CLOT_SO_TYPECLA) et l'heure d'appel ;
+//     fait, l'onglet « Enrolement / requete » relit en base les instances de clôture (EcranCloture.Enrolements : rôle, PC, parties,
+//     acte, audience, convocation, 4CLO survenu) ;
+//   - le second, « Courrier aux débiteurs » (mode 5, OPE_SELECT_PC.cs:1761-1775) ; « Dernier courrier envoyé » (ligne dépliée) se relit.
+// fix-ok: pas un correctif -- retouches d'un même ajout (bouton, annonce, relecture), mesuré au 28/11 : PROC_CLOT sans geste, puis refus du
+// chef du 28/11 (le courrier est secondaire) : le bloc et le bouton de l'enrôlement, l'onglet relu en base.
 
 import { Fragment, useEffect, useState } from 'react'
 import { appeler } from '../pont'
@@ -84,6 +90,35 @@ interface LigneClot {
   auForfait?: boolean | null
   /** Lue en base : l'identifiant de la PC, que le courrier aux debiteurs envoie ; absent en demonstration. */
   id?: number | null
+}
+
+/** Une instance de clôture enrôlée, lue en base (Pont/EcranClotureBase.cs, LigneEnrolementCloture) ; dates aaaa-mm-jj, vide = non lu. */
+interface LigneEnrol {
+  idInstance: number
+  role: string
+  repertoire: string
+  idPc: number
+  numPc: string
+  demandeur: string
+  defendeur: string
+  acteSaisine: string
+  enrolement: string
+  audience: string
+  heureAudience: string
+  chambre: string
+  classement: string
+  heureAppel: string
+  convocation: string
+  dateConvocation: string
+  examenSurvenu: string
+}
+
+/** Les instances de clôture enrôlées (Pont/EcranClotureBase.cs, VueEnrolementsCloture). */
+export interface VueEnrolements {
+  mode: ModeLecture
+  message: string | null
+  lignes: LigneEnrol[]
+  total: number
 }
 
 /** Ce que rend le pont (Pont/EcranClotureBase.cs, VueCloture). */
@@ -199,6 +234,14 @@ export function EcranCloture({ ouvrirDossier, dossier = null }: ProprietesEcranC
   const [annonce, setAnnonce] = useState<CompteRendu>(null)
   const [relecture, setRelecture] = useState(0)
   const [envoi, setEnvoi] = useState(false)
+  // La ligne du liquidateur de la grille d'enrôlement de RIG v2 (OPE_SELECT_PC.cs:345-397) : l'audience par sa date et son heure,
+  // le type de classement (vide : CLOT_SO_TYPECLA), l'heure d'appel.
+  const [dateAudience, setDateAudience] = useState('')
+  const [heureAudience, setHeureAudience] = useState('')
+  const [classementEnrol, setClassementEnrol] = useState('')
+  const [heureAppel, setHeureAppel] = useState('')
+  // Les instances de clôture enrôlées, lues quand l'onglet « Enrolement / requete » s'ouvre en base.
+  const [enrolements, setEnrolements] = useState<VueEnrolements | null>(null)
 
   // Du / Au sont les dates de la recherche de RIG v2 : en base, chaque changement relit les procedures.
   useEffect(() => {
@@ -208,12 +251,41 @@ export function EcranCloture({ ouvrirDossier, dossier = null }: ProprietesEcranC
   }, [critDu, critAu, relecture])
   const aujourdhui = vue?.aujourdhui ?? null
   const enBase = vue?.mode === 'serveur'
+  const ongletEnrolementsEnBase = enBase && !etapeSelection
+  useEffect(() => {
+    if (!ongletEnrolementsEnBase) return
+    let perime = false
+    void appeler<VueEnrolements>('EcranCloture.Enrolements', '', '').then((v) => { if (!perime) setEnrolements(v) },
+      () => { if (!perime) setEnrolements({ mode: 'erreur', message: "Le pont n'a pas rendu les enrôlements.", lignes: [], total: 0 }) })
+    return () => { perime = true }
+  }, [ongletEnrolementsEnBase, relecture])
+  const lignesEnrol = ongletEnrolementsEnBase ? enrolements?.lignes ?? [] : []
+  // « Aller a une affaire… » cherche aussi parmi les instances relues : défendeur, n° de rôle ou n° de PC.
+  const instancesAffichees = estBlanc(critAffaire) ? lignesEnrol : lignesEnrol.filter((e) =>
+    contientSansCasse(e.defendeur, critAffaire.trim()) || contientSansCasse(e.role, critAffaire.trim()) || contientSansCasse(e.numPc, critAffaire.trim()))
   // La base en mode « serveur », les exemples en demonstration ; rien quand la base n'a pas repondu.
   const lignes: LigneClot[] = vue === null ? [] : enBase ? vue.lignes : vue.mode === 'demo' ? Lignes : []
   const Chambres = distinctsTries(lignes.map((l) => l.chambre).filter((c) => c !== ''))
 
   const enRetard = enRetardLe(aujourdhui)
   const criteres: CriteresCloture = { critAffaire, critChambre, critDu, critAu, critAFacturer, critExamenDepasse, critTypes }
+
+  /** « Enrôler sur saisine d'office » (mode de clôture 1 de RIG v2) des PC affichées, à l'audience choisie : écrit par le serveur ;
+   *  fait, les procédures sont relues (une PC enrôlée quitte la sélection) et l'onglet « Enrolement / requete » montre les instances. */
+  async function enroler() {
+    setEnvoi(true)
+    try {
+      const ids = trouvees.map((l) => l.id).filter((id): id is number => typeof id === 'number')
+      const r = await appeler<ResultatGesteVue>('EcranCloture.EnrolerSurSaisineOffice', ids, dateAudience, heureAudience, classementEnrol,
+                                               heureAppel, false)
+      setAnnonce(r.fait || r.sansEcrivain ? r.message : { refus: r.message })
+      if (r.fait) { setRelecture((n) => n + 1); setEtapeSelection(false) }
+    } catch {
+      setAnnonce({ refus: "Le pont n'a pas répondu : rien n'est enregistré." })
+    } finally {
+      setEnvoi(false)
+    }
+  }
 
   /** « Courrier aux débiteurs » (mode de clôture 5 de RIG v2, cases cochées par défaut : les PC affichées) : écrit par le serveur ;
    *  fait, les procédures sont relues (leur dernier courrier). */
@@ -318,10 +390,44 @@ export function EcranCloture({ ouvrirDossier, dossier = null }: ProprietesEcranC
           </button>
         </div>
 
+        {enBase && (
+          <div className="rig-criteres__bloc">
+            <div className="rig-kicker">Enrolement sur saisine d'office</div>
+            <div className="rig-criteres__paire">
+              <label className="rig-saisie-champ">
+                <span className="rig-saisie-champ__libelle">Date d'audience</span>
+                <input className="rig-saisie-champ__saisie" type="date" value={dateAudience} onChange={(e) => setDateAudience(e.target.value)} />
+              </label>
+              <label className="rig-saisie-champ">
+                <span className="rig-saisie-champ__libelle">Heure d'audience</span>
+                <input className="rig-saisie-champ__saisie" value={heureAudience} placeholder="09:30" maxLength={5}
+                       onChange={(e) => setHeureAudience(e.target.value)} />
+              </label>
+            </div>
+            <div className="rig-criteres__paire">
+              <label className="rig-saisie-champ">
+                <span className="rig-saisie-champ__libelle">Type de classement</span>
+                <input className="rig-saisie-champ__saisie" value={classementEnrol} placeholder="par défaut" maxLength={5}
+                       onChange={(e) => setClassementEnrol(e.target.value)} />
+              </label>
+              <label className="rig-saisie-champ">
+                <span className="rig-saisie-champ__libelle">Heure d'appel</span>
+                <input className="rig-saisie-champ__saisie" value={heureAppel} placeholder="09:45" maxLength={5}
+                       onChange={(e) => setHeureAppel(e.target.value)} />
+              </label>
+            </div>
+          </div>
+        )}
+
         <div className="rig-criteres__actions">
           <button className="rig-bouton" onClick={effacer}>Effacer</button>
           {enBase && (
             <button className="rig-bouton rig-bouton--fort" disabled={envoi || trouvees.length === 0}
+                    title="Mode de clôture « Enrôlement sur saisine d'office » de RIG v2 : une instance de clôture par PC affichée, appelée à l'audience choisie, sa convocation, l'examen de clôture survenu"
+                    onClick={() => void enroler()}>Enrôler sur saisine d'office</button>
+          )}
+          {enBase && (
+            <button className="rig-bouton" disabled={envoi || trouvees.length === 0}
                     title="Mode de clôture « Courrier aux débiteurs » de RIG v2 : l'évènement, la demande et le courrier de chaque PC affichée"
                     onClick={() => void courrierDebiteurs()}>Courrier aux débiteurs</button>
           )}
@@ -339,13 +445,18 @@ export function EcranCloture({ ouvrirDossier, dossier = null }: ProprietesEcranC
         </div>
 
         <EnteteListe titre={etapeSelection ? 'Selection des procedures collectives' : 'Enrolement et requete'}
-                     synthese={<>{trouvees.length}{trouvees.length > 1 ? ' affaires' : ' affaire'}{` sur ${enBase ? vue.total : lignes.length} · `}
+                     synthese={ongletEnrolementsEnBase
+                       ? <>{instancesAffichees.length}{instancesAffichees.length > 1 ? ' instances de cloture enrolees' : ' instance de cloture enrolee'}
+                           {` sur ${enrolements?.total ?? 0}, les plus recentes d'abord`}</>
+                       : <>{trouvees.length}{trouvees.length > 1 ? ' affaires' : ' affaire'}{` sur ${enBase ? vue.total : lignes.length} · `}
                        <b>{aFacturer}</b>{' a facturer · '}
                        {enBase ? <><b>{auForfait}</b>{' au forfait'}</> : <>{'forfaits '}<b>{montant(forfaits)}</b></>}</>}
                      filtre={{ valeur: critAffaire, changer: setCritAffaire, indication: 'Aller a une affaire…',
-                               valider: () => { if (trouvees.length === 1) ouvrirDossier(trouvees[0]!.dossier) } }} />
+                               // Une instance relue ne porte pas son dossier : Entrée n'ouvre rien dans cet onglet.
+                               valider: () => { if (!ongletEnrolementsEnBase && trouvees.length === 1) ouvrirDossier(trouvees[0]!.dossier) } }} />
 
-        <CartesChiffrees cartes={[
+        {/* Les cartes et les vues chiffrent la sélection de PC : absentes de l'onglet des instances relues en base. */}
+        {!ongletEnrolementsEnBase && <CartesChiffrees cartes={[
           enBase ? { cle: 'au-forfait', titre: 'Au forfait', valeur: auForfait, complement: `sur ${trouvees.length}`,
                      anneau: { part: auForfait, total: trouvees.length, teinte: 'ardoise' } } :
           { cle: 'forfaits', titre: 'Forfaits', valeur: montant(forfaits), legende: true,
@@ -363,11 +474,13 @@ export function EcranCloture({ ouvrirDossier, dossier = null }: ProprietesEcranC
             anneau: { part: depassees, total: trouvees.length, teinte: 'rouge' },
             actif: critExamenDepasse, choisir: () => setCritExamenDepasse(!critExamenDepasse),
             indication: critExamenDepasse ? 'Toutes les affaires' : 'Seulement les limites depassees' },
-        ]} />
+        ]} />}
 
-        <VuesListe vues={vues.map((v) => ({ cle: v.cle, libelle: v.libelle, compte: filtrer(v.criteres, aujourdhui, lignes, enBase).length }))}
-                   active={vueActive} enregistrer={enregistrerVue}
-                   choisir={(cle) => { const v = vues.find((x) => x.cle === cle); if (v) poserCriteres(v.criteres) }} />
+        {!ongletEnrolementsEnBase && (
+          <VuesListe vues={vues.map((v) => ({ cle: v.cle, libelle: v.libelle, compte: filtrer(v.criteres, aujourdhui, lignes, enBase).length }))}
+                     active={vueActive} enregistrer={enregistrerVue}
+                     choisir={(cle) => { const v = vues.find((x) => x.cle === cle); if (v) poserCriteres(v.criteres) }} />
+        )}
 
         <div className="rig-table-cadre">
           <table className="rig-table rig-lm-table">
@@ -395,6 +508,17 @@ export function EcranCloture({ ouvrirDossier, dossier = null }: ProprietesEcranC
                   <th className="rig-lm-droite">Forfait</th>
                   <th aria-label="Actions"></th>
                 </tr>
+              ) : ongletEnrolementsEnBase ? (
+                // En base, les instances de clôture enrôlées (étape « Résultats » de RIG v2, OPE_RESULTATS.cs:267-299) : N Role et N PC
+                // sous le défendeur, puis ce que l'enrôlement a posé (appel, convocation, 4CLO de la PC survenu).
+                <tr>
+                  <th>Defendeur</th>
+                  <th>Demandeur</th>
+                  <th>Acte de saisine</th>
+                  <th>Audience</th>
+                  <th>Convocation</th>
+                  <th>Examen survenu</th>
+                </tr>
               ) : (
                 // Colonnes de « 2-3 Enrolement Requete » (RIG v2) : N Role et N PC sous le defendeur.
                 <tr>
@@ -408,7 +532,27 @@ export function EcranCloture({ ouvrirDossier, dossier = null }: ProprietesEcranC
               )}
             </thead>
             <tbody>
-              {trouvees.map((ligne) => {
+              {ongletEnrolementsEnBase && instancesAffichees.map((e) => (
+                <tr key={e.idInstance}>
+                  <CelluleIdentite nom={e.defendeur} objet={`${e.role} · ${e.numPc}`}
+                                   titre={`${e.defendeur} — role ${e.role} (repertoire ${e.repertoire}) · ${e.numPc}`} />
+                  <td title={e.demandeur}>{e.demandeur}</td>
+                  <td title={e.acteSaisine}>{e.acteSaisine}</td>
+                  <td className="rig-table__mono" title={[e.chambre && `chambre ${e.chambre}`, e.classement && `classement ${e.classement}`,
+                                                          e.heureAppel && `appel a ${e.heureAppel}`].filter(Boolean).join(' · ')}>
+                    {dateCourte(e.audience)} {e.heureAudience}
+                  </td>
+                  <td className="rig-table__mono">{e.convocation} {dateCourte(e.dateConvocation)}</td>
+                  <td>{e.examenSurvenu !== '' && <PointEtat teinte="vert">{dateCourte(e.examenSurvenu)}</PointEtat>}</td>
+                </tr>
+              ))}
+              {ongletEnrolementsEnBase && instancesAffichees.length === 0 && (
+                <tr><td colSpan={NbColonnesEnrolement} className="rig-table__vide">
+                  {lignesEnrol.length > 0 ? 'Aucune instance ne repond a ce critere.'
+                                          : enrolements?.message ?? 'Aucune instance de clôture enrôlée.'}
+                </td></tr>
+              )}
+              {!ongletEnrolementsEnBase && trouvees.map((ligne) => {
                 const retard = enRetard(ligne)
                 const estOuverte = etapeSelection && ouverte === ligne.role
                 const ouvrir: ActionLigne = { libelle: 'Ouvrir le dossier', agir: () => ouvrirDossier(ligne.dossier) }
@@ -468,19 +612,27 @@ export function EcranCloture({ ouvrirDossier, dossier = null }: ProprietesEcranC
                   </Fragment>
                 )
               })}
-              {trouvees.length === 0 && (
+              {!ongletEnrolementsEnBase && trouvees.length === 0 && (
                 <tr><td colSpan={nbColonnes} className="rig-table__vide">Aucune affaire ne repond a ces criteres.</td></tr>
               )}
             </tbody>
           </table>
         </div>
 
-        <PiedListe aide="Clic sur une ligne pour ouvrir le dossier.">
-          <span><b>{trouvees.length}</b>{trouvees.length > 1 ? ' affaires affichees' : ' affaire affichee'}</span>
-          {enBase ? <span>Au forfait <b>{auForfait}</b></span> : <span>Forfaits <b>{montant(forfaits)}</b></span>}
-          <span>A facturer <b>{aFacturer}</b></span>
-          <span>Limite depassee <b>{depassees}</b></span>
-        </PiedListe>
+        {ongletEnrolementsEnBase ? (
+          // Les instances affichées et, parmi elles, celles dont le 4CLO de la PC est survenu ; une instance relue n'ouvre pas de dossier.
+          <PiedListe>
+            <span><b>{instancesAffichees.length}</b>{instancesAffichees.length > 1 ? ' instances affichees' : ' instance affichee'}</span>
+            <span>Examen survenu <b>{instancesAffichees.filter((e) => e.examenSurvenu !== '').length}</b></span>
+          </PiedListe>
+        ) : (
+          <PiedListe aide="Clic sur une ligne pour ouvrir le dossier.">
+            <span><b>{trouvees.length}</b>{trouvees.length > 1 ? ' affaires affichees' : ' affaire affichee'}</span>
+            {enBase ? <span>Au forfait <b>{auForfait}</b></span> : <span>Forfaits <b>{montant(forfaits)}</b></span>}
+            <span>A facturer <b>{aFacturer}</b></span>
+            <span>Limite depassee <b>{depassees}</b></span>
+          </PiedListe>
+        )}
       </ListeModerne>
     </div>
   )
