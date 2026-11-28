@@ -33,3 +33,27 @@ INSERT INTO v2.BODACC (BDCCR_ID_BDCCR, BDCCR_TYPE_BODACC, BDCCR_DATE_PUBLICITE, 
     (1600224, 'P', '20250215', 10, 'N'), (1600225, 'B', '20250402', 20, 'N'),
     -- ECARTEES : type, cout ou type d'annonce vides (« is not null » de ReleveBODACC.cs:265) -- jumelle comptee 1600221
     (1600226, NULL, '20250106', 50, 'N'), (1600227, 'A', '20250107', NULL, 'N'), (1600228, 'A', '20250108', 50, NULL);
+-- Lot 3 du plan-f4fb097f (28/11/2026), les gestes de PROC_FIBEN (EcrivainReleveFiben.cs) : le droit d'executer le processus FIBEN
+-- (FORM_ACCUEIL.cs:1614-1624, soc.Droit), tel que RIG_DEV le declare (PROCESSUS_ET_FONCTIONALITE, lu le 28/11/2026 : « FIBEN », DLL,
+-- domaine 1 -- hors Comptabilite --, reserve Amitel ; la reserve ne joue qu'a l'attribution des droits, UserRoleProcesssu.cs:271-275,
+-- pas a l'execution), sur le role BANC de l'agent du banc ; un agent SANS ce droit (banc.l3.sansdroit, role BANC_L3 sans fonction,
+-- admis comme lui), pour le refus ; les colonnes de la file des editions que l'etat ecrit (EditionsEtatsV2.cs).
+IF NOT EXISTS (SELECT 1 FROM soc.Fonction WHERE Code = 'FIBEN')
+    INSERT INTO soc.Fonction (Code, Libelle, TypeV2, Comptabilite, ReserveAmitel) VALUES ('FIBEN', N'FIBEN', 'DLL', 0, 1);
+IF NOT EXISTS (SELECT 1 FROM soc.RoleFonction WHERE Role = 'BANC' AND Fonction = 'FIBEN') INSERT INTO soc.RoleFonction (Role, Fonction) VALUES ('BANC', 'FIBEN');
+IF NOT EXISTS (SELECT 1 FROM soc.Role WHERE Nom = 'BANC_L3') INSERT INTO soc.Role (Nom, Libelle) VALUES ('BANC_L3', 'Banc lot 3, sans droit');
+IF NOT EXISTS (SELECT 1 FROM soc.Compte WHERE CompteWindows = 'banc.l3.sansdroit')
+BEGIN
+    INSERT INTO soc.Compte (CompteWindows, Nom, Prenom, Abrege, Civilite, CodeGreffe, IdService, Desactive)
+    SELECT 'banc.l3.sansdroit', 'SANSDROIT', 'Banc', 'BANCL3', 'M.', CodeGreffe, IdService, 0 FROM soc.Compte WHERE CompteWindows = 'banc.ecrans';
+    INSERT INTO soc.CompteRole (IdCompte, Role) SELECT Id, 'BANC_L3' FROM soc.Compte WHERE CompteWindows = 'banc.l3.sansdroit';
+END
+IF OBJECT_ID(N'v2.DEMANDE_EDITION') IS NULL
+    CREATE TABLE v2.DEMANDE_EDITION (DMNED_ID_DMNED int NOT NULL PRIMARY KEY, DMNED_ID_DMND int NULL, DMNED_ID_DSRCS int NULL,
+        DMNED_LOT varchar(255) NULL, DMNED_PHASE_TRAITEMENT varchar(10) NOT NULL, DMNED_DATE_PRE_EMISSION datetime NULL,
+        DMNED_DESIGNATION_DESTINATAIRE varchar(255) NULL, DMNED_LIBELLE_DOCUMENT varchar(255) NOT NULL,
+        DMNED_LIBELLE_ERREUR varchar(255) NULL, DMNED_DATE_CREATION datetime NULL, DMNED_ID_EMAIL_ENVOYE int NULL,
+        DMNED_MODE_ENVOI int NULL);
+IF COL_LENGTH('v2.DEMANDE_EDITION', 'DMNED_CODE_PROCESSUS') IS NULL ALTER TABLE v2.DEMANDE_EDITION ADD DMNED_CODE_PROCESSUS varchar(40) NULL;
+IF COL_LENGTH('v2.DEMANDE_EDITION', 'DMNED_TYPE_GENERATION') IS NULL ALTER TABLE v2.DEMANDE_EDITION ADD DMNED_TYPE_GENERATION varchar(40) NULL;
+IF COL_LENGTH('v2.DEMANDE_EDITION', 'DMNED_PARAMETRE_GENERATION') IS NULL ALTER TABLE v2.DEMANDE_EDITION ADD DMNED_PARAMETRE_GENERATION varchar(max) NULL;

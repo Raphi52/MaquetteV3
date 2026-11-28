@@ -1,0 +1,33 @@
+# « Bilans en rejet » (EcrivainBilansRejetes) : « Envoyer vers XDCA » de RIG v2 (PROC_REJETS_BILANS\ETP_REJETS_BILANS\
+# OPE_REJETS_BILANS.cs:237-262) -- une affaire « Affaire créée le ... » et une demande XDCA qualifiee sur l'action du bilan, qui
+# saute l'etape d'entree. Lignes du jeu : PROC_REJETS_BILANS.sql et .attendu.
+
+# Refus : deux bilans coches. La grille de la V2 est a selection unique (ultDataGridViewRejetsBilans.cs:187) : le geste part sur
+# UN bilan. Rien n'est ecrit, pas meme pour 1600741. Jumeau accepte : 1600741 seul, bloc 3.
+geste: Agir Envoyer vers XDCA
+ids: 1600741,1600744
+resultat: refuse
+message: Un seul bilan à la fois : RIG v2 envoie vers XDCA le bilan sélectionné dans sa grille, à sélection unique.
+---
+# Refus : l'acte 1600743 (annexe du depot L6D0721) a le motif 1, qui n'est pas un rejet (GetCodesMotifsRejet l'ecarte,
+# proc_rejets_bilans.md:501) : il n'est pas dans la grille de la V2. Jumeau accepte : 1600741, bilan du meme depot au motif 3, bloc 3.
+geste: Agir Envoyer vers XDCA
+ids: 1600743
+resultat: refuse
+message: Le bilan 1600743 n'est plus en rejet dans la base du greffe : relisez la liste.
+---
+# Le bilan 2024 de REJ ALPHA (depot L6D0721, action 1600711) part vers XDCA : sa demande XDCA est qualifiee (Q), non validee, et la
+# ligne passe « En correction ». Les deux autres lignes ne bougent pas.
+geste: Agir Envoyer vers XDCA
+ids: 1600741
+resultat: fait
+message: Bilan du dépôt L6D0721 envoyé vers XDCA : sa demande de correction est créée. RIG v3 n'a pas l'écran XDCA : reprendre la demande dans RIG v2.
+lignes:
+Bilan 2024 · REJ BETA SAS | dossier 2016 B 60702 · SIREN 516 007 002 · dépôt L6D0722 du 05/04/2025 · clôture au 31/12/2024 · motif 10 · Actif nul · correction XDCA en cours | Rejet de fond | EnCours | []
+Bilan 2024 · REJ ALPHA SAS | dossier 2016 B 60701 · SIREN 516 007 001 · dépôt L6D0721 du 02/04/2025 · clôture au 31/12/2024 · motif 3 · Bilan incomplet · correction XDCA en cours | Renvoi possible | EnCours | []
+Bilan 2023 · REJ ALPHA SAS | dossier 2016 B 60701 · SIREN 516 007 001 · dépôt L6D0723 du 01/03/2025 · clôture au 31/12/2023 · motif C7 · Pages illisibles | Renvoi possible | AFaire | []
+# La demande : processus XDCA, qualifiee, hors cours, le parametre de la V2 (l. 254-255), le dossier, son numero de gestion et sa
+# designation (l. 248-249).
+controle: SELECT DMND_CODE_PROSS + '/' + DMND_ETAT_DEMANDE + '/' + CAST(DMND_EN_COURS AS varchar(1)) + '/' + DMND_TEXTE_PARAMETRE + '/' + CAST(DMND_ID_DSRCS AS varchar(10)) + '/' + DMND_NUM_INDICATIF + '/' + DMND_NOM FROM v2.DEMANDE WHERE DMND_ID_ACTRC = 1600711 => XDCA/Q/0/SAUTER_ETAPE_ENTREE=1;/1600701/2016B60701/REJ ALPHA SAS
+# Son affaire, neuve : « Affaire créée le <jour> » (l. 241).
+controle: SELECT COUNT(*) FROM v2.DEMANDE AS d JOIN v2.AFFAIRE AS a ON a.AFFRE_ID_AFFRE = d.DMND_ID_AFFRE WHERE d.DMND_ID_ACTRC = 1600711 AND a.AFFRE_LIBELLE = N'Affaire créée le ' + FORMAT(a.AFFRE_DATE_CREATION, 'dd-MM-yyyy') => 1

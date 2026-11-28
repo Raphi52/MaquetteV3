@@ -52,10 +52,15 @@ internal sealed class LecteurBilansRejetes : IRechercheEcran
     /// <summary>Les codes qui permettent le renvoi a Infogreffe (IsRenvoiToInfogreffeAllowed).</summary>
     internal static readonly string[] CodesRenvoi = ["3", "7", "A7", "B7", "C7", "D7", "E7"];
 
+    /// <summary>Les codes de rejet par defaut de la V2 (ChiffresSeuils.GetCodesMotifsRejet, ToFriendlyString : en tete du fichier), en
+    /// liste SQL : ce qui fait d'un acte depose un « bilan en rejet » (proc_rejets_bilans.md:501), pour la liste et ses gestes
+    /// (EcrivainBilansRejetes).</summary>
+    internal const string CodesRejet = "'3', '7', '10', '16', '17', 'C7', 'D7', 'E7'";
+
     /// <summary>Aucun critere : la forme File n'envoie que le texte, le numero metier (en tete du fichier).</summary>
     public IReadOnlyCollection<string> Criteres { get; } = [];
 
-    private const string Requete = """
+    private const string Requete = $"""
         SELECT TOP (@plafond) s.NumeroGestion, s.Siren,
                COALESCE(NULLIF(LTRIM(RTRIM(e.Denomination)), ''), LTRIM(RTRIM(CONCAT(e.Patronyme, ' ', e.Prenom)))) AS Designation,
                p.DPTRC_NUM_DEPOT, p.DPTRC_DATE, x.EXRCC_DATE_CLOTURE, ad.ACTDP_SAISIE_BILAN_CodeRejet AS Code,
@@ -69,7 +74,7 @@ internal sealed class LecteurBilansRejetes : IRechercheEcran
         JOIN v2.DEPOT_RCS AS p ON p.DPTRC_ID_DPTRC = a.IdDepot
         JOIN v2.ACTE_DEPOSE AS ad ON ad.ACTDP_ID_DPTRC = p.DPTRC_ID_DPTRC
         JOIN v2.EXERCICE AS x ON x.EXRCC_ID_EXRCC = p.DPTRC_ID_EXRCC
-        WHERE ad.ACTDP_SAISIE_BILAN_CodeRejet IN ('3', '7', '10', '16', '17', 'C7', 'D7', 'E7')
+        WHERE ad.ACTDP_SAISIE_BILAN_CodeRejet IN ({CodesRejet})
           AND (@debutSaisie IS NULL OR CONVERT(date, ad.ACTDP_SAISIE_BILAN_DateSaisieTerminee) >= @debutSaisie) /*filtres*/
         ORDER BY p.DPTRC_DATE DESC, s.NumeroGestion DESC, ad.ACTDP_ID_ACDPS
         """;

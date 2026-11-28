@@ -2,12 +2,14 @@
 // gauche les documents (les lignes), a droite la page ouverte et les outils de la fiche RIG v2. Pivoter tourne la page
 // A L'ECRAN (une vue, rien n'est ecrit) ; tout autre geste (Enregistrer le PDF, Imprimer...) le dit : rien n'est
 // enregistre tant qu'aucun ecrivain n'existe. En demonstration, aucun fichier : la page dit ce qu'elle montrerait.
+// LA PIECE OUVERTE (plan « RIG v3 complet », lot 3, 28/11/2026) : une ligne de la base ouvre sa FICHE lue (FicheLue : le fichier,
+// la piece, le titre, les pages, selon la procedure) ; ses pages ne sont pas encore montrees (LecteurPiecesGed.cs dit ce qui manque).
 
 import { useState } from 'react'
 import { EnteteListe, ListeModerne, normaliser } from '../../composants/ListeModerne'
 import type { DescripteurEcranVue } from '../../plan/types'
 import {
-  Annonce, Provenance, Sections, TableLignes, gestesDe, parcoursDe, refus, synthese, texteLigne,
+  Annonce, FicheLue, Provenance, Sections, TableLignes, deLaBase, gestesDe, parcoursDe, refus, synthese, texteLigne,
   useAnnonce, useLignes,
 } from './commun'
 
@@ -53,11 +55,14 @@ export function FormeDocument({ d }: { d: DescripteurEcranVue }) {
                 <>
                   <b className="rig-eg-page__titre">{sel.nom}</b>
                   <span className="rig-eg-page__detail">{sel.precisions}</span>
-                  <span className="rig-eg-page__vide">Aperçu indisponible : aucun fichier n’est ouvert en démonstration.</span>
+                  <span className="rig-eg-page__vide">{deLaBase(vue, sel)
+                    ? 'Pièce ouverte dans la base du greffe : sa fiche est ci-dessous, ses pages ne sont pas encore affichées par RIG v3.'
+                    : 'Aperçu indisponible : aucun fichier n’est ouvert en démonstration.'}</span>
                 </>
               ) : <span className="rig-eg-page__vide">Aucun document à montrer.</span>}
             </div>
-            <Sections sections={p.sections} saisies={{}} changer={() => {}} lecture />
+            {sel ? <FicheLue d={d} l={sel} vue={vue} sections={p.sections} />
+                 : <Sections sections={p.sections} saisies={{}} changer={() => {}} lecture />}
           </section>
         </div>
       </ListeModerne>
