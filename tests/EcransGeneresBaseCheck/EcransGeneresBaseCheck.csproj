@@ -18,6 +18,7 @@
 
   <ItemGroup>
     <Compile Include="Program.cs" />
+    <Compile Include="Blocs.cs" />
     <ProjectReference Include="../../RigV3Desktop.csproj" />
     <ProjectReference Include="../../Serveur/RigV3.Serveur.csproj" />
     <ProjectReference Include="../../Base/RigV3.Migrations.csproj" />

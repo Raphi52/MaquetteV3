@@ -173,8 +173,11 @@ internal sealed class ModuleEcransMain : IModuleServeur
             .RequireAuthorization(PolitiquesSocle.AgentAdmis);
     }
 
-    /// <summary><paramref name="faire"/> sur la base V3 du greffe ; 404 / 503 de la politique si elle ne s'ouvre plus.</summary>
-    private static async Task<IResult> SurLaBase(CatalogueGreffes c, string greffe, CancellationToken ct, Func<SqlConnection, Task<IResult>> faire)
+    /// <summary><paramref name="faire"/> sur la base V3 du greffe ; 404 / 503 de la politique si elle ne s'ouvre plus.
+    /// Interne (28/11/2026) : un ecran fait main branche apres le lot 20 publie ses routes dans SON module
+    /// (Serveur/Socle/EcransMain/Module&lt;Ecran&gt;.cs, IModuleServeur trouve par reflexion) et s'en sert, sans toucher ce fichier
+    /// que tous les lots partageaient.</summary>
+    internal static async Task<IResult> SurLaBase(CatalogueGreffes c, string greffe, CancellationToken ct, Func<SqlConnection, Task<IResult>> faire)
     {
         SqlConnection cn;
         try { cn = await c.OuvrirBaseV3Async(greffe, ct); }
