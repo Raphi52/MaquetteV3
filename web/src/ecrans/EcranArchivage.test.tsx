@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
-import { Demonstration, EcranArchivage, SansBordereau, type VueArchivage } from './EcranArchivage'
+import { Demonstration, EcranArchivage, type VueArchivage } from './EcranArchivage'
 import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
 
 afterEach(() => { cleanup(); retirerFauxPont() })
@@ -107,7 +107,9 @@ describe('EcranArchivage', () => {
 })
 
 // Branche sur la base (plan « RIG v3 100 % fonctionnel », lot 20) : les dossiers radies de la base ; les types de RIG v2 ;
-// le type, obligatoire, part au pont ; « Preparer le bordereau » dit la raison de RIG v2 ; en panne, le motif et aucune ligne.
+// le type, obligatoire, part au pont ; « Preparer le bordereau » est ecrit par le serveur (lot 11 du plan du parcours complet) :
+// son compte rendu, puis la liste relue -- son refus en alerte ; en panne, le motif et aucune ligne.
+// fix-ok: pas un correctif -- lot 11 (28/11/2026) : SansBordereau (« la V3 n'édite pas encore ») n'est plus vrai, le geste écrit.
 describe('EcranArchivage branche sur la base', () => {
   const lue = { dossier: '2019B27001', denomination: 'ALPHA BASE SARL', type: 'B1', radiation: '2015-06-03' }
   const Base = (v: Partial<VueArchivage>): VueArchivage =>
@@ -134,8 +136,37 @@ describe('EcranArchivage branche sur la base', () => {
     expect([compteV2.value, compteV2.readOnly]).toEqual(['1', true])
     expect(container.querySelector('.rig-lm-pied')!.textContent).toBe('1 formalite affichee')
     expect(container.querySelector('.rig-tcw__exemple')).toBeNull()
+  })
+
+  it('« Preparer le bordereau » en base : le geste part au pont avec les criteres, son compte rendu, puis la liste relue', async () => {
+    let prepare = false
+    const pont = installerFauxPont({
+      'EcranArchivage.Dossiers': () => Base(prepare ? { lignes: [], total: 0 } : { lignes: [lue], total: 1 }),
+      'EcranArchivage.Bordereau': () => {
+        prepare = true
+        return { fait: true, sansEcrivain: false, ids: ['27001'],
+                 message: 'Bordereau préparé pour 1 dossier(s) (2019B27001) : annexe « Historique des FORMALITES » et bordereau BGEDANNEX_1_IMP à imprimer.' }
+      },
+    })
+    render(<EcranArchivage ouvrirDossier={vi.fn()} />)
+    await screen.findByText('ALPHA BASE SARL')
     fireEvent.click(screen.getByRole('button', { name: 'Preparer le bordereau' }))
-    expect(screen.getByRole('status').textContent).toBe(SansBordereau)
+    expect((await screen.findByRole('status')).textContent).toContain('Bordereau préparé pour 1 dossier(s) (2019B27001)')
+    expect(pont.appels).toHaveBeenCalledWith('EcranArchivage.Bordereau', '2012-01-01', '2016-12-31', '', '')
+    await vi.waitFor(() => expect(screen.queryByText('ALPHA BASE SARL')).toBeNull())
+  })
+
+  it('« Preparer le bordereau » refuse par le serveur : le refus en alerte, la liste inchangee', async () => {
+    installerFauxPont({
+      'EcranArchivage.Dossiers': () => Base({ lignes: [lue], total: 1 }),
+      'EcranArchivage.Bordereau': () => ({ fait: false, sansEcrivain: false, ids: [],
+        message: '0 dossier(s) à archiver : RIG v2 ne prépare le bordereau que pour 1 à 149 dossiers (VALIDER reste grisé). Rien n’est enregistré.' }),
+    })
+    render(<EcranArchivage ouvrirDossier={vi.fn()} />)
+    await screen.findByText('ALPHA BASE SARL')
+    fireEvent.click(screen.getByRole('button', { name: 'Preparer le bordereau' }))
+    expect((await screen.findByRole('alert')).textContent).toContain('ne prépare le bordereau que pour 1 à 149 dossiers')
+    expect(screen.getByText('ALPHA BASE SARL')).not.toBeNull()
   })
 
   it('150 dossiers ou plus : RIG v2 refuse le bordereau, l ecran le dit', async () => {

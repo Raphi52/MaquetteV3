@@ -20,10 +20,16 @@
 // (Outils\DLLEdition\RigRapport\Jud\Stats). RIG v2 les ecrit dans un classeur Excel ; la V3 les montre ici, tableau par
 // tableau. Sans serveur : la demonstration du pont, marquee « exemple ». Les anciens chiffres en dur de cet ecran (et ses
 // colonnes « periode precedente / ecart », ses niveaux Greffe / Chambre / Section) n'avaient pas de source V2 : retires.
+//
+// LE GESTE (plan « RIG v3 complet, mesuré par le banc du parcours complet », lot 11, 28/11/2026) : le bouton « Excel » de RIG v2
+// (OPE_STATISTIQUES_BASE.cs:65-72), le classeur du volet sur sa periode, pose dans la file des editions par le serveur
+// (Pont/EcranStatistiques.cs, Serveur/Socle/EcransMain/EcritureStatistiques.cs) ; son compte rendu s'affiche, son refus en alerte.
+// fix-ok: pas un correctif -- trois retouches d'un même ajout (bouton, appel, annonce), mesuré au 28/11 : PROC_STAT sans geste.
 
 import { useEffect, useState } from 'react'
 import { appeler } from '../pont'
 import { ProvenanceEcran, type ModeLecture } from '../provenance'
+import { Annonce, type CompteRendu, type ResultatGesteVue } from './formes/commun'
 
 type VoletStat = 'Internes' | 'Web' | 'RepartitionsJcOp' | 'ActivitesCa' | 'ActivitesSalaries' | 'Semestrielles'
 
@@ -94,6 +100,21 @@ export function EcranStatistiques() {
 
   const titre = Volets.find(([cle]) => cle === volet)![1]
 
+  // « Excel » : le classeur du volet affiche, pose dans la file des editions (ecrit par le serveur).
+  const [annonce, setAnnonce] = useState<CompteRendu>(null)
+  const [envoi, setEnvoi] = useState(false)
+  async function excel() {
+    setEnvoi(true)
+    try {
+      const r = await appeler<ResultatGesteVue>('EcranStatistiques.Excel', volet, dateDebut, dateFin)
+      setAnnonce(r.fait || r.sansEcrivain ? r.message : { refus: r.message })
+    } catch {
+      setAnnonce({ refus: "Le pont n'a pas répondu : rien n'est enregistré." })
+    } finally {
+      setEnvoi(false)
+    }
+  }
+
   return (
     <div className="rig-proc__corps">
 
@@ -138,6 +159,12 @@ export function EcranStatistiques() {
             </button>
           ))}
         </div>
+
+        <div className="rig-criteres__actions">
+          <button className="rig-bouton rig-bouton--fort" disabled={envoi} onClick={() => void excel()}
+                  title="Le classeur du volet sur sa période, comme le bouton Excel de RIG v2 : posé dans la file des éditions">Excel</button>
+        </div>
+        <Annonce texte={annonce} />
       </aside>
 
       <section className="rig-resultats-proc">

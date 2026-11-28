@@ -8,6 +8,18 @@ public static class RoutesArchivage
 {
     public const string Dossiers = "/ecrans-main/{greffe}/archivage";
 
+    /// <summary>
+    /// POST un geste (<c>RigV3.Contrats.EcransGeneres.GesteEcran</c>, Type = Agir, Ids vide) : « Préparer le bordereau » de RIG v2,
+    /// « Un seul bordereau de numérisation par dossier » (PROC_ARCHIRAD.traitementBordereauUnique, PROC_ARCHIRAD.cs:155-217) sur les
+    /// dossiers de la recherche (<see cref="ChampDu"/>, <see cref="ChampAu"/>, <see cref="ChampType"/>, ou <see cref="ChampListe"/>) ;
+    /// rend un <c>ResultatGeste</c> dont Ids = les dossiers dotés de leur bordereau (422 : le refus de RIG v2). Écriture :
+    /// Serveur/Socle/EcransMain/EcritureArchivage.cs (lot 11 du plan du parcours complet).
+    /// </summary>
+    public const string Bordereau = "/ecrans-main/{greffe}/archivage/bordereau";
+
+    /// <summary>Les clés des critères dans les Valeurs du geste (dates aaaa-mm-jj ; la liste : des numéros séparés par des espaces).</summary>
+    public const string ChampDu = "Date mini", ChampAu = "Date maxi", ChampType = "Type RCS", ChampListe = "Liste";
+
     /// <summary>Le plafond de RIG v2 : « Nombre de dossiers (max 150) » ; au-delà, VALIDER reste grisé (OPE_ARCHRSEL.cs:98-102).</summary>
     public const int MaxBordereau = 150;
 

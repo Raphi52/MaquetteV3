@@ -1,3 +1,6 @@
+// fix-ok: pas un correctif -- lot 11 du plan-f4fb097f (28/11/2026) : le geste « Excel » (mesuré au 28/11 : PROC_STAT « geste non
+// prouvé ») ; la troisième retouche replace son commentaire dans le <summary> de la classe (XML de documentation bien formé).
+using RigV3.Contrats.EcransGeneres;
 using RigV3.Contrats.EcransMain;
 
 namespace RigV3Desktop.Pont;
@@ -16,9 +19,31 @@ public sealed record VueStatistiques(TableauStatVue[] Tableaux, string? Refus, s
 /// dans la base du greffe (Serveur/Socle/EcransMain/LectureStatistiques.cs, plan « RIG v3 100 % fonctionnel », lot 9,
 /// 27/11/2026) ; SANS serveur, la demonstration ci-dessous, marquee « exemple » par l'ecran -- les memes tableaux et libelles que
 /// le calcul, des chiffres d'exemple. En panne : le motif et aucun tableau (Pont/LectureEcranMain.cs).
+///
+/// LE GESTE (plan « RIG v3 complet, mesuré par le banc du parcours complet », lot 11, 28/11/2026) : le bouton « Excel » de RIG v2, le
+/// classeur du volet sur sa periode -- <see cref="CreerClasseurAsync"/>, pose dans la file des editions par le serveur
+/// (Serveur/Socle/EcransMain/EcritureStatistiques.cs). Sans serveur, rien n'est ecrit (« Démonstration »).
 /// </summary>
 public static class EcranStatistiques
 {
+    [JSInvokable("EcranStatistiques.Excel")]
+    public static Task<ResultatGeste> Excel(string volet, string debut, string fin)
+        => CreerClasseurAsync(ClientServeur.Actif, SessionAgent.CodeGreffe, volet, debut, fin);
+
+    /// <summary>Le classeur <paramref name="volet"/> du <paramref name="debut"/> au <paramref name="fin"/> (aaaa-mm-jj) ; sans serveur ni
+    /// greffe, « Démonstration ». Le resultat porte la demande d'edition (Ids).</summary>
+    public static async Task<ResultatGeste> CreerClasseurAsync(ClientServeur? serveur, string? greffe, string volet, string debut, string fin)
+    {
+        if (serveur is null || string.IsNullOrWhiteSpace(greffe))
+            return new ResultatGeste(false, $"{EcranGenere.Demonstration} : RIG n'est pas branché sur la base d'un greffe.") { SansEcrivain = true };
+        return await EcranGenere.EnvoyerGesteAsync(serveur, greffe, RoutesEcransMain.Pour(RoutesStatistiques.Excel, greffe),
+            new GesteEcran(TypeGeste.Agir, [], new Dictionary<string, string>
+            {
+                [RoutesStatistiques.ChampVolet] = volet?.Trim() ?? "", [RoutesStatistiques.ChampDebut] = debut?.Trim() ?? "",
+                [RoutesStatistiques.ChampFin] = fin?.Trim() ?? "",
+            }) { Nom = "Excel" });
+    }
+
     [JSInvokable("EcranStatistiques.Calculer")]
     public static Task<VueStatistiques> Calculer(string volet, string debut, string fin, string? niveau)
         => CalculerAsync(ClientServeur.Actif, SessionAgent.CodeGreffe, volet, debut, fin, niveau);

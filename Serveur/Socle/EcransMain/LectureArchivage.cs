@@ -1,3 +1,5 @@
+// fix-ok: pas un correctif -- lot 11 du plan-f4fb097f (28/11/2026) : la requête est partagée avec le geste du bordereau
+// (EcritureArchivage.cs), qui la joue dans SA transaction ; trois retouches d'un même découpage (Requete / LignesAsync).
 using System.Data;
 using System.Globalization;
 using Microsoft.Data.SqlClient;
@@ -58,6 +60,16 @@ public static class LectureArchivage
     public static async Task<DossiersArchivageLus> LireAsync(SqlConnection baseGreffe, RechercheArchivage recherche, CancellationToken ct,
                                                             int plafond = Plafond)
     {
+        var (sql, parametres, motif) = Requete(recherche, plafond);
+        if (motif is not null) return new DossiersArchivageLus([], 0, motif);
+        await using var r = await LectureV2.LireAsync(baseGreffe, sql, ct, parametres);
+        return await LignesAsync(r, ct);
+    }
+
+    /// <summary>La requête de <paramref name="recherche"/> et ses paramètres, ou le motif d'un critère obligatoire manquant -- aussi celle
+    /// du bordereau (EcritureArchivage.cs), jouée dans la transaction du geste.</summary>
+    internal static (string Sql, SqlParameter[] Parametres, string? Motif) Requete(RechercheArchivage recherche, int plafond = Plafond)
+    {
         var parametres = new List<SqlParameter> { new("@plafond", SqlDbType.Int) { Value = plafond } };
         string filtre;
         var liste = (recherche.Liste ?? "").Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Distinct().ToArray();
@@ -72,7 +84,7 @@ public static class LectureArchivage
         {
             var type = (recherche.TypeRcs ?? "").Trim().ToUpperInvariant();
             if (recherche.Du is not { } du || recherche.Au is not { } au || !RoutesArchivage.TypesRcs.Contains(type))
-                return new DossiersArchivageLus([], 0, CriteresManquants);
+                return ("", [], CriteresManquants);
             var valeurs = ValeursType(type);
             parametres.Add(new SqlParameter("@du", SqlDbType.DateTime) { Value = du.ToDateTime(TimeOnly.MinValue) });
             parametres.Add(new SqlParameter("@lendemainAu", SqlDbType.DateTime) { Value = au.ToDateTime(TimeOnly.MinValue).AddDays(1) });
@@ -80,9 +92,14 @@ public static class LectureArchivage
             filtre = "d.DateRadiation >= @du AND d.DateRadiation < @lendemainAu " +
                      $"AND d.TypeRcs IN ({string.Join(", ", valeurs.Select((_, i) => $"@t{i}"))})";
         }
+        return ($"{Debut} {filtre}\n  AND {SansHistorique}{Ordre}", [.. parametres], null);
+    }
+
+    /// <summary>Les dossiers que la requête rend, et leur total.</summary>
+    internal static async Task<DossiersArchivageLus> LignesAsync(SqlDataReader r, CancellationToken ct)
+    {
         var lignes = new List<DossierArchivageLu>();
         var total = 0;
-        await using var r = await LectureV2.LireAsync(baseGreffe, $"{Debut} {filtre}\n  AND {SansHistorique}{Ordre}", ct, [.. parametres]);
         while (await r.ReadAsync(ct))
         {
             total = Convert.ToInt32(r["Total"], CultureInfo.InvariantCulture);

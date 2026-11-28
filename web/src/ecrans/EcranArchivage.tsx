@@ -26,11 +26,17 @@
 // A, B, C, D, AC, I -- obligatoire, comme les dates), ou des numeros de gestion de la liste, sans « Historique des
 // FORMALITES » en GED : ceux que compte la recherche de RIG v2 (Serveur/Socle/EcransMain/LectureArchivage.cs) ; RIG v2
 // n'admet le bordereau que pour 1 a 149 dossiers. Sans serveur, les formalites d'exemple ci-dessous, marquees ; en panne,
-// le motif et aucune ligne. « Preparer le bordereau » N'ECRIT RIEN et le dit (en base : la raison de RIG v2 ; sans serveur :
-// « Demonstration : rien n'est enregistre ») -- il marquait avant les lignes « Sur bordereau » sans rien enregistrer.
+// le motif et aucune ligne.
+//
+// LE GESTE (plan « RIG v3 complet, mesuré par le banc du parcours complet », lot 11, 28/11/2026) : en base, « Preparer le
+// bordereau » est ecrit par le serveur (Pont/EcranArchivageBase.cs, Serveur/Socle/EcransMain/EcritureArchivage.cs) : un bordereau
+// par dossier, comme RIG v2 par defaut (PROC_ARCHIRAD.cs:155-217) -- l'annexe « Historique des FORMALITES » et le bordereau a
+// imprimer ; le compte rendu du serveur s'affiche (son refus en alerte), et la liste est relue : un dossier dote de son annexe en
+// sort. Sans serveur : « Demonstration : rien n'est enregistre » (il marquait avant les lignes « Sur bordereau » sans rien enregistrer).
 
 import { useEffect, useState } from 'react'
 import { appeler } from '../pont'
+import { Annonce, type CompteRendu, type ResultatGesteVue } from './formes/commun'
 import { ProvenanceEcran, type ModeLecture } from '../provenance'
 import { contientSansCasse, dateCourte, entierLisible, estBlanc } from '../criteres'
 import { CelluleIdentite, EnteteListe, ListeModerne, Pastille, PiedListe, PointEtat, VuesListe, type Teinte } from '../composants/ListeModerne'
@@ -65,9 +71,6 @@ export interface VueArchivage {
 /** Ce que dit « Preparer le bordereau » sans serveur. */
 export const Demonstration = "Démonstration : rien n'est enregistré."
 
-/** Ce que dit « Preparer le bordereau » branche a la base : la raison de RIG v2 (PROC_ARCHIRAD.cs:44-61, :150-200). */
-export const SansBordereau = "Rien n'est enregistré : dans RIG v2, le bordereau crée une demande par dossier, ses éditions et " +
-  "l'annexe « Historique des FORMALITES » en GED (PROC_ARCHIRAD). La V3 n'édite pas encore ces bordereaux."
 
 const Exemples: LigneArchi[] = [
   { dossier: '1998B00214', denomination: 'SARL MENUISERIE COLLIN', type: 'PM', radiation: '2014-03-12', dernierDepot: '2013-11-04', pieces: 18 },
@@ -105,7 +108,10 @@ export function EcranArchivage({ ouvrirDossier }: ProprietesEcranArchivage) {
   const [nbDossiers, setNbDossiers] = useState(50)
   const [imprimante, setImprimante] = useState('Greffe - Etage 1')
   // Ce que « Preparer le bordereau » a repondu : il n'ecrit rien, il dit pourquoi.
-  const [compteRendu, setCompteRendu] = useState<string | null>(null)
+  const [compteRendu, setCompteRendu] = useState<CompteRendu>(null)
+  // Un bordereau prepare relit la liste ; pendant l'envoi, le bouton attend.
+  const [relecture, setRelecture] = useState(0)
+  const [envoi, setEnvoi] = useState(false)
 
   // La vue du pont, relue a chaque critere de RIG v2 (dates, type, liste) ; null tant qu'il n'a pas repondu.
   const [vue, setVue] = useState<VueArchivage | null>(null)
@@ -114,13 +120,25 @@ export function EcranArchivage({ ouvrirDossier }: ProprietesEcranArchivage) {
     void appeler<VueArchivage>('EcranArchivage.Dossiers', dateMin, dateMax, typeRcs, libelleListe)
       .then((v) => { if (!perime) setVue(v) })
     return () => { perime = true }
-  }, [dateMin, dateMax, typeRcs, libelleListe])
+  }, [dateMin, dateMax, typeRcs, libelleListe, relecture])
   const enBase = vue?.mode === 'serveur'
   const Lignes: LigneArchi[] = vue === null ? [] : enBase ? vue.lignes : vue.mode === 'demo' ? Exemples : []
   const vuesType = vue !== null && enBase ? vue.types.map((t) => ({ cle: t, libelle: t })) : VuesType
 
-  function preparer() {
-    setCompteRendu(enBase ? SansBordereau : Demonstration)
+  // fix-ok: pas un correctif -- lot 11 (28/11/2026) : le bordereau, mesuré « geste non prouvé » au banc du parcours, est écrit par le
+  // serveur ; plusieurs retouches d'un même ajout (appel, compte rendu, relecture).
+  async function preparer() {
+    if (!enBase) { setCompteRendu(Demonstration); return }
+    setEnvoi(true)
+    try {
+      const r = await appeler<ResultatGesteVue>('EcranArchivage.Bordereau', dateMin, dateMax, typeRcs, libelleListe)
+      setCompteRendu(r.fait || r.sansEcrivain ? r.message : { refus: r.message })
+      if (r.fait) setRelecture((n) => n + 1)
+    } catch {
+      setCompteRendu({ refus: "Le pont n'a pas répondu : rien n'est enregistré." })
+    } finally {
+      setEnvoi(false)
+    }
   }
 
   function saisirNbDossiers(texte: string) {
@@ -227,9 +245,9 @@ export function EcranArchivage({ ouvrirDossier }: ProprietesEcranArchivage) {
         </div>
 
         <div className="rig-criteres__actions">
-          <button className="rig-bouton rig-bouton--fort" onClick={preparer}>Preparer le bordereau</button>
+          <button className="rig-bouton rig-bouton--fort" disabled={envoi} onClick={() => void preparer()}>Preparer le bordereau</button>
         </div>
-        {compteRendu && <p className="rig-eg-note" role="status">{compteRendu}</p>}
+        <Annonce texte={compteRendu} />
       </aside>
 
       <ListeModerne etiquette="Formalites retenues">

@@ -78,3 +78,26 @@ describe('EcranStatistiques', () => {
     expect(container.querySelectorAll('tbody tr')).toHaveLength(0)
   })
 })
+
+// Le geste (lot 11 du plan du parcours complet) : « Excel », le classeur du volet sur sa periode, ecrit par le serveur
+// (Serveur/Socle/EcransMain/EcritureStatistiques.cs, prouve par tests/ParcoursCompletCheck/Sondes/Statistiques.cs).
+describe('EcranStatistiques : le bouton Excel', () => {
+  it('envoie le volet et la periode affiches, annonce le compte rendu ; un refus en alerte', async () => {
+    let refuser = false
+    const pont = installerFauxPont({
+      'EcranStatistiques.Calculer': vue,
+      'EcranStatistiques.Excel': () => refuser
+        ? { fait: false, sansEcrivain: false, ids: [], message: 'Impossible de trouver la maquette' }
+        : { fait: true, sansEcrivain: false, ids: ['4100500'], message: 'Classeur « Statistiques internes du 01-10-2026 au 31-10-2026 » posé dans la file des éditions.' },
+    })
+    render(<EcranStatistiques />)
+    await screen.findByText('Affaires enrôlées')
+    const periode = moisPrecedent(new Date())
+    fireEvent.click(screen.getByRole('button', { name: 'Excel' }))
+    expect((await screen.findByRole('status')).textContent).toContain('posé dans la file des éditions')
+    expect(pont.appels).toHaveBeenCalledWith('EcranStatistiques.Excel', 'Internes', periode.debut, periode.fin)
+    refuser = true
+    fireEvent.click(screen.getByRole('button', { name: 'Excel' }))
+    await waitFor(() => expect(screen.getByRole('alert').textContent).toContain('Impossible de trouver la maquette'))
+  })
+})
