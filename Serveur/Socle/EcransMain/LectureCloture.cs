@@ -109,4 +109,75 @@ public static class LectureCloture
         }
         return new AffairesClotureLues([.. lignes], total);
     }
+
+    // ================================================================ LES ENRÔLEMENTS (onglet « Enrôlement / requête »)
+
+    /// <summary>Les évènements de convocation des trois modes d'enrôlement (ParamCLOT_AllCodeEvePro, PROC_CLOT.cs:165-203).</summary>
+    internal static readonly LectureReglage ConvocationRequete = new("CLOT_EVE_PRO_CONV", "", "PROC_CLOT.cs:172");
+    internal static readonly LectureReglage ConvocationLrar = new("CLOT_EVE_PRO_CONVSO_LRAR", "", "PROC_CLOT.cs:178");
+    internal static readonly LectureReglage ConvocationHuissier = new("CLOT_EVE_PRO_CONVSO_HUI", "", "PROC_CLOT.cs:183");
+
+    /// <summary>
+    /// Les instances de clôture enrôlées : celles des codes d'affaire de clôture (@code1 à @code3, ParamCLOT_AllCodeAffaire), sur une PC,
+    /// dont l'enrôlement est entre @du et @au (sans borne : toutes), les plus récentes d'abord. Les colonnes de l'étape « Résultats » de
+    /// RIG v2 (OPE_RESULTATS.cs:267-299) : n° de PC et de rôle, acte de saisine (son libellé), premier demandeur, premier défendeur
+    /// (« [n] » devant s'il y en a plusieurs, :278), l'audience du premier appel (:284) ; et ce que l'enrôlement sur saisine d'office pose
+    /// (EcritureCloture.EnrolerAsync) : le classement et l'heure de l'appel, la dernière convocation survenue de l'instance, le 4CLO survenu
+    /// de la PC. La V2 ne liste à cette étape que les enrôlements sur requête ; la V3 y montre les trois codes, pour relire aussi ceux sur
+    /// saisine d'office.
+    /// </summary>
+    private static readonly string RequeteEnrolements = """
+        SELECT TOP (@plafond) i.INSTN_ID_INSTN, i.INSTN_NUM_ROLE, i.INSTN_NUM_REP_GENERAL, p.PRCLL_ID_PRCLL, p.PRCLL_NUM_PC, i.INSTN_DATE_ENROLEMENT,
+               ISNULL(ap.R_CODEACTEPR_LIBELLE_ECRAN, ISNULL(i.INSTN_CODE_ACTE_PROCE, '')) AS Acte, dem.Designation AS Demandeur,
+               CASE WHEN def.Nombre > 1 THEN '[' + CONVERT(varchar(10), def.Nombre) + '] ' ELSE '' END + ISNULL(def.Designation, '') AS Defendeur,
+               app.AUDNC_DATE, app.AUDNC_HEURE, app.AUDNC_CHAMBRE, app.APPAF_TYPE_CLASSEMENT, app.APPAF_HEURE_APPEL,
+               conv.EVNPR_CODE_EVE_PRO AS Convocation, conv.EVNPR_DATE AS DateConvocation,
+               (SELECT MAX(e.EVNPR_DATE) FROM v2.EVENEMENT_PROCEDURE AS e
+                WHERE e.EVNPR_ID_PRCLL = p.PRCLL_ID_PRCLL AND e.EVNPR_CODE_EVE_PRO LIKE '4CLO%' AND e.EVNPR_SURVENU = 1) AS ExamenSurvenu,
+               COUNT(*) OVER () AS Total
+        FROM v2.INSTANCE AS i
+        JOIN v2.PROCEDURE_COLLECTIVE AS p ON p.PRCLL_ID_PRCLL = i.INSTN_ID_PRCLL
+        LEFT JOIN v2.CODE_ACTE_PROCE AS ap ON ap.R_CODEACTEPR_VALEUR = i.INSTN_CODE_ACTE_PROCE
+        OUTER APPLY (SELECT TOP (1) pr.PRT_DESIGNATION AS Designation FROM v2.PARTIE AS pr
+                     WHERE pr.PRT_ID_INSTN = i.INSTN_ID_INSTN AND pr.PRT_QUALIF_PARTIE LIKE 'D%' ORDER BY pr.PRT_NUM_ORDRE, pr.PRT_ID_PRT) AS dem
+        OUTER APPLY (SELECT TOP (1) pr.PRT_DESIGNATION AS Designation, COUNT(*) OVER () AS Nombre FROM v2.PARTIE AS pr
+                     WHERE pr.PRT_ID_INSTN = i.INSTN_ID_INSTN AND pr.PRT_QUALIF_PARTIE LIKE 'F%' ORDER BY pr.PRT_NUM_ORDRE, pr.PRT_ID_PRT) AS def
+        OUTER APPLY (SELECT TOP (1) a.AUDNC_DATE, a.AUDNC_HEURE, a.AUDNC_CHAMBRE, aa.APPAF_TYPE_CLASSEMENT, aa.APPAF_HEURE_APPEL
+                     FROM v2.APPEL_AFFAIRE AS aa LEFT JOIN v2.AUDIENCE_CABINET AS a ON a.AUDNC_ID_ADNC = aa.APPAF_ID_ADNC
+                     WHERE aa.APPAF_ID_INSTN = i.INSTN_ID_INSTN ORDER BY aa.APPAF_NUM_ORDRE, aa.APPAF_ID_APPAF) AS app
+        OUTER APPLY (SELECT TOP (1) e.EVNPR_CODE_EVE_PRO, e.EVNPR_DATE FROM v2.EVENEMENT_PROCEDURE AS e
+                     WHERE e.EVNPR_ID_INSTN = i.INSTN_ID_INSTN AND e.EVNPR_SURVENU = 1 AND e.EVNPR_CODE_EVE_PRO IN (@conv1, @conv2, @conv3)
+                     ORDER BY e.EVNPR_DATE DESC, e.EVNPR_ID_EVNPR DESC) AS conv
+        WHERE i.INSTN_CODE_AFFAIRE IN (@code1, @code2, @code3)
+          AND (@du IS NULL OR i.INSTN_DATE_ENROLEMENT >= @du) AND (@au IS NULL OR i.INSTN_DATE_ENROLEMENT < DATEADD(day, 1, @au))
+        ORDER BY i.INSTN_DATE_ENROLEMENT DESC, i.INSTN_ID_INSTN DESC
+        """;
+
+    /// <summary>Les instances de clôture enrôlées (<see cref="RequeteEnrolements"/>), au plus <paramref name="plafond"/>.</summary>
+    public static async Task<EnrolementsClotureLus> EnrolementsAsync(SqlConnection baseGreffe, RechercheCloture recherche, CancellationToken ct,
+                                                                    int plafond = Plafond)
+    {
+        async Task<SqlParameter> Code(string nom, LectureReglage r)
+            => new(nom, SqlDbType.VarChar, 40) { Value = await r.LireTexteAsync(baseGreffe, ct) is { Length: > 0 } c ? c.Trim() : DBNull.Value };
+        object Jour(DateOnly? d) => d is { } v ? v.ToDateTime(TimeOnly.MinValue) : DBNull.Value;
+        var lignes = new List<EnrolementClotureLu>();
+        var total = 0;
+        await using var r = await LectureV2.LireAsync(baseGreffe, RequeteEnrolements, ct,
+            new SqlParameter("@plafond", SqlDbType.Int) { Value = plafond },
+            new SqlParameter("@du", SqlDbType.DateTime) { Value = Jour(recherche.Du) },
+            new SqlParameter("@au", SqlDbType.DateTime) { Value = Jour(recherche.Au) },
+            await Code("@code1", CodeAffaireSo), await Code("@code2", CodeAffaire), await Code("@code3", CodeAffaireAv2006),
+            await Code("@conv1", ConvocationRequete), await Code("@conv2", ConvocationLrar), await Code("@conv3", ConvocationHuissier));
+        while (await r.ReadAsync(ct))
+        {
+            total = Convert.ToInt32(r["Total"], CultureInfo.InvariantCulture);
+            string T(string c) => FormeLigne.Texte(r, c).Trim();
+            lignes.Add(new EnrolementClotureLu(Convert.ToInt32(r["INSTN_ID_INSTN"], CultureInfo.InvariantCulture), T("INSTN_NUM_ROLE"),
+                T("INSTN_NUM_REP_GENERAL"), Convert.ToInt32(r["PRCLL_ID_PRCLL"], CultureInfo.InvariantCulture), T("PRCLL_NUM_PC"), T("Demandeur"),
+                T("Defendeur"), T("Acte"), FormeLigne.DateDe(r, "INSTN_DATE_ENROLEMENT"), FormeLigne.DateDe(r, "AUDNC_DATE"), T("AUDNC_HEURE"),
+                T("AUDNC_CHAMBRE"), T("APPAF_TYPE_CLASSEMENT"), T("APPAF_HEURE_APPEL"), T("Convocation"), FormeLigne.DateDe(r, "DateConvocation"),
+                FormeLigne.DateDe(r, "ExamenSurvenu")));
+        }
+        return new EnrolementsClotureLus([.. lignes], total);
+    }
 }

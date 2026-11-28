@@ -295,3 +295,115 @@ describe('EcranCloture : le courrier aux debiteurs', () => {
     expect(screen.queryByRole('button', { name: 'Courrier aux débiteurs' })).toBeNull()
   })
 })
+
+// Le geste PRINCIPAL (refus du chef du 28/11/2026) : « Enrôlement sur saisine d'office », le mode 1 de RIG v2 (OPE_SELECT_PC.cs:1776-1899),
+// écrit par le serveur (EcritureCloture.EnrolerAsync, prouvé par Sondes/Cloture.cs) sur les PC affichées, à l'audience choisie par sa date
+// et son heure ; fait, l'onglet « Enrolement / requete » relit les instances de clôture de la base (EcranCloture.Enrolements).
+// L'entrée qui ferait échouer ces tests si l'écran était faux : le clic « Enrôler sur saisine d'office » avec la date 2026-12-12, l'heure
+// 09:30 et l'appel 09:45 -- le pont doit recevoir exactement [4100102], '2026-12-12', '09:30', '', '09:45', false.
+describe('EcranCloture : l enrolement sur saisine d office', () => {
+  const pc = {
+    role: 'P4100102', affaire: 'SONDE ENROLEMENT SO', demandeur: '', defendeur: 'SONDE ENROLEMENT SO', chambre: '', audience: '', heureAppel: '',
+    classement: '', limiteExamen: '2026-12-08', aFacturer: true, dernierCourrier: '', dossier: '', numPc: 'P4100102', heureDebut: '', dirigeants: '',
+    liquidateurs: 'MAITRE SONDE Liquidateur', forfait: '', huissier: '', codePostalVille: '', acteSaisine: '', depot: '', facturation: '',
+    auForfait: false, id: 4100102,
+  }
+  const enrolee = {
+    idInstance: 4100500, role: '2026F00001', repertoire: '2026000001', idPc: 4100102, numPc: 'P4100102', demandeur: "Saisine d'office",
+    defendeur: 'SONDE ENROLEMENT SO', acteSaisine: 'requête du liquidateur', enrolement: '2026-11-28', audience: '2026-12-12', heureAudience: '09:30',
+    chambre: '', classement: 'PC', heureAppel: '09:45', convocation: 'ED_CLOTLJ', dateConvocation: '2026-11-28', examenSurvenu: '2026-11-28',
+  }
+
+  it('envoie les PC affichees et l audience au pont, annonce le compte rendu et montre l instance relue dans « Enrolement / requete »', async () => {
+    let fait = false
+    const pont = installerFauxPont({
+      'EcranCloture.Affaires': () => ({ mode: 'serveur', message: null, lignes: fait ? [] : [pc], total: fait ? 0 : 1, aujourdhui: '2026-11-28' }),
+      'EcranCloture.EnrolerSurSaisineOffice': () => {
+        fait = true
+        return { fait: true, sansEcrivain: false, ids: ['4100500'],
+                 message: "Enrôlement sur saisine d'office : 1 instance(s) de clôture créée(s), 2026F00001 (PC P4100102)." }
+      },
+      'EcranCloture.Enrolements': () => ({ mode: 'serveur', message: null, lignes: fait ? [enrolee] : [], total: fait ? 1 : 0 }),
+    })
+    const { container } = render(<EcranCloture ouvrirDossier={vi.fn()} />)
+    await screen.findByText('SONDE ENROLEMENT SO')
+    fireEvent.change(screen.getByLabelText("Date d'audience"), { target: { value: '2026-12-12' } })
+    fireEvent.change(screen.getByLabelText("Heure d'audience"), { target: { value: '09:30' } })
+    fireEvent.change(screen.getByLabelText("Heure d'appel"), { target: { value: '09:45' } })
+    fireEvent.click(screen.getByRole('button', { name: "Enrôler sur saisine d'office" }))
+    expect((await screen.findByRole('status')).textContent).toContain('1 instance(s) de clôture créée(s), 2026F00001')
+    expect(pont.appels).toHaveBeenCalledWith('EcranCloture.EnrolerSurSaisineOffice', [4100102], '2026-12-12', '09:30', '', '09:45', false)
+    // Relu : l'onglet « Enrolement / requete » montre l'instance, son appel, sa convocation et le 4CLO survenu.
+    await vi.waitFor(() => expect(container.querySelector('tbody')!.textContent).toContain('2026F00001'))
+    const ligne = container.querySelector('tbody tr')!
+    expect(ligne.textContent).toContain('SONDE ENROLEMENT SO')
+    expect(ligne.textContent).toContain("Saisine d'office")
+    expect(ligne.textContent).toContain('12/12/2026 09:30')
+    expect(ligne.textContent).toContain('ED_CLOTLJ')
+    expect(ligne.textContent).toContain('28/11/2026')
+    expect(pont.appels).toHaveBeenCalledWith('EcranCloture.Enrolements', '', '')
+  })
+
+  // En base, l'onglet « Enrolement / requete » liste les INSTANCES relues : le pied les compte, et les cartes et les vues, qui chiffrent
+  // la sélection de PC, n'y sont pas (relecture du 28/11 : « 0 affaire affichee » sous 62 instances, capture 22 du lot 11).
+  // L'entrée qui ferait échouer ce test si la correction était fausse : 2 PC dans la sélection et 3 instances relues -- un pied qui
+  // compte encore la sélection dit « 2 affaires affichees » au lieu de « 3 instances affichees ».
+  it('l onglet « Enrolement / requete » en base compte les instances relues, pas la sélection ; « Selection PC » garde ses chiffres', async () => {
+    const pc2 = { ...pc, role: 'P4100103', affaire: 'SONDE CAPTURE', defendeur: 'SONDE CAPTURE', numPc: 'P4100103', aFacturer: false, id: 4100103 }
+    const instances = [
+      enrolee,
+      { ...enrolee, idInstance: 4100501, role: '2026F00002', idPc: 4100104, numPc: 'P4100104', defendeur: 'AUTRE DEBITEUR', examenSurvenu: '' },
+      { ...enrolee, idInstance: 4100502, role: '2026F00003', idPc: 4100105, numPc: 'P4100105', defendeur: 'TROISIEME DEBITEUR' },
+    ]
+    installerFauxPont({
+      'EcranCloture.Affaires': () => ({ mode: 'serveur', message: null, lignes: [pc, pc2], total: 2, aujourdhui: '2026-11-28' }),
+      'EcranCloture.Enrolements': () => ({ mode: 'serveur', message: null, lignes: instances, total: 3 }),
+    })
+    const { container } = render(<EcranCloture ouvrirDossier={vi.fn()} />)
+    await screen.findByText('SONDE CAPTURE')
+    const pied = () => container.querySelector('.rig-lm-pied')!.textContent!
+    expect(pied()).toContain('2 affaires affichees')
+    expect(container.querySelector('.rig-lm-cartes')).not.toBeNull()
+
+    fireEvent.click(screen.getByRole('button', { name: 'Enrolement / requete' }))
+    await vi.waitFor(() => expect(container.querySelectorAll('tbody tr')).toHaveLength(3))
+    expect(pied()).toContain('3 instances affichees')
+    expect(pied()).toContain('Examen survenu 2')
+    expect(pied()).not.toContain('affaire')
+    expect(pied()).not.toContain('A facturer')
+    // Les cartes et les vues chiffrent la sélection de PC : rien à compter ici.
+    expect(container.querySelector('.rig-lm-cartes')).toBeNull()
+    expect(container.querySelector('.rig-lm-vue')).toBeNull()
+    // « Aller a une affaire… » cherche parmi les instances (défendeur, n° de rôle ou n° de PC), et le pied suit.
+    const champ = screen.getByLabelText('Aller a une affaire…')
+    fireEvent.change(champ, { target: { value: 'P4100104' } })
+    expect(container.querySelectorAll('tbody tr')).toHaveLength(1)
+    expect(container.querySelector('tbody')!.textContent).toContain('AUTRE DEBITEUR')
+    expect(pied()).toContain('1 instance affichee')
+    expect(resultat(container)).toBe("1 instance de cloture enrolee sur 3, les plus recentes d'abord")
+
+    // Jumelle acceptée : de retour sur « Selection PC », la sélection est recomptée.
+    fireEvent.change(champ, { target: { value: '' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Selection PC' }))
+    expect(pied()).toContain('2 affaires affichees')
+    expect(pied()).toContain('A facturer 1')
+    expect(container.querySelector('.rig-lm-cartes')).not.toBeNull()
+  })
+
+  it('refuse par le serveur : le refus en alerte, l etape « Selection PC » reste ; sans serveur : pas de bouton', async () => {
+    installerFauxPont({
+      'EcranCloture.Affaires': () => ({ mode: 'serveur', message: null, lignes: [pc], total: 1, aujourdhui: '2026-11-28' }),
+      'EcranCloture.EnrolerSurSaisineOffice': () => ({ fait: false, sansEcrivain: false, ids: [],
+        message: 'En enrôlement sur SO, vous devez selectionner une audience pour le liquidateur MAITRE SONDE Liquidateur' }),
+    })
+    render(<EcranCloture ouvrirDossier={vi.fn()} />)
+    fireEvent.click(await screen.findByRole('button', { name: "Enrôler sur saisine d'office" }))
+    expect((await screen.findByRole('alert')).textContent).toContain('vous devez selectionner une audience')
+    expect(screen.getByText('Selection des procedures collectives')).toBeTruthy()
+    cleanup(); retirerFauxPont()
+    installerFauxPont({ 'EcranCloture.Affaires': () => Demonstration })
+    render(<EcranCloture ouvrirDossier={vi.fn()} />)
+    await screen.findByText('SARL BOULANGERIE DUVAL')
+    expect(screen.queryByRole('button', { name: "Enrôler sur saisine d'office" })).toBeNull()
+  })
+})

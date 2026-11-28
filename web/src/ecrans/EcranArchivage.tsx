@@ -121,6 +121,9 @@ export function EcranArchivage({ ouvrirDossier }: ProprietesEcranArchivage) {
       .then((v) => { if (!perime) setVue(v) })
     return () => { perime = true }
   }, [dateMin, dateMax, typeRcs, libelleListe, relecture])
+  // Un compte rendu parle des critères qui l'ont produit : les changer l'efface (capture 14 du lot 11, 28/11/2026 : le refus sur
+  // 1960A00017 restait sous la liste d'autres dates). La relecture après un bordereau fait (relecture) le garde.
+  useEffect(() => { setCompteRendu(null) }, [dateMin, dateMax, typeRcs, libelleListe])
   const enBase = vue?.mode === 'serveur'
   const Lignes: LigneArchi[] = vue === null ? [] : enBase ? vue.lignes : vue.mode === 'demo' ? Exemples : []
   const vuesType = vue !== null && enBase ? vue.types.map((t) => ({ cle: t, libelle: t })) : VuesType
