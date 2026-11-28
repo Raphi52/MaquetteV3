@@ -12,6 +12,10 @@ public static class RoutesConsultationJud
 
     public const string Xml = "/ecrans-main/{greffe}/consultation-jud/{id}/xml";
 
+    /// <summary>POST, le geste « traiter l'enrolement » (GesteEcran : Ids = [son id], valeurs <see cref="TraitementEnrolement"/>) ;
+    /// ecrit par Serveur/Socle/EcransMain/EcritureConsultationJud.cs (lot 8 du plan « parcours complet », 28/11/2026).</summary>
+    public const string Traiter = "/ecrans-main/{greffe}/consultation-jud/traiter";
+
     /// <summary>L'adresse du XML de l'enrolement <paramref name="id"/> du greffe <paramref name="greffe"/>.</summary>
     public static string XmlPour(string greffe, int id) =>
         RoutesEcransMain.Pour(Xml, greffe).Replace("{id}", id.ToString(System.Globalization.CultureInfo.InvariantCulture));
@@ -32,3 +36,16 @@ public sealed record EnrolementsLus(EnrolementLu[] Lignes, int Total);
 /// <summary>Le flux XML d'un enrolement (RPJCE_FLUX) : <paramref name="Existe"/> faux si l'enrolement n'est plus dans la base ;
 /// <paramref name="Xml"/> null s'il n'a pas de flux.</summary>
 public sealed record FluxEnrolementLu(int Id, bool Existe, string? Xml);
+
+/// <summary>
+/// Les champs du geste « traiter l'enrolement », sous leurs titres de RIG v2 (OPE_CJUDINFOG.Designer.cs : MetierTitre de l'operation
+/// « Saisie de la demande » et de ses champs). Etat : « A » Accepte, « R » Refuse (ULT_COMBO_ACCEPTE_REFUSE.cs:20-21) ; type de
+/// rejet : MQPIECE ou PAIEMENT (OPE_CJUDINFOG.cs:87-90).
+/// </summary>
+public static class TraitementEnrolement
+{
+    public const string Section = "Saisie de la demande";
+    public const string Etat = "Etat traitement";
+    public const string TypeRejet = "Type rejet";
+    public const string MotifRejet = "Motif rejet";
+}

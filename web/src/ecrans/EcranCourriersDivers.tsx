@@ -9,9 +9,12 @@
 //
 // Porte depuis Components/Ecrans/EcranCourriersDivers.razor (lot 5) : meme
 // balisage, memes classes CSS. La liste des modeles vient du C#
-// (Pont/EcranCourriersDivers.cs, Metier/CourriersDivers.cs) : c'est la MEME que
-// celle d'ou la page du dossier tire les courriers qu'elle ecrit pour une
-// affaire (plan « Vue du dossier », lot 9). Gardee ici, elle aurait derive.
+// (Pont/EcranCourriersDivers.cs) : branche au serveur, celle de la base du greffe
+// (COURRIER_JUDICIAIRE, lot 8 du plan « parcours complet », 28/11/2026), avec les
+// gestes de la fiche -- Valider (creer, modifier) et Supprimer, ecrits par le serveur ;
+// sans serveur, la demonstration de Metier/CourriersDivers.cs, la MEME que celle d'ou
+// la page du dossier tire les courriers qu'elle ecrit pour une affaire (plan « Vue du
+// dossier », lot 9), marquee « exemple ».
 //
 // LISTE MODERNE (24/11/2026, plan des listes modernes, lot 5) : le catalogue prend les briques de
 // composants/ListeModerne.tsx -- tete (synthese, « Aller a un courrier… » Ctrl K qui filtre la liste affichee,
@@ -23,6 +26,8 @@ import { useEffect, useState } from 'react'
 import { appeler } from '../pont'
 import { contientSansCasse, estBlanc } from '../criteres'
 import { EnteteListe, ListeModerne, Pastille, PiedListe, PointEtat, VuesListe, type Teinte } from '../composants/ListeModerne'
+import { ProvenanceEcran, type ModeLecture } from '../provenance'
+import { Annonce, DEMONSTRATION, type CompteRendu, type ResultatGesteVue } from './formes/commun'
 
 // v2 : table COURRIER_JUDICIAIRE (colonnes COUJU_*).
 export interface CourrierDiversVue {
@@ -32,12 +37,32 @@ export interface CourrierDiversVue {
   paramEdition: string
   avecDestinataire: boolean
   actif: boolean
+  /** COUJU_ID_COUJU d'un modele de la base ; vide pour un modele de la demonstration. */
+  id?: string
 }
+
+/** Un parametre d'edition que la fiche propose pour un type d'entite (PRMED_CODE_PROCESSUS EDIT_*). */
+export interface ParamEditionVue { code: string; libelle: string; typeEntite: string }
 
 /** Ce que Pont/EcranCourriersDivers.cs (Catalogue) rend : les types d'entite du filtre et tous les modeles. */
 export interface CatalogueCourriersVue {
   types: string[]
   courriers: CourrierDiversVue[]
+  /** Branche au serveur (lot 8 du plan « parcours complet ») : les parametres d'edition de la fiche, la provenance. */
+  paramsEdition?: ParamEditionVue[]
+  mode?: ModeLecture
+  message?: string | null
+}
+
+/** La fiche en saisie (OPE_EDITION_COURRIER_DIVERS) : id vide = « Ajout d'un courrier divers ». */
+interface FicheCourrier {
+  id: string
+  code: string
+  libelle: string
+  typeEntite: string
+  paramEdition: string
+  avecDestinataire: boolean
+  actif: boolean
 }
 
 /** La teinte d'un type d'entite : celle de la nature d'affaire correspondante (Recherche d'affaires). */
@@ -68,12 +93,55 @@ export function EcranCourriersDivers() {
   const [selection, setSelection] = useState<string | null>(null)
   // « Aller a un courrier… » (Ctrl K) : filtre la liste AFFICHEE, sans toucher aux criteres.
   const [filtreRapide, setFiltreRapide] = useState('')
+  // Les gestes de la fiche (Valider, Supprimer) : ecrits par le serveur, le catalogue se relit (lot 8 du plan « parcours complet »).
+  const [fiche, setFiche] = useState<FicheCourrier | null>(null)
+  const [annonce, setAnnonce] = useState<CompteRendu>(null)
+  const [envoi, setEnvoi] = useState(false)
+  const [relecture, setRelecture] = useState(0)
 
   useEffect(() => {
     let perime = false
     void appeler<CatalogueCourriersVue>('EcranCourriersDivers.Catalogue').then((c) => { if (!perime) setCatalogue(c) })
     return () => { perime = true }
-  }, [])
+  }, [relecture])
+
+  const enBase = catalogue?.mode === 'serveur'
+  const paramsDuType = (type: string) => (catalogue?.paramsEdition ?? []).filter((p) => p.typeEntite === type)
+
+  function ajouter() {
+    if (!enBase) { setAnnonce(`${DEMONSTRATION} — « Ajouter un courrier divers ».`); return }
+    setAnnonce(null)
+    setFiche({ id: '', code: '', libelle: '', typeEntite: '', paramEdition: '', avecDestinataire: true, actif: true })
+  }
+
+  function modifier(c: CourrierDiversVue) {
+    setAnnonce(null)
+    setFiche({ id: c.id ?? '', code: c.code, libelle: c.libelle, typeEntite: c.typeEntite, paramEdition: c.paramEdition,
+               avecDestinataire: c.avecDestinataire, actif: c.actif })
+  }
+
+  async function envoyer(geste: 'Enregistrer' | 'Supprimer') {
+    if (!fiche) return
+    setEnvoi(true)
+    try {
+      const r = geste === 'Supprimer'
+        ? await appeler<ResultatGesteVue>('EcranCourriersDivers.Supprimer', fiche.id)
+        : await appeler<ResultatGesteVue>('EcranCourriersDivers.Enregistrer', fiche.id || null, {
+            'Code': fiche.code, 'Libellé': fiche.libelle, 'Type entité': fiche.typeEntite, 'Paramètre édition': fiche.paramEdition,
+            'Avec destinataire': fiche.avecDestinataire ? '1' : '0', 'Actif': fiche.actif ? '1' : '0',
+          })
+      setAnnonce(r.fait || r.sansEcrivain ? r.message : { refus: r.message })
+      if (r.fait) {
+        setSelection(geste === 'Supprimer' ? null : fiche.code)
+        setFiche(null)
+        setRelecture((n) => n + 1)
+      }
+    } catch {
+      setAnnonce({ refus: "Le pont n'a pas répondu : rien n'est enregistré." })
+    } finally {
+      setEnvoi(false)
+    }
+  }
 
   const courriers = catalogue?.courriers ?? []
   /** Les courriers que montrent ces criteres (la recherche saisie comprise). */
@@ -130,7 +198,7 @@ export function EcranCourriersDivers() {
         </div>
 
         <div className="rig-criteres__actions">
-          <button className="rig-bouton">Ajouter un courrier divers</button>
+          <button className="rig-bouton" onClick={ajouter}>Ajouter un courrier divers</button>
         </div>
       </aside>
 
@@ -141,6 +209,8 @@ export function EcranCourriersDivers() {
                        {inactifs > 0 && <>{' · '}<b>{inactifs}</b>{inactifs > 1 ? ' inactifs' : ' inactif'}</>}</> : undefined}
                      filtre={{ valeur: filtreRapide, changer: setFiltreRapide, indication: 'Aller a un courrier…',
                                valider: () => { if (affiches.length === 1) setSelection(affiches[0]!.code) } }} />
+
+        {catalogue?.mode !== undefined && <ProvenanceEcran mode={catalogue.mode} message={catalogue.message} quoi="Courriers divers" />}
 
         {catalogue && (
           <VuesListe vues={vues.map((v) => ({ cle: v.cle, libelle: v.libelle, compte: trouver(v.actifsSeuls, v.type).length }))}
@@ -221,9 +291,60 @@ export function EcranCourriersDivers() {
             </div>
             <div className="rig-criteres__actions">
               <button className="rig-bouton rig-bouton--plat">Acceder au parametre edition</button>
+              {enBase && s.id && <>{' '}<button className="rig-bouton" onClick={() => modifier(s)}>Modifier</button></>}
             </div>
           </div>
         )}
+
+        {fiche !== null && (
+          <div className="rig-criteres__bloc" style={{ padding: 'var(--rig-esp-3)' }}>
+            <div className="rig-kicker">{fiche.id === '' ? 'Ajout d\'un courrier divers' : `${fiche.code} (${fiche.libelle})`}</div>
+            <div className="rig-criteres__paire">
+              <label className="rig-saisie-champ">
+                <span className="rig-saisie-champ__libelle">Code</span>
+                <input className="rig-saisie-champ__saisie" maxLength={20} value={fiche.code} readOnly={fiche.id !== ''}
+                       onChange={(e) => setFiche({ ...fiche, code: e.target.value })} />
+              </label>
+              <label className="rig-saisie-champ">
+                <span className="rig-saisie-champ__libelle">Libellé</span>
+                <input className="rig-saisie-champ__saisie" maxLength={100} value={fiche.libelle}
+                       onChange={(e) => setFiche({ ...fiche, libelle: e.target.value })} />
+              </label>
+            </div>
+            <div className="rig-criteres__paire">
+              <label className="rig-saisie-champ">
+                <span className="rig-saisie-champ__libelle">Type entité</span>
+                <select className="rig-saisie-champ__saisie" value={fiche.typeEntite}
+                        onChange={(e) => setFiche({ ...fiche, typeEntite: e.target.value, paramEdition: '' })}>
+                  <option value="">—</option>
+                  {(catalogue?.types ?? []).map((t) => <option key={t} value={t}>{nomDuType(t)}</option>)}
+                </select>
+              </label>
+              <label className="rig-saisie-champ">
+                <span className="rig-saisie-champ__libelle">Paramètre édition</span>
+                <select className="rig-saisie-champ__saisie" value={fiche.paramEdition}
+                        onChange={(e) => setFiche({ ...fiche, paramEdition: e.target.value })}>
+                  <option value="">—</option>
+                  {paramsDuType(fiche.typeEntite).map((p) => <option key={p.code} value={p.code}>{p.code} — {p.libelle}</option>)}
+                </select>
+              </label>
+            </div>
+            <label className="rig-saisie-champ">
+              <span className="rig-saisie-champ__libelle">Avec destinataire</span>
+              <input type="checkbox" checked={fiche.avecDestinataire} onChange={(e) => setFiche({ ...fiche, avecDestinataire: e.target.checked })} />
+            </label>
+            <label className="rig-saisie-champ">
+              <span className="rig-saisie-champ__libelle">Actif</span>
+              <input type="checkbox" checked={fiche.actif} onChange={(e) => setFiche({ ...fiche, actif: e.target.checked })} />
+            </label>
+            <div className="rig-criteres__actions">
+              <button className="rig-bouton rig-bouton--fort" disabled={envoi} onClick={() => void envoyer('Enregistrer')}>Valider</button>{' '}
+              {fiche.id !== '' && <><button className="rig-bouton" disabled={envoi} onClick={() => void envoyer('Supprimer')}>Supprimer</button>{' '}</>}
+              <button className="rig-bouton rig-bouton--plat" onClick={() => setFiche(null)}>Annuler</button>
+            </div>
+          </div>
+        )}
+        <Annonce texte={annonce} />
 
         {catalogue && (
           <PiedListe>

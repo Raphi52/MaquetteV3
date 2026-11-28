@@ -69,9 +69,40 @@ describe('EcranDepotsJud', () => {
     const { pont } = await ouvrir()
     expect(screen.queryByLabelText('Evenement survenu')).toBeNull()
     fireEvent.click(screen.getByRole('button', { name: 'Nouvel evenement survenu' }))
-    expect((screen.getByLabelText('Evenement survenu') as HTMLSelectElement).value).toBe('JUG')
+    // Aucune instance depliee : pas de code a proposer (la liste de RIG v2 depend du type de l'instance).
+    expect((screen.getByLabelText('Evenement survenu') as HTMLSelectElement).value).toBe('')
+    expect(screen.queryByRole('button', { name: /^Enregistrer le depot/ })).toBeNull()
     expect(await screen.findByDisplayValue('2026-09-09')).toBe(screen.getByLabelText('Date de l\'evenement'))
     expect(pont.appels).toHaveBeenCalledWith('EcranDepotsJud.DateDuJour')
+  })
+
+  // Lot 8 du plan « parcours complet » : les codes de l'instance depliee viennent du pont (la base), le depot s'ecrit par le pont,
+  // la liste se relit ; un refus de RIG v2 s'affiche tel quel, rien n'est relu.
+  it('depose un evenement sur l\'instance depliee : codes du pont, geste fait puis liste relue ; un refus se dit', async () => {
+    const deposer = vi.fn((_role: unknown, code: unknown) => code === 'DJ38'
+      ? { fait: true, message: 'Dépôt DP3800001 enregistré sur l\'instance 2026J00121.', sansEcrivain: false, ids: ['2026J00121'] }
+      : { fait: false, message: 'Le code « DJ39 » n\'est pas un événement avec dépôt proposé.', sansEcrivain: false, ids: [] })
+    const pont = installerFauxPont({
+      'EcranDepotsJud.DateDuJour': () => '2026-09-09', 'EcranDepotsJud.Vue': () => ({ ...exemple, mode: 'serveur' }),
+      'EcranDepotsJud.Codes': () => ({ codes: [{ code: 'DJ38', libelle: 'Dépôt de requête' }, { code: 'DJ39', libelle: 'Dépôt de pièces' }], mode: 'serveur', message: null }),
+      'EcranDepotsJud.Deposer': deposer,
+    })
+    const { container } = render(<EcranDepotsJud ouvrirDossier={vi.fn()} />)
+    await screen.findByText('SARL BOULANGERIE DUVAL')
+    fireEvent.click(screen.getByRole('button', { name: 'Nouvel evenement survenu' }))
+    fireEvent.click(rangees(container)[0]!.querySelector('.rig-lm-chevron')!)
+    await vi.waitFor(() => expect(pont.appels).toHaveBeenCalledWith('EcranDepotsJud.Codes', '2026J00121'))
+    await vi.waitFor(() => expect((screen.getByLabelText('Evenement survenu') as HTMLSelectElement).value).toBe('DJ38'))
+    await screen.findByDisplayValue('2026-09-09')
+    const lectures = pont.appels.mock.calls.filter((c) => c[0] === 'EcranDepotsJud.Vue').length
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer le depot sur 2026J00121' }))
+    expect((await screen.findByRole('status')).textContent).toBe('Dépôt DP3800001 enregistré sur l\'instance 2026J00121.')
+    expect(deposer).toHaveBeenCalledWith('2026J00121', 'DJ38', '2026-09-09')
+    await vi.waitFor(() => expect(pont.appels.mock.calls.filter((c) => c[0] === 'EcranDepotsJud.Vue').length).toBe(lectures + 1))
+    fireEvent.change(screen.getByLabelText('Evenement survenu'), { target: { value: 'DJ39' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer le depot sur 2026J00121' }))
+    expect((await screen.findByRole('alert')).textContent).toContain('n\'est pas un événement avec dépôt proposé')
+    expect(pont.appels.mock.calls.filter((c) => c[0] === 'EcranDepotsJud.Vue').length).toBe(lectures + 1)
   })
 
   it('cherche par numero (« Aller a une instance… ») et par denomination, sans casse', async () => {

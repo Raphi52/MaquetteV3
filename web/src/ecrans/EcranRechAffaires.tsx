@@ -48,6 +48,7 @@
 
 import { Fragment, useEffect, useState } from 'react'
 import { appeler } from '../pont'
+import { Annonce, type CompteRendu, type ResultatGesteVue } from './formes/commun'
 import { ProvenanceEcran, type ModeLecture } from '../provenance'
 import { EnteteTriable } from '../composants/EnteteTriable'
 import {
@@ -270,6 +271,11 @@ export function EcranRechAffaires({ noAffaire, ouvrir, ouvrirUnDossier }: Propri
   const [ouverte, setOuverte] = useState<string | null>(null)
   const [libererNumeros, setLibererNumeros] = useState(true)
   const [message, setMessage] = useState<string | null>(null)
+  // « Rattacher une demande » (le Valider de PROC_RECHAFF recu avec une demande, lot 8 du plan « parcours complet ») : le numero
+  // saisi, le compte rendu ; fait, la recherche se relit sur ce numero (la demande est dans l'affaire choisie).
+  const [demandeARattacher, setDemandeARattacher] = useState('')
+  const [annonceRattachement, setAnnonceRattachement] = useState<CompteRendu>(null)
+  const [envoiRattachement, setEnvoiRattachement] = useState(false)
 
   // La colonne sur laquelle la grille est rangee ; null = ordre d'origine
   // (du plus recent au plus ancien).
@@ -374,6 +380,22 @@ export function EcranRechAffaires({ noAffaire, ouvrir, ouvrirUnDossier }: Propri
    * Ecran de demonstration : la suppression XXAFF n'ecrit rien, elle
    * rend compte de ce qui serait supprime et du sort des numeros metiers.
    */
+  /** Rattacher la demande saisie a l'affaire choisie : ecrit par le serveur ; fait, la recherche se relit sur le numero de la demande. */
+  async function rattacher() {
+    if (selection === null) return
+    setEnvoiRattachement(true)
+    try {
+      const numero = demandeARattacher.trim()
+      const r = await appeler<ResultatGesteVue>('EcranRechAffaires.Rattacher', selection, numero)
+      setAnnonceRattachement(r.fait || r.sansEcrivain ? r.message : { refus: r.message })
+      if (r.fait) setCritNumero(numero)
+    } catch {
+      setAnnonceRattachement({ refus: "Le pont n'a pas répondu : rien n'est enregistré." })
+    } finally {
+      setEnvoiRattachement(false)
+    }
+  }
+
   function supprimer() {
     if (choisie === null) return
     // SOC-015 CA04 : une ancienne affaire ne se modifie pas dans la V3 ; le bloc « Ancien RIG » propose de l'y ouvrir.
@@ -684,6 +706,20 @@ export function EcranRechAffaires({ noAffaire, ouvrir, ouvrirUnDossier }: Propri
             )}
           </div>
         )}
+
+        <div className="rig-criteres__bloc" style={{ padding: 'var(--rig-esp-3) var(--rig-esp-4)' }}>
+          <div className="rig-kicker">Rattacher une demande</div>
+          <span className="rig-resultats-proc__compte">
+            {selection === null ? 'Selectionnez l\'affaire qui recevra la demande.' : `Affaire choisie : ${selection}`}
+          </span>
+          <label className="rig-saisie-champ">
+            <span className="rig-saisie-champ__libelle">N° de demande</span>
+            <input className="rig-saisie-champ__saisie" value={demandeARattacher} onChange={(e) => setDemandeARattacher(e.target.value)} />
+          </label>
+          <button className="rig-bouton rig-bouton--fort" disabled={selection === null || demandeARattacher.trim() === '' || envoiRattachement}
+                  onClick={() => void rattacher()}>Rattacher a l'affaire choisie</button>
+          <Annonce texte={annonceRattachement} />
+        </div>
 
         <div className="rig-criteres__bloc" style={{ padding: 'var(--rig-esp-3) var(--rig-esp-4)' }}>
           <div className="rig-kicker">Suppression (XXAFF)</div>

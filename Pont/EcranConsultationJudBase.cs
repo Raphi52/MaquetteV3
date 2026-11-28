@@ -1,4 +1,5 @@
 using System.Globalization;
+using RigV3.Contrats.EcransGeneres;
 using RigV3.Contrats.EcransMain;
 
 namespace RigV3Desktop.Pont;
@@ -45,6 +46,32 @@ public static partial class EcranConsultationJud
             s.LireAsync<FluxEnrolementLu>(RoutesConsultationJud.XmlPour(g, n)));
         if (lu.Valeur is not { } v) return new(lu.Mode, null, lu.Message ?? "Sans serveur : le XML ne se lit pas.");
         return new(lu.Mode, v.Xml, !v.Existe ? Disparu : v.Xml is null ? SansFlux : null);
+    }
+
+    /// <summary>
+    /// « Saisie de la demande » de RIG v2 (OPE_CJUDINFOG) : traiter l'enrolement <paramref name="id"/> -- <paramref name="etat"/> « R »
+    /// (refuse) avec son type et son motif de rejet ; « A » (accepter) est refuse par le serveur, que RIG v3 ne reprend pas
+    /// (Serveur/Socle/EcransMain/EcritureConsultationJud.cs). Sans serveur, ou pour un enrolement d'exemple (sans Id) : rien n'est
+    /// ecrit, « Démonstration ». Lot 8 du plan « parcours complet », 28/11/2026.
+    /// </summary>
+    [JSInvokable("EcranConsultationJud.Traiter")]
+    public static Task<ResultatGeste> Traiter(string id, string etat, string typeRejet, string motif)
+        => TraiterAsync(ClientServeur.Actif, SessionAgent.CodeGreffe, id, etat, typeRejet, motif);
+
+    public static async Task<ResultatGeste> TraiterAsync(ClientServeur? serveur, string? greffe, string? id, string etat, string typeRejet, string motif)
+    {
+        if (serveur is null || greffe is null)
+            return new ResultatGeste(false, $"{EcranGenere.Demonstration} : RIG n'est pas branché sur la base d'un greffe.") { SansEcrivain = true };
+        if (string.IsNullOrEmpty(id))
+            return new ResultatGeste(false, $"{EcranGenere.Demonstration} : un enrôlement d'exemple n'existe pas dans la base du greffe.") { SansEcrivain = true };
+        var valeurs = new Dictionary<string, string>
+        {
+            [GesteEcran.Cle(TraitementEnrolement.Section, TraitementEnrolement.Etat)] = etat,
+            [GesteEcran.Cle(TraitementEnrolement.Section, TraitementEnrolement.TypeRejet)] = typeRejet,
+            [GesteEcran.Cle(TraitementEnrolement.Section, TraitementEnrolement.MotifRejet)] = motif,
+        };
+        return await EcranGenere.EnvoyerGesteAsync(serveur, greffe, RoutesEcransMain.Pour(RoutesConsultationJud.Traiter, greffe),
+            new GesteEcran(TypeGeste.Enregistrer, [id], valeurs));
     }
 
     private static string Jour(DateTime? d) => d?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "";

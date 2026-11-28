@@ -40,6 +40,7 @@ import {
 } from '../composants/ListeModerne'
 import type { ContexteDossierVue } from '../plan/types'
 import { ProvenanceEcran, type ModeLecture } from '../provenance'
+import { Annonce, type CompteRendu, type ResultatGesteVue } from './formes/commun'
 
 interface DossierJud {
   affaire: string
@@ -148,12 +149,36 @@ export function EcranConsultationJud({ ouvrirDossier, dossier = null }: Propriet
   const [ouverte, setOuverte] = useState<string | null>(null)
   // null tant que le pont n'a pas repondu : aucune ligne, jamais la demonstration a la place de la base.
   const [vue, setVue] = useState<VueConsultationJud | null>(null)
+  // « Saisie de la demande » de RIG v2 (OPE_CJUDINFOG, lot 8 du plan « parcours complet ») : l'etat de traitement, et pour un refus
+  // son type et son motif ; le serveur l'ecrit (Pont/EcranConsultationJudBase.cs, Traiter), la liste se relit ensuite.
+  const [traitement, setTraitement] = useState({ etat: 'R', type: 'MQPIECE', motif: '' })
+  const [annonce, setAnnonce] = useState<CompteRendu>(null)
+  const [envoi, setEnvoi] = useState(false)
+  const [relecture, setRelecture] = useState(0)
 
   useEffect(() => {
     let perime = false
-    void appeler<VueConsultationJud>('EcranConsultationJud.Vue').then((v) => { if (!perime) setVue(v) })
+    void appeler<VueConsultationJud>('EcranConsultationJud.Vue').then((v) => {
+      if (perime) return
+      setVue(v)
+      // La ligne choisie est relue avec la liste : son etat de traitement suit la base.
+      setSelection((avant) => avant === null ? null : v.lignes.find((l) => l.id === avant.id && l.affaire === avant.affaire) ?? avant)
+    })
     return () => { perime = true }
-  }, [])
+  }, [relecture])
+
+  async function traiter(dos: DossierJud) {
+    setEnvoi(true)
+    try {
+      const r = await appeler<ResultatGesteVue>('EcranConsultationJud.Traiter', dos.id ?? '', traitement.etat, traitement.type, traitement.motif)
+      setAnnonce(r.fait || r.sansEcrivain ? r.message : { refus: r.message })
+      if (r.fait) setRelecture((n) => n + 1)
+    } catch {
+      setAnnonce({ refus: "Le pont n'a pas répondu : rien n'est enregistré." })
+    } finally {
+      setEnvoi(false)
+    }
+  }
 
   const source = vue?.lignes ?? []
   const criteres: CriteresConsultation = { critTexte, critDemat, critTraitement, critCreationDu, critTraitementAu, rejetsSeuls }
@@ -349,6 +374,42 @@ export function EcranConsultationJud({ ouvrirDossier, dossier = null }: Propriet
               <button className="rig-bouton" onClick={() => ouvrirDossier(s.dossier)}>Visualiser la piece</button>{' '}
               <button className="rig-bouton rig-bouton--plat" onClick={() => setXmlOuvert(!xmlOuvert)}>Visualiser le XML</button>
             </div>
+            {s.etatTraitement === 'En attente' && (
+              <div className="rig-criteres__bloc">
+                <div className="rig-kicker">Saisie de la demande</div>
+                <div className="rig-criteres__paire">
+                  <label className="rig-saisie-champ">
+                    <span className="rig-saisie-champ__libelle">Etat traitement</span>
+                    <select className="rig-saisie-champ__saisie" value={traitement.etat}
+                            onChange={(e) => setTraitement({ ...traitement, etat: e.target.value })}>
+                      <option value="A">Accepté</option>
+                      <option value="R">Refusé</option>
+                    </select>
+                  </label>
+                  {traitement.etat === 'R' && (
+                    <label className="rig-saisie-champ">
+                      <span className="rig-saisie-champ__libelle">Type rejet</span>
+                      <select className="rig-saisie-champ__saisie" value={traitement.type}
+                              onChange={(e) => setTraitement({ ...traitement, type: e.target.value })}>
+                        <option value="MQPIECE">Manque pièce</option>
+                        <option value="PAIEMENT">Paiement incorrect</option>
+                      </select>
+                    </label>
+                  )}
+                </div>
+                {traitement.etat === 'R' && (
+                  <label className="rig-saisie-champ">
+                    <span className="rig-saisie-champ__libelle">Motif rejet</span>
+                    <textarea className="rig-saisie-champ__saisie" rows={2} maxLength={300} value={traitement.motif}
+                              onChange={(e) => setTraitement({ ...traitement, motif: e.target.value })} />
+                  </label>
+                )}
+                <div className="rig-criteres__actions">
+                  <button className="rig-bouton rig-bouton--fort" disabled={envoi} onClick={() => void traiter(s)}>Valider</button>
+                </div>
+              </div>
+            )}
+            <Annonce texte={annonce} />
             {xmlOuvert && <pre className="rig-code">{s.xml ?? (xmlLu !== null && xmlLu.id === s.id ? xmlLu.texte : 'Lecture du XML…')}</pre>}
           </div>
         )}

@@ -11,6 +11,15 @@ public sealed record DecisionRedaction(int Id, string Numero, string Affaire, bo
                                        string AvantDireDroit, string Contradictoire, string ExecutionProvisoire, bool DebatsPublics,
                                        bool DecisionPublique, bool MesureInstruction, int Documents, string[] Mesures);
 
+/// <summary>Une valeur d'une liste de la décision (sa valeur, son libellé).</summary>
+public sealed record ValeurListe(string Valeur, string Libelle);
+
+/// <summary>Une liste de la fiche « Décision judiciaire » : le titre de son champ, obligatoire ou non, ses valeurs.</summary>
+public sealed record ListeDecision(string Champ, bool Obligatoire, ValeurListe[] Valeurs);
+
+/// <summary>Les listes de la fiche, d'où elles viennent et le motif d'une panne.</summary>
+public sealed record VueListesDecision(ListeDecision[] Listes, string Mode, string? Message);
+
 /// <summary>
 /// Ce que l'écran affiche : les décisions, d'où elles viennent (Pont/LectureEcranMain.cs) et, branché, combien la base en compte
 /// (<paramref name="Total"/>) : la lecture s'arrête au plafond (LectureRedaction.Plafond), l'écran dit alors « n affichées sur

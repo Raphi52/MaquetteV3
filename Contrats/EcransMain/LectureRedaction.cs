@@ -22,3 +22,34 @@ public sealed record DecisionRedactionLue(int Id, string Role, string Affaire, s
 
 /// <summary>Les décisions lues (au plus le plafond), dans l'ordre de RIG v2, et leur total.</summary>
 public sealed record DecisionsRedactionLues(DecisionRedactionLue[] Lignes, int Total);
+
+/// <summary>
+/// Le geste « valider la décision » de PROC_REDA (OPE_DECISION_JUDICIAIRE, bouton Valider : POST <see cref="Valider"/>, GesteEcran Ids =
+/// [l'id de la decision], valeurs sous les titres de RIG v2 de l'operation « Décision judiciaire », OPE_DECISION_JUDICIAIRE.Designer.cs:165-297 ;
+/// un champ absent garde la valeur de la base). Dates aaaa-mm-jj (vide : aucune), cases « 1 » / « 0 ». Ecrit par
+/// Serveur/Socle/EcransMain/EcritureRedaction.cs (lot 8 du plan « parcours complet », 28/11/2026).
+/// </summary>
+/// <summary>Une valeur d'une liste de la decision : sa valeur et son libelle.</summary>
+public sealed record ValeurListeLue(string Valeur, string Libelle);
+
+/// <summary>Une liste de la decision : le titre de son champ (<see cref="ValidationDecision"/>), obligatoire ou non, et ses valeurs.</summary>
+public sealed record ListeDecisionLue(string Champ, bool Obligatoire, ValeurListeLue[] Valeurs);
+
+public static class ValidationDecision
+{
+    public const string Valider = "/ecrans-main/{greffe}/redaction/valider";
+
+    /// <summary>GET, les valeurs des cinq listes de la decision (<see cref="ListeDecisionLue"/>[], une par champ, dans l'ordre de la fiche).</summary>
+    public const string Listes = "/ecrans-main/{greffe}/redaction/listes";
+
+    public const string Section = "Décision judiciaire";
+    public const string SensGeneral = "Sens général";
+    public const string Ressort = "Ressort";
+    public const string AvantDireDroit = "Avant dire droit";
+    public const string Contradictoire = "Contradictoire";
+    public const string ExecutionProvisoire = "Exécution provisoire";
+    public const string DatePrevue = "Date prévue";
+    public const string Date = "Date";
+    public const string DebatsPublics = "Débats publics";
+    public const string DecisionPublique = "Décision publique";
+}

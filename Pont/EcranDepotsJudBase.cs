@@ -1,4 +1,5 @@
 using System.Globalization;
+using RigV3.Contrats.EcransGeneres;
 using RigV3.Contrats.EcransMain;
 
 namespace RigV3Desktop.Pont;
@@ -28,6 +29,52 @@ public static partial class EcranDepotsJud
         if (lu.Valeur is not { } v) return new VueDepotsJud([], lu.Mode, lu.Message);
         return new VueDepotsJud([.. v.Lignes.Select(Ligne)], lu.Mode, null, v.Total);
     }
+
+    /// <summary>
+    /// Les codes d'evenement avec depot proposes pour l'instance de role <paramref name="role"/> (la liste de l'etape « Evénement
+    /// survenu » de RIG v2, Serveur/Socle/EcransMain/EcritureDepotsJud.cs). Sans serveur : les codes de la demonstration. Lot 8 du plan
+    /// « parcours complet », 28/11/2026.
+    /// </summary>
+    [JSInvokable("EcranDepotsJud.Codes")]
+    public static Task<VueCodesDepot> Codes(string role) => CodesAsync(ClientServeur.Actif, SessionAgent.CodeGreffe, role);
+
+    public static async Task<VueCodesDepot> CodesAsync(ClientServeur? serveur, string? greffe, string? role)
+    {
+        if (serveur is not null && string.IsNullOrWhiteSpace(role)) return new VueCodesDepot([], "vide", "Choisissez une instance de la liste.");
+        var lu = await LectureEcransMain.LireAsync(serveur, greffe, "les codes d'événement avec dépôt", (s, g) =>
+            s.LireAsync<CodesDepotLus>(RoutesDepotsJud.CodesPour(g, role ?? "")));
+        if (lu.Mode == LectureEcransMain.Demo) return CodesExemple;
+        return lu.Valeur is { } v ? new VueCodesDepot([.. v.Codes.Select(c => new CodeDepot(c.Code, c.Libelle))], lu.Mode,
+                                                      v.Codes.Length > 0 ? null : AucunCode(v.Type), v.Type)
+                                  : new VueCodesDepot([], lu.Mode, lu.Message);
+    }
+
+    /// <summary>
+    /// « Nouvel événement survenu » de RIG v2 : l'evenement <paramref name="code"/> du <paramref name="date"/> (aaaa-mm-jj) et son depot
+    /// numerote, sur l'instance <paramref name="role"/>, ecrits par le serveur. Sans serveur, ou pour une instance d'exemple : rien
+    /// n'est ecrit, « Démonstration ».
+    /// </summary>
+    [JSInvokable("EcranDepotsJud.Deposer")]
+    public static Task<ResultatGeste> Deposer(string role, string code, string date)
+        => EnregistrerAsync(ClientServeur.Actif, SessionAgent.CodeGreffe, role, code, date);
+
+    public static async Task<ResultatGeste> EnregistrerAsync(ClientServeur? serveur, string? greffe, string role, string code, string date)
+    {
+        if (serveur is null || greffe is null)
+            return new ResultatGeste(false, $"{EcranGenere.Demonstration} : RIG n'est pas branché sur la base d'un greffe.") { SansEcrivain = true };
+        var valeurs = new Dictionary<string, string>
+        {
+            [GesteEcran.Cle(DepotEvenement.Section, DepotEvenement.Code)] = code,
+            [GesteEcran.Cle(DepotEvenement.Section, DepotEvenement.Date)] = date,
+        };
+        return await EcranGenere.EnvoyerGesteAsync(serveur, greffe, RoutesEcransMain.Pour(RoutesDepotsJud.Deposer, greffe),
+            new GesteEcran(TypeGeste.Creer, [role], valeurs));
+    }
+
+    /// <summary>Le motif d'une liste vide : la liste de RIG v2 ne propose que les codes avec depot compatibles avec le type de l'instance.</summary>
+    private static string AucunCode(string type) => type.Length == 0
+        ? "Cette instance n'est pas une instance de la série JROP de la base du greffe : aucun code proposé."
+        : $"Aucun code d'événement avec dépôt n'est compatible avec cette instance (type {type}) dans la base du greffe : RIG v2 n'en proposerait aucun.";
 
     private static LigneDepotJud Ligne(InstanceDepotLue i)
     {

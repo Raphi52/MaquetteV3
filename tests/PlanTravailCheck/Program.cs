@@ -141,7 +141,7 @@ internal static class Programme
         Exiger(catalogue.All(a => a.Ecran != "PROC_COURRIER_DIVERS") && Monte("PROC_COURRIER_DIVERS"),
             "aucune action du dossier n'ouvre le CATALOGUE des courriers divers (ecran de parametrage, toujours monte pour l'accueil)");
         var ecranCatalogue = File.ReadAllText(Path.Combine(racine, "web/src/ecrans/EcranCourriersDivers.tsx"));
-        var catalogueCourriers = EcranCourriersDivers.Catalogue();
+        var catalogueCourriers = EcranCourriersDivers.Exemple();   // la demonstration du pont (sans serveur), lot 8 du plan « parcours complet »
         Exiger(ecranCatalogue.Contains("appeler<CatalogueCourriersVue>('EcranCourriersDivers.Catalogue')")
                && CourriersDivers.Modeles.All(m => !ecranCatalogue.Contains(m.ParamEdition))
                && catalogueCourriers.Courriers.Select(c => c.Code).SequenceEqual(CourriersDivers.Modeles.Select(m => m.Code))

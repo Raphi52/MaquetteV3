@@ -7,6 +7,21 @@ namespace RigV3.Contrats.EcransMain;
 public static class RoutesAffaires
 {
     public const string Affaires = "/ecrans-main/{greffe}/affaires";
+
+    /// <summary>POST, le geste « rattacher une demande a l'affaire choisie » (GesteEcran : Ids = [l'affaire], valeur
+    /// <see cref="RattachementDemande.Demande"/>) ; ecrit par Serveur/Socle/EcransMain/EcritureRechAffaires.cs (lot 8 du plan « parcours
+    /// complet », 28/11/2026).</summary>
+    public const string Rattacher = "/ecrans-main/{greffe}/affaires/rattacher";
+}
+
+/// <summary>
+/// Le champ du geste « rattacher une demande » : RIG v2 recoit la demande en parametre du processus (PROC_RECHAFF.cs:20-26,
+/// NumDemandeInput) et la rattache a l'affaire validee (DoValider, :33-61) ; l'ecran de la V3 la saisit sous ce titre.
+/// </summary>
+public static class RattachementDemande
+{
+    public const string Section = "Rattachement";
+    public const string Demande = "N° de demande";
 }
 
 /// <summary>

@@ -41,6 +41,7 @@ import { Fragment, useEffect, useState } from 'react'
 import { appeler } from '../pont'
 import { contientSansCasse, dateCourte, distinctsTries, estBlanc } from '../criteres'
 import { ProvenanceEcran, type ModeLecture } from '../provenance'
+import { Annonce, type CompteRendu, type ResultatGesteVue } from './formes/commun'
 import {
   CartesChiffrees, CelluleChevron, EnteteListe, LigneDetail, ListeModerne, MenuLigne, Pastille, PiedListe,
   PointEtat, VuesListe, teinteStatut, type ActionLigne, type Teinte,
@@ -177,13 +178,45 @@ const NbColonnes = 8
 export function EcranGedJud({ ouvrirDossier, dossier = null }: ProprietesEcranGedJud) {
   // Les documents du pont ; sans reponse (pas de pont) ou sans serveur, la demonstration reste.
   const [vue, setVue] = useState<VueGedJud | null>(null)
+  // Relue apres un geste (« Modifier le document », lot 8 du plan « parcours complet »).
+  const [relecture, setRelecture] = useState(0)
   useEffect(() => {
     let perime = false
     void appeler<VueGedJud>('EcranGedJud.Documents')
-      .then((v) => { if (!perime && v.mode !== undefined && v.mode !== 'demo') setVue(v) })
+      .then((v) => {
+        if (perime || v.mode === undefined || v.mode === 'demo') return
+        setVue(v)
+        setSelection((avant) => avant === null ? null : v.lignes.find((l) => l.id !== undefined && l.id === avant.id) ?? avant)
+      })
       .catch(() => { /* pas de pont (tests, page hors WebView2) : la demonstration reste */ })
     return () => { perime = true }
+  }, [relecture])
+  // « Modifier le document » de RIG v2 (PROC_GED_MODIF) : la liste « Etat » de la base, le motif d'un rejet, le commentaire.
+  const [etatsGed, setEtatsGed] = useState<{ code: string; libelle: string }[]>([])
+  useEffect(() => {
+    let perime = false
+    void appeler<{ etats: { code: string; libelle: string }[] }>('EcranGedJud.Etats')
+      .then((v) => { if (!perime) setEtatsGed(v.etats ?? []) })
+      .catch(() => { /* pas de pont : pas de geste */ })
+    return () => { perime = true }
   }, [])
+  const [modif, setModif] = useState<{ id: string; etat: string; motif: string; commentaire: string } | null>(null)
+  const [annonce, setAnnonce] = useState<CompteRendu>(null)
+  const [envoi, setEnvoi] = useState(false)
+
+  async function enregistrerDocument() {
+    if (!modif) return
+    setEnvoi(true)
+    try {
+      const r = await appeler<ResultatGesteVue>('EcranGedJud.Modifier', modif.id, modif.etat, modif.motif, modif.commentaire)
+      setAnnonce(r.fait || r.sansEcrivain ? r.message : { refus: r.message })
+      if (r.fait) { setModif(null); setRelecture((n) => n + 1) }
+    } catch {
+      setAnnonce({ refus: "Le pont n'a pas répondu : rien n'est enregistré." })
+    } finally {
+      setEnvoi(false)
+    }
+  }
   const docs = vue ? vue.lignes : Docs
   const etats = vue ? etatsDeLaBase(docs) : Etats
   const vues = vue ? vuesDeLaBase(etats) : VuesDocuments
@@ -424,7 +457,42 @@ export function EcranGedJud({ ouvrirDossier, dossier = null }: ProprietesEcranGe
               <button className="rig-bouton rig-bouton--plat" onClick={() => setAction('Envoyer par e-mail')}>Envoyer par e-mail</button>{' '}
               <button className="rig-bouton rig-bouton--plat" onClick={() => setAction('Envoyer par courrier')}>Envoyer par courrier</button>{' '}
               <button className="rig-bouton rig-bouton--plat" onClick={() => setHistorique(!historique)}>Historique</button>
+              {s.id !== undefined && etatsGed.length > 0 && (
+                <>{' '}<button className="rig-bouton rig-bouton--plat"
+                  onClick={() => { setAnnonce(null); setModif({ id: s.id!, etat: s.codeEtat ?? '', motif: s.motifRejet ?? '', commentaire: s.commentaire ?? '' }) }}>
+                  Modifier le document</button></>
+              )}
             </div>
+            {modif !== null && modif.id === s.id && (
+              <div className="rig-criteres__bloc">
+                <div className="rig-kicker">Modifier le document</div>
+                <div className="rig-criteres__paire">
+                  <label className="rig-saisie-champ">
+                    <span className="rig-saisie-champ__libelle">Etat</span>
+                    <select className="rig-saisie-champ__saisie" value={modif.etat} onChange={(e) => setModif({ ...modif, etat: e.target.value })}>
+                      {etatsGed.map((e) => <option key={e.code} value={e.code}>{e.libelle || e.code}</option>)}
+                    </select>
+                  </label>
+                  {modif.etat === 'R' && (
+                    <label className="rig-saisie-champ">
+                      <span className="rig-saisie-champ__libelle">Motif rejet</span>
+                      <input className="rig-saisie-champ__saisie" maxLength={1000} value={modif.motif}
+                             onChange={(e) => setModif({ ...modif, motif: e.target.value })} />
+                    </label>
+                  )}
+                </div>
+                <label className="rig-saisie-champ">
+                  <span className="rig-saisie-champ__libelle">Libellé</span>
+                  <input className="rig-saisie-champ__saisie" maxLength={1000} value={modif.commentaire}
+                         onChange={(e) => setModif({ ...modif, commentaire: e.target.value })} />
+                </label>
+                <div className="rig-criteres__actions">
+                  <button className="rig-bouton rig-bouton--fort" disabled={envoi} onClick={() => void enregistrerDocument()}>Enregistrer</button>{' '}
+                  <button className="rig-bouton rig-bouton--plat" onClick={() => setModif(null)}>Annuler</button>
+                </div>
+              </div>
+            )}
+            <Annonce texte={annonce} />
             {historique && s.historiques.length > 0 && (
               <ul className="rig-historique__liste">
                 {s.historiques.map((h, i) => <li key={i}>{h}</li>)}

@@ -1,4 +1,5 @@
 using System.Globalization;
+using RigV3.Contrats.EcransGeneres;
 using RigV3.Contrats.EcransMain;
 
 namespace RigV3Desktop.Pont;
@@ -54,6 +55,24 @@ public static partial class EcranRechAffaires
             comptes[i] = lu.Valeur is { } v ? Trouvees([.. v.Lignes.Select(DeLaBase)], EnMemoire(vues[i]), null, true).Length : null;
         }
         return comptes;
+    }
+
+    /// <summary>
+    /// Rattacher la demande <paramref name="demande"/> a l'affaire <paramref name="affaire"/> : le Valider de PROC_RECHAFF quand RIG v2 le
+    /// recoit avec une demande (ventilations, articles de sa facture et demande deplaces ; Serveur/Socle/EcransMain/EcritureRechAffaires.cs).
+    /// Sans serveur, ou pour une affaire d'exemple : rien n'est ecrit, « Démonstration ». Lot 8 du plan « parcours complet », 28/11/2026.
+    /// </summary>
+    [JSInvokable("EcranRechAffaires.Rattacher")]
+    public static Task<ResultatGeste> Rattacher(string affaire, string demande)
+        => ValiderAsync(ClientServeur.Actif, SessionAgent.CodeGreffe, affaire, demande);
+
+    public static async Task<ResultatGeste> ValiderAsync(ClientServeur? serveur, string? greffe, string affaire, string demande)
+    {
+        if (serveur is null || greffe is null)
+            return new ResultatGeste(false, $"{EcranGenere.Demonstration} : RIG n'est pas branché sur la base d'un greffe.") { SansEcrivain = true };
+        var valeurs = new Dictionary<string, string> { [GesteEcran.Cle(RattachementDemande.Section, RattachementDemande.Demande)] = demande };
+        return await EcranGenere.EnvoyerGesteAsync(serveur, greffe, RoutesEcransMain.Pour(RoutesAffaires.Rattacher, greffe),
+            new GesteEcran(TypeGeste.Enregistrer, [affaire], valeurs));
     }
 
     private static Task<LectureEcranMain<AffairesLues>> LireAsync(ClientServeur? serveur, string? greffe, CriteresAffaires c)

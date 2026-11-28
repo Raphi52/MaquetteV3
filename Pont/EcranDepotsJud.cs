@@ -7,6 +7,12 @@ public sealed record LigneDepotJud(string Numero, string Denomination, string Na
 /// <summary>Ce que l'ecran montre : ses instances, d'ou elles viennent (Pont/LectureEcranMain.cs) et leur total.</summary>
 public sealed record VueDepotsJud(LigneDepotJud[] Lignes, string Mode = "demo", string? Message = null, int Total = 0);
 
+/// <summary>Un code d'evenement avec depot de la liste « Evénement survenu » : son code et son libelle.</summary>
+public sealed record CodeDepot(string Code, string Libelle);
+
+/// <summary>Les codes proposes pour une instance, d'ou ils viennent (Pont/LectureEcranMain.cs) et le motif d'une panne.</summary>
+public sealed record VueCodesDepot(CodeDepot[] Codes, string Mode = "demo", string? Message = null, string Type = "");
+
 /// <summary>
 /// Pont de l'ecran PROC_DEPOTJUD (web/src/ecrans/EcranDepotsJud.tsx).
 ///
@@ -20,10 +26,11 @@ public sealed record VueDepotsJud(LigneDepotJud[] Lignes, string Mode = "demo", 
 /// </summary>
 public static partial class EcranDepotsJud
 {
-    /// <summary>JeuDemo.Aujourdhui, au format d'un &lt;input type="date"&gt; (aaaa-mm-jj).</summary>
+    /// <summary>La date de l'evenement proposee, au format d'un &lt;input type="date"&gt; (aaaa-mm-jj) : branche au serveur, le jour
+    /// (la date de travail de RIG v2, OPE_DEPOT.cs:192) ; sans serveur, JeuDemo.Aujourdhui, le jour de la demonstration.</summary>
     [JSInvokable("EcranDepotsJud.DateDuJour")]
     public static string DateDuJour() =>
-        JeuDemo.Aujourdhui.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        (ClientServeur.Actif is null ? JeuDemo.Aujourdhui : DateTime.Today).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
 
     /// <summary>Les instances de demonstration (celles que l'ecran declarait), sans serveur.</summary>
     public static VueDepotsJud Exemple() => new(
@@ -33,4 +40,8 @@ public static partial class EcranDepotsJud
         new("2025J00088", "EURL COIFFURE MARIE", "Sauvegarde", "1re", "2025-11-02", "Ordonnance", "Suspendue", "alerte", true, "2023B01120"),
         new("2024J00507", "SCI DU MOULIN", "Redressement judiciaire", "3e", "2024-06-12", "Cloture", "Close", "ok", false, "2025B00044"),
     ], LectureEcransMain.Demo, null, 4);
+
+    /// <summary>Les codes de la demonstration (ceux que l'ecran declarait), sans serveur.</summary>
+    public static readonly VueCodesDepot CodesExemple = new(
+        [new("JUG", "Jugement"), new("ORD", "Ordonnance"), new("EXP", "Designation d'expert"), new("CLO", "Cloture")], LectureEcransMain.Demo);
 }

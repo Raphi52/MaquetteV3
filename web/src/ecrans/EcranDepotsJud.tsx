@@ -31,9 +31,15 @@
 // PROC_DEPOTJUD, date d'enrolement, dernier evenement survenu, « A facturer » quand aucun client (PROC_DEPOTJUD.cs:58-64),
 // « En cours » quand une demande la tient. Sans serveur, les quatre instances de demonstration du pont, marquees
 // « exemple » (ProvenanceEcran) ; en panne, le motif et aucune ligne. La mise en page ne change pas.
+//
+// LE GESTE (lot 8 du plan « parcours complet », 28/11/2026) : a l'etape « Nouvel evenement survenu », l'instance depliee
+// recoit l'evenement et son depot numerote (Pont/EcranDepotsJudBase.cs, Deposer → Serveur/Socle/EcransMain/
+// EcritureDepotsJud.cs). Ses codes sont ceux de RIG v2 (avec depot, compatibles avec le type de l'instance), lus dans la base ;
+// aucun code : le motif est dit sous la liste. La date proposee est celle du jour.
 
 import { Fragment, useEffect, useState } from 'react'
 import { appeler } from '../pont'
+import { Annonce, type CompteRendu, type ResultatGesteVue } from './formes/commun'
 import { contientSansCasse, dateCourte, estBlanc } from '../criteres'
 import {
   CelluleChevron, CelluleIdentite, EnteteListe, LigneDetail, ListeModerne, MenuLigne, Pastille, PiedListe, PointEtat,
@@ -98,7 +104,15 @@ export function EcranDepotsJud({ ouvrirDossier, dossier = null }: ProprietesEcra
   // instance y est cherchee par son numero.
   const [numInstance, setNumInstance] = useState(dossier?.numero ?? '')
   const [denomination, setDenomination] = useState('')
-  const [evenement, setEvenement] = useState('JUG')
+  // Le code de l'evenement survenu : la liste de l'instance depliee (Pont/EcranDepotsJudBase.cs, Codes ; lot 8 du plan « parcours
+  // complet ») -- les codes avec depot compatibles avec son type, lus dans la base ; sans serveur, ceux de la demonstration.
+  const [evenement, setEvenement] = useState('')
+  const [codes, setCodes] = useState<{ code: string; libelle: string }[]>([])
+  // Le motif d'une liste vide (aucun code compatible avec le type de l'instance), dit sous la liste.
+  const [motifCodes, setMotifCodes] = useState<string | null>(null)
+  const [annonce, setAnnonce] = useState<CompteRendu>(null)
+  const [envoi, setEnvoi] = useState(false)
+  const [relecture, setRelecture] = useState(0)
   // null tant que le pont n'a pas repondu (ou une fois la date effacee).
   const [dateEvenement, setDateEvenement] = useState<string | null>(null)
   // La ligne depliee par son chevron (une a la fois).
@@ -110,7 +124,37 @@ export function EcranDepotsJud({ ouvrirDossier, dossier = null }: ProprietesEcra
     let perime = false
     void appeler<VueDepotsJud>('EcranDepotsJud.Vue').then((v) => { if (!perime) setVue(v) })
     return () => { perime = true }
-  }, [])
+  }, [relecture])
+
+  // Les codes proposes pour l'instance depliee : relus a chaque instance choisie.
+  useEffect(() => {
+    if (ouverte === null) { setCodes([]); setMotifCodes(null); return }
+    let perime = false
+    void appeler<{ codes: { code: string; libelle: string }[]; message?: string | null }>('EcranDepotsJud.Codes', ouverte)
+      .then((v) => {
+        if (perime) return
+        const liste = v?.codes ?? []
+        setCodes(liste)
+        setMotifCodes(v?.message ?? null)
+        setEvenement((avant) => liste.some((c) => c.code === avant) ? avant : (liste[0]?.code ?? ''))
+      })
+      .catch(() => { if (!perime) { setCodes([]); setMotifCodes(null) } })
+    return () => { perime = true }
+  }, [ouverte])
+
+  /** « Nouvel événement survenu » et son dépôt sur l'instance dépliée : écrits par le serveur, la liste se relit. */
+  async function deposer(role: string) {
+    setEnvoi(true)
+    try {
+      const r = await appeler<ResultatGesteVue>('EcranDepotsJud.Deposer', role, evenement, dateEvenement ?? '')
+      setAnnonce(r.fait || r.sansEcrivain ? r.message : { refus: r.message })
+      if (r.fait) setRelecture((n) => n + 1)
+    } catch {
+      setAnnonce({ refus: "Le pont n'a pas répondu : rien n'est enregistré." })
+    } finally {
+      setEnvoi(false)
+    }
+  }
 
   useEffect(() => {
     let perime = false
@@ -165,11 +209,10 @@ export function EcranDepotsJud({ ouvrirDossier, dossier = null }: ProprietesEcra
           <div className="rig-criteres__bloc" style={{ padding: 'var(--rig-esp-3)' }}>
             <label className="rig-saisie-champ">
               <span className="rig-saisie-champ__libelle">Evenement survenu</span>
-              <select className="rig-saisie-champ__saisie" value={evenement} onChange={(e) => setEvenement(e.target.value)}>
-                <option value="JUG">Jugement</option>
-                <option value="ORD">Ordonnance</option>
-                <option value="EXP">Designation d'expert</option>
-                <option value="CLO">Cloture</option>
+              <select className="rig-saisie-champ__saisie" value={evenement} onChange={(e) => setEvenement(e.target.value)}
+                      disabled={ouverte === null}>
+                {ouverte === null && <option value="">Depliez une instance de la liste</option>}
+                {codes.map((c) => <option key={c.code} value={c.code}>{c.code} — {c.libelle}</option>)}
               </select>
             </label>
             <label className="rig-saisie-champ">
@@ -177,6 +220,14 @@ export function EcranDepotsJud({ ouvrirDossier, dossier = null }: ProprietesEcra
               <input className="rig-saisie-champ__saisie" type="date" value={dateEvenement ?? ''}
                      onChange={(e) => setDateEvenement(e.target.value || null)} />
             </label>
+            {ouverte !== null && motifCodes !== null && <p className="rig-eg-note" role="note">{motifCodes}</p>}
+            {ouverte !== null && (
+              <div className="rig-criteres__actions">
+                <button className="rig-bouton rig-bouton--fort" disabled={envoi || evenement === ''} onClick={() => void deposer(ouverte)}>
+                  Enregistrer le depot sur {ouverte}</button>
+              </div>
+            )}
+            <Annonce texte={annonce} />
           </div>
         )}
 
