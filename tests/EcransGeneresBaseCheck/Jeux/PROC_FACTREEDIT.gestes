@@ -1,0 +1,50 @@
+# Gestes de « Refacturation » (EcrivainRefacturation.cs), lot 4 du plan-f4fb097f, sur le jeu PROC_FACTREEDIT.sql.
+# « Valider » = VALIDER de RIG v2 : OPE_REVIEW.DoGenererLesDemandesEditions (OPE_REVIEW.cs:236-254) donne la dernière édition de facture
+# de chaque facture cochée au tableau d'édition, qui en fait une NOUVELLE édition (DemandeEdition.CreateNouvelleDemandeEdition), phase C,
+# l'origine comme édition rééditée. La liste ne change pas (elle montre les factures dont une édition a abouti) : aucun « lignes: » ;
+# ce qui se relit est la nouvelle édition, sa facture et son montant comparé à un SELECT.
+#
+# Refus 1 : l'agent n'a pas la fonction FACTREEDIT (FORM_ACCUEIL.cs:1624) -- jumeau accepte : le bloc 5, l'agent du banc (rôle BANC).
+agent: banc.l4.sansdroit
+geste: Agir Valider
+ids: F12E001
+resultat: refuse
+message: Vous n'êtes pas autorisé à exécuter le processus 'FACTREEDIT'.
+---
+# Refus 2 : aucune facture cochée -- jumeau accepte : le bloc 5, une facture.
+geste: Agir Valider
+ids:
+resultat: refuse
+message: Aucune facture cochée : rien n'est réédité.
+---
+# Refus 3 : F12E999 n'existe pas -- jumeau accepte : F12E001 (bloc 5).
+geste: Agir Valider
+ids: F12E001,F12E999
+resultat: refuse
+message: La facture F12E999 n'existe plus dans la base du greffe : relisez la liste.
+---
+# Refus 4 : F12E004 n'a AUCUNE édition de facture (son édition est un courrier, maquette COURRIER_LIBRE) : RIG v2 ne relance rien
+# (OPE_REVIEW.cs:239) -- jumeau accepte : F12E001, édition FACT_3_IMP (bloc 5).
+geste: Agir Valider
+ids: F12E004
+resultat: refuse
+message: Aucune édition de facture (maquette FACT_n_IMP) pour les factures cochées : RIG v2 n'en relance aucune.
+---
+# F12E001 : sa seule édition de facture, 2208501 (émise), est recopiée en phase C, rééditée = 2208501, sur la même demande, sans groupe ;
+# la facture de la nouvelle édition vaut 125,00 TTC, le montant de la ligne (PROC_FACTREEDIT.attendu), relu par un SELECT.
+geste: Agir Valider
+ids: F12E001
+resultat: fait
+message: Facture F12E001 : son édition n° 2208501 relancée dans la file des éditions.
+controle: SELECT CONCAT(DMNED_PHASE_TRAITEMENT, '|', DMNED_LIBELLE_DOCUMENT, '|', DMNED_CODE_MAQUETTE, '|', DMNED_CODE_PROCESSUS, '|', DMNED_ID_DMND, '|', ISNULL(DMNED_NUM_GROUPE, '-')) FROM v2.DEMANDE_EDITION WHERE DMNED_ID_DMNED_REEDITEE = 2208501 => C|Facture F12E001|FACT_3_IMP|FACT|2208401|-
+controle: SELECT CAST(f.FACTU_MONTANT_TTC AS varchar(20)) FROM v2.DEMANDE_EDITION AS de JOIN v2.DEMANDE AS d ON d.DMND_ID_DMND = de.DMNED_ID_DMND JOIN v2.FACTURE AS f ON f.FACTU_NUM_DEMANDE = d.DMND_NUM_DEMANDE WHERE de.DMNED_ID_DMNED_REEDITEE = 2208501 => 125.00
+controle: SELECT COUNT(*) FROM v2.DEMANDE_EDITION WHERE DMNED_ID_DMNED = 2208501 AND DMNED_PHASE_TRAITEMENT = 'E' => 1
+controle: SELECT COUNT(*) FROM soc.Journal WHERE Ecran = 'Refacturation' AND Famille = 'demande' AND Objet = N'la réédition de la facture F12E001' AND Verbe = 'a cree' => 1
+---
+# F12E002 a deux éditions de facture (2208502 GT, 2208503 P) : la plus récente, 2208503, est relancée, pas 2208502 ; F12E004, sans
+# édition de facture, est passée (OPE_REVIEW.cs:239) et nommée.
+geste: Agir Valider
+ids: F12E002,F12E004
+resultat: fait
+message: Facture F12E002 : son édition n° 2208503 relancée dans la file des éditions. Sans édition de facture, non rééditée : F12E004.
+controle: SELECT CONCAT(COUNT(CASE WHEN DMNED_ID_DMNED_REEDITEE = 2208503 THEN 1 END), '|', COUNT(CASE WHEN DMNED_ID_DMNED_REEDITEE = 2208502 THEN 1 END)) FROM v2.DEMANDE_EDITION => 1|0

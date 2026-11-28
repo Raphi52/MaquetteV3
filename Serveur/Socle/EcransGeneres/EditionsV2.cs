@@ -118,10 +118,17 @@ internal static class EditionsV2
     /// <summary>
     /// La demande d'edition de <paramref name="parametre"/> sur la demande <paramref name="idDemande"/>, pour l'entite source
     /// (<paramref name="codeEntite"/>, <paramref name="idSource"/>), vers la file differee <paramref name="lot"/> ou l'imprimante
-    /// <paramref name="imprimante"/> (une des deux, ou aucune : le tableau d'editions la choisit). Rend son id.
+    /// <paramref name="imprimante"/> (une des deux, ou aucune : le tableau d'editions la choisit). Rend son id. Sans demande
+    /// (<paramref name="idDemande"/> null), DMNED_ID_DMND reste vide : la trace est le journal des gestes, comme les registres judiciaires
+    /// (EcrivainRegistresJudiciaires.cs). <paramref name="autres"/> : des colonnes de plus (DMNED_LIBELLE_SOURCE...), ecrites si la table
+    /// les porte.
     /// </summary>
-    internal static async Task<int> DemandeEditionAsync(GesteEnCours geste, int idDemande, ParametreEdition parametre, string? libelle,
-        string codeEntite, string? idSource, string? lot, string? imprimante, CancellationToken ct)
+    // fix-ok: pas un correctif -- lot 1 du plan-f4fb097f (28/11/2026) : les editions de « Surveiller » (SURVBOD, SRBE_RAPPEL, deliberes,
+    // taxes, pilotage, statistiques) ont besoin d'une demande facultative, d'une entite source facultative et de colonnes de plus ; les
+    // appelants existants passent un int et une entite, inchanges (conversion implicite).
+    internal static async Task<int> DemandeEditionAsync(GesteEnCours geste, int? idDemande, ParametreEdition parametre, string? libelle,
+        string? codeEntite, string? idSource, string? lot, string? imprimante, CancellationToken ct,
+        IReadOnlyDictionary<string, object?>? autres = null)
     {
         var compte = geste.Agent.CompteWindows.Length > 32 ? geste.Agent.CompteWindows[..32] : geste.Agent.CompteWindows;
         var valeurs = new Dictionary<string, object?>(StringComparer.OrdinalIgnoreCase)
@@ -140,6 +147,7 @@ internal static class EditionsV2
             ["DMNED_ENVOI_PAR_MAIL"] = false, ["DMNED_HAS_NUMLRAR"] = false, ["DMNED_IS_NON_SUPPRESSIBLE"] = false, ["DMNED_HAS_NUMLR"] = false,
             ["DMNED_MASQUER_COFFRE_FORT"] = false,
         };
+        foreach (var (colonne, valeur) in autres ?? new Dictionary<string, object?>()) valeurs[colonne] = valeur;
         var presentes = await ColonnesAsync(geste, "v2.DEMANDE_EDITION", ct);
         return await geste.InsererAsync("v2.DEMANDE_EDITION", "DMNED_ID_DMNED",
             valeurs.Where(v => presentes.Contains(v.Key)).ToDictionary(v => v.Key, v => v.Value), ct);
