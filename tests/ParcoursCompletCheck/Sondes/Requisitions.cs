@@ -8,13 +8,14 @@ namespace ParcoursCompletCheck;
 /// (la recherche est le geste « Rechercher » de la session, EcranRequisitions.AgirAsync) : le banc ne devine pas ses données, cette
 /// sonde les prouve (DonneesAsync) -- une raison sociale de la base du banc, cherchée par le pont, rend ce dossier, lu en base.
 ///
-/// LE GESTE N'EST PAS REPRIS (lot 7 du plan « RIG v3 complet », 28/11/2026) : le geste principal de RIG v2 est « Terminer » la
-/// commande de documents (D:\RigApplication\Source\RCS\Exe\PROC_REQUI\frmREQUI.cs, Terminer :1399-2401) -- l'affaire et la demande
-/// REQUI créées à l'ouverture (:143-155), le choix de l'imprimante et des clients facturé et destinataire (frmGestionImprimante,
-/// :1438-1468), la facture (:1803-1910), les COMMANDE (InsererCommande :2528-2543), les LIGNE_EDITION et SELECTION des documents
-/// (:2256-2330, :2847). La V3 ne les écrit pas encore (Pont/EcranRequisitions.cs, Terminer : « L impression et la facturation ne sont
-/// pas encore portees (TODO #275) ») : la sonde le dit, la ligne reste rouge sur son geste, sans faux vert.
+/// LE GESTE (lot 7 du plan « RIG v3 complet », 28/11/2026) : « Terminer » la commande de documents (D:\RigApplication\Source\RCS\Exe\
+/// PROC_REQUI\frmREQUI.cs, Terminer :1399-2401), sur sa branche sans facture remise au guichet -- l'affaire et la demande REQUI, les
+/// COMMANDE, la demande LPLURI du dossier et ses lignes d'édition, écrites par le serveur (Serveur/Socle/EcransMain/
+/// EcritureRequisitions.cs, qui nomme ce qu'il ne reprend pas : facturation, clients, états d'inscriptions, impression), joué par le pont
+/// puis relu par le pont (EcranRequisitions.LireCommandeAsync).
 /// </summary>
+// fix-ok: cause mesuree au banc ParcoursCompletCheck du 28/11/2026 (12:55) -- PROC_REQUI rouge « Terminer n'est pas repris : la V3
+// n'ecrit rien en base » ; la sonde joue maintenant le geste ecrit par le serveur (EcritureRequisitions.cs) et le relit par le pont.
 public sealed class SondeRequisitions : ISondeEcran
 {
     public string Code => "PROC_REQUI";
@@ -48,6 +49,47 @@ public sealed class SondeRequisitions : ISondeEcran
         IF OBJECT_ID('v2.DATE_TRAVAIL') IS NULL
             CREATE TABLE v2.DATE_TRAVAIL (DTTRV_CODE_DATE_TRAVAIL varchar(10) NOT NULL PRIMARY KEY, DTTRV_DATE_FRAICHEUR datetime NULL);
         IF COL_LENGTH('v2.DATE_TRAVAIL', 'DTTRV_DATE_FRAICHEUR') IS NULL ALTER TABLE v2.DATE_TRAVAIL ADD DTTRV_DATE_FRAICHEUR datetime NULL;
+        -- Ce que « Terminer » ecrit (Serveur/Socle/EcransMain/EcritureRequisitions.cs), aux types de RIG_DEV (RigDatabase\dbo\Tables\
+        -- AFFAIRE.sql, DEMANDE.sql, COMMANDE.sql, PSEUDO_VARIABLE.sql, LIGNE_EDITION.sql).
+        IF OBJECT_ID('v2.AFFAIRE') IS NULL
+            CREATE TABLE v2.AFFAIRE (AFFRE_ID_AFFRE int IDENTITY(3700001, 1) NOT NULL PRIMARY KEY, AFFRE_DATE_CREATION datetime NOT NULL);
+        IF COL_LENGTH('v2.AFFAIRE', 'AFFRE_ID_UTLST_CREATION') IS NULL ALTER TABLE v2.AFFAIRE ADD AFFRE_ID_UTLST_CREATION int NULL;
+        IF COL_LENGTH('v2.AFFAIRE', 'AFFRE_LIBELLE') IS NULL ALTER TABLE v2.AFFAIRE ADD AFFRE_LIBELLE varchar(70) NULL;
+        IF OBJECT_ID('v2.DEMANDE') IS NULL
+            CREATE TABLE v2.DEMANDE (DMND_ID_DMND int IDENTITY(3700001, 1) NOT NULL PRIMARY KEY, DMND_NUM_DEMANDE varchar(11) NOT NULL,
+                DMND_ETAT_DEMANDE varchar(1) NOT NULL, DMND_EN_COURS bit NOT NULL DEFAULT (0));
+        IF COL_LENGTH('v2.DEMANDE', 'DMND_ID_AFFRE') IS NULL ALTER TABLE v2.DEMANDE ADD DMND_ID_AFFRE int NULL;
+        IF COL_LENGTH('v2.DEMANDE', 'DMND_NOM') IS NULL ALTER TABLE v2.DEMANDE ADD DMND_NOM varchar(255) NULL;
+        IF COL_LENGTH('v2.DEMANDE', 'DMND_NUM_INDICATIF') IS NULL ALTER TABLE v2.DEMANDE ADD DMND_NUM_INDICATIF varchar(14) NULL;
+        IF COL_LENGTH('v2.DEMANDE', 'DMND_CODE_PROSS') IS NULL ALTER TABLE v2.DEMANDE ADD DMND_CODE_PROSS varchar(40) NULL;
+        IF COL_LENGTH('v2.DEMANDE', 'DMND_DATE_CREATION') IS NULL ALTER TABLE v2.DEMANDE ADD DMND_DATE_CREATION datetime NULL;
+        IF COL_LENGTH('v2.DEMANDE', 'DMND_NOM_UTILISATEUR') IS NULL ALTER TABLE v2.DEMANDE ADD DMND_NOM_UTILISATEUR varchar(255) NULL;
+        IF COL_LENGTH('v2.DEMANDE', 'DMND_ID_DSRCS') IS NULL ALTER TABLE v2.DEMANDE ADD DMND_ID_DSRCS int NULL;
+        IF COL_LENGTH('v2.DEMANDE', 'DMND_ID_AUTRE') IS NULL ALTER TABLE v2.DEMANDE ADD DMND_ID_AUTRE int NULL;
+        IF OBJECT_ID('v2.COMMANDE') IS NULL
+            CREATE TABLE v2.COMMANDE (CMMDE_ID_CMMDE int IDENTITY(3700001, 1) NOT NULL PRIMARY KEY, CMMDE_DATE datetime NOT NULL,
+                CMMDE_TYPE varchar(10) NULL, CMMDE_QTE smallint NULL, CMMDE_ID_DMND int NULL, CMMDE_ID_DSRCS int NULL, CMMDE_ID_NINSC int NULL,
+                CMMDE_PROVENANCE varchar(10) NULL, CMMDE_GUICHET bit NULL);
+        IF OBJECT_ID('v2.PSEUDO_VARIABLE') IS NULL
+            CREATE TABLE v2.PSEUDO_VARIABLE (PSDVR_CPT int IDENTITY(3700001, 1) NOT NULL PRIMARY KEY, PSDVR_ID_DEMANDE int NOT NULL,
+                PSDVR_NOM_VARIABLE varchar(50) NOT NULL, PSDVR_VALEUR_VARIABLE varchar(8000) NOT NULL);
+        IF OBJECT_ID('v2.LIGNE_EDITION') IS NULL
+            CREATE TABLE v2.LIGNE_EDITION (LGEDT_ID_LGEDT int IDENTITY(3700001, 1) NOT NULL PRIMARY KEY, LGEDT_ID_DMND int NULL,
+                LGEDT_CODE_MODELE_DOC varchar(50) NOT NULL, LGEDT_TRANSMISSION varchar(20) NOT NULL, LGEDT_NUM_ORDRE smallint NOT NULL,
+                LGEDT_NOMBRE smallint NOT NULL);
+        -- La table d'un autre jeu n'en porte qu'une partie (LGEDT_CODE_MODELE_DOC absente, mesure du 28/11/2026) : NULL a l'ajout.
+        IF COL_LENGTH('v2.LIGNE_EDITION', 'LGEDT_ID_DMND') IS NULL ALTER TABLE v2.LIGNE_EDITION ADD LGEDT_ID_DMND int NULL;
+        IF COL_LENGTH('v2.LIGNE_EDITION', 'LGEDT_CODE_MODELE_DOC') IS NULL ALTER TABLE v2.LIGNE_EDITION ADD LGEDT_CODE_MODELE_DOC varchar(50) NULL;
+        IF COL_LENGTH('v2.LIGNE_EDITION', 'LGEDT_ID_UTLST') IS NULL ALTER TABLE v2.LIGNE_EDITION ADD LGEDT_ID_UTLST int NULL;
+        IF COL_LENGTH('v2.LIGNE_EDITION', 'LGEDT_DESTINATION_PHYSIQUE') IS NULL ALTER TABLE v2.LIGNE_EDITION ADD LGEDT_DESTINATION_PHYSIQUE varchar(50) NULL;
+        IF COL_LENGTH('v2.LIGNE_EDITION', 'LGEDT_TRANSMISSION') IS NULL ALTER TABLE v2.LIGNE_EDITION ADD LGEDT_TRANSMISSION varchar(20) NULL;
+        IF COL_LENGTH('v2.LIGNE_EDITION', 'LGEDT_NUM_ORDRE') IS NULL ALTER TABLE v2.LIGNE_EDITION ADD LGEDT_NUM_ORDRE smallint NULL;
+        IF COL_LENGTH('v2.LIGNE_EDITION', 'LGEDT_NOMBRE') IS NULL ALTER TABLE v2.LIGNE_EDITION ADD LGEDT_NOMBRE smallint NULL;
+        IF COL_LENGTH('v2.LIGNE_EDITION', 'LGEDT_SCEAU') IS NULL ALTER TABLE v2.LIGNE_EDITION ADD LGEDT_SCEAU varchar(255) NULL;
+        IF COL_LENGTH('v2.LIGNE_EDITION', 'LGEDT_IMP_BAC') IS NULL ALTER TABLE v2.LIGNE_EDITION ADD LGEDT_IMP_BAC varchar(10) NULL;
+        IF COL_LENGTH('v2.LIGNE_EDITION', 'LGEDT_ETAT_EDT') IS NULL ALTER TABLE v2.LIGNE_EDITION ADD LGEDT_ETAT_EDT varchar(1) NULL;
+        IF COL_LENGTH('v2.LIGNE_EDITION', 'LGEDT_ETAT_TRS') IS NULL ALTER TABLE v2.LIGNE_EDITION ADD LGEDT_ETAT_TRS varchar(1) NULL;
+        IF COL_LENGTH('v2.LIGNE_EDITION', 'LGEDT_RECTO_VERSO') IS NULL ALTER TABLE v2.LIGNE_EDITION ADD LGEDT_RECTO_VERSO bit NULL;
         """;
 
     public Task<PreuveSonde>? DonneesAsync(ContexteSonde c) => DonneesBaseAsync(c);
@@ -83,7 +125,54 @@ public sealed class SondeRequisitions : ISondeEcran
         finally { EcranRequisitions.Fermer(vue.Session); }
     }
 
-    public Task<PreuveSonde> GesteAsync(ContexteSonde c) => Task.FromResult(new PreuveSonde(false, false,
-        "« Terminer » la commande de documents (RIG v2 : affaire et demande REQUI, imprimante, clients, facture, COMMANDE, éditions — " +
-        "frmREQUI.cs:1399-2401) n'est pas repris : la V3 n'écrit rien en base (Pont/EcranRequisitions.cs, Terminer), pas de faux vert"));
+    /// <summary>
+    /// « Terminer » la commande de documents, joué par le pont sur un dossier de la base du banc : un Kbis (et un certificat de
+    /// non-faillite si le dossier le permet), remis au guichet, sans facture (Serveur/Socle/EcransMain/EcritureRequisitions.cs, ses
+    /// sources RIG v2 et ce qu'il ne reprend pas). Relu par le pont (EcranRequisitions.LireCommandeAsync) : la demande REQUI validée,
+    /// ses lignes de COMMANDE, la demande LPLURI du dossier et sa ligne d'édition KBISXML_1_PDF.
+    /// </summary>
+    public async Task<PreuveSonde> GesteAsync(ContexteSonde c)
+    {
+        static JsonElement V(object? v) => JsonSerializer.SerializeToElement(v);
+        var nom = await c.Valeur("""
+            SELECT TOP (1) e.Denomination FROM rec.DossierRcs AS s JOIN rec.Entreprise AS e ON e.Id = s.IdEntreprise
+            WHERE LEN(e.Denomination) >= 4 AND e.Denomination NOT LIKE '%[0-9]%' ORDER BY s.Id
+            """);
+        if (nom.Length == 0) return new(false, false, "aucun dossier RCS avec une dénomination dans la base du banc : rien à commander");
+        var vue = EcranRequisitions.Ouvrir();
+        try
+        {
+            await EcranRequisitions.AgirAsync(c.Client, c.Greffe, vue.Session, "Critere", V(new { champ = "CritRaisonSociale", valeur = nom }));
+            var trouvee = await EcranRequisitions.AgirAsync(c.Client, c.Greffe, vue.Session, "Rechercher", V(null));
+            if (trouvee.Trouvees.FirstOrDefault(t => t.Designation.Contains(nom, StringComparison.OrdinalIgnoreCase)) is not { } ligne)
+                return new(false, false, $"recherche « {nom} » par le pont : {trouvee.ModeResultats}, aucune ligne à commander");
+            var panier = await EcranRequisitions.AgirAsync(c.Client, c.Greffe, vue.Session, "AjouterAuPanier", V(ligne.Rang));
+            await EcranRequisitions.AgirAsync(c.Client, c.Greffe, vue.Session, "Article", V(new { champ = "NbKBis", valeur = "1" }));
+            var cnf = panier.Articles is { CnfPossible: true };
+            if (cnf) await EcranRequisitions.AgirAsync(c.Client, c.Greffe, vue.Session, "Article", V(new { champ = "NbCertifNonFaillite", valeur = "1" }));
+            await EcranRequisitions.AgirAsync(c.Client, c.Greffe, vue.Session, "BasculerCritere", V("CritGuichet"));
+            var fin = await EcranRequisitions.AgirAsync(c.Client, c.Greffe, vue.Session, "Terminer", V(null));
+            if (!fin.Message.StartsWith("Votre commande est terminée", StringComparison.Ordinal) || fin.NbPanier != 0)
+                return new(false, false, $"Terminer « {ligne.Designation} » par le pont : « {fin.Message} » ({fin.NbPanier} commande(s) au panier)");
+
+            // Relue par le pont, a part : la derniere demande REQUI de la base (controle SQL), lue par EcranRequisitions.LireCommandeAsync.
+            var numero = await c.Valeur("SELECT TOP (1) DMND_NUM_DEMANDE FROM v2.DEMANDE WHERE DMND_CODE_PROSS = 'REQUI' ORDER BY DMND_ID_DMND DESC");
+            var relue = await EcranRequisitions.LireCommandeAsync(c.Client, c.Greffe, numero);
+            var lpluri = relue.Valeur?.Demandes.SingleOrDefault();
+            var types = relue.Valeur?.Lignes.Select(l => $"{l.Type} x{l.Quantite}").ToArray() ?? [];
+            var attendus = cnf ? new[] { "KBIS x1", "CNF x1" } : ["KBIS x1"];
+            return relue.Valeur is { Requi: { Etat: "V", EnCours: false } requi } && types.SequenceEqual(attendus)
+                   && relue.Valeur.Lignes.All(l => l.Guichet && l.IdDossier == requi.IdDossier)
+                   && lpluri is { Etat: "V" } && lpluri.Nom.StartsWith($"REQUI de la {numero} - ", StringComparison.Ordinal)
+                   && lpluri.Editions.Any(e => e.Modele == "KBISXML_1_PDF" && e.Nombre == 1)
+                   && requi.Nom == lpluri.Numero
+                ? new(true, true, $"Terminer fait (« {fin.Message[..fin.Message.IndexOf(')', StringComparison.Ordinal)]}) »), relu par le pont : "
+                                + $"demande {requi.Numero} validée, commande {string.Join(", ", types)} au guichet, {lpluri.Numero} « {lpluri.Nom} » : "
+                                + string.Join(", ", lpluri.Editions.Select(e => $"{e.Modele} x{e.Nombre}")))
+                : new(true, false, $"Terminer rendu fait, mais relu ({relue.Mode} {relue.Message}) : demande {numero} "
+                                 + $"{(relue.Valeur?.Requi is { } r ? $"état {r.Etat}, en cours {r.EnCours}, nom « {r.Nom} »" : "absente")}, "
+                                 + $"lignes [{string.Join(", ", types)}], LPLURI {(lpluri is null ? "absente" : $"« {lpluri.Nom} » {lpluri.Etat} [{string.Join(", ", lpluri.Editions.Select(e => e.Modele))}]")}");
+        }
+        finally { EcranRequisitions.Fermer(vue.Session); }
+    }
 }
