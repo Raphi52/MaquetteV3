@@ -25,12 +25,18 @@
 //
 // BRANCHE SUR LA BASE (plan « RIG v3 100 % fonctionnel », lot 14, 27/11/2026) : les experts et leurs mesures viennent du pont
 // (Pont/EcranExpertsBase.cs) -- table EXPERT et PARTICIPANT joint a MESURE de la base du greffe (Serveur/Socle/EcransMain/
-// LectureExperts.cs, Participant.GetListeParticipantJoinMesureByExpert cite). L'ecran n'ecrit rien. Sans serveur, les exemples
-// ci-dessous, marques ; en panne, le motif et aucun expert.
+// LectureExperts.cs, Participant.GetListeParticipantJoinMesureByExpert cite). Sans serveur, les exemples ci-dessous, marques (en
+// lecture) ; en panne, le motif et aucun expert.
+//
+// « ENREGISTRER LA FICHE » (plan « RIG v3 complet, mesure par le banc du parcours complet », lot 9, 28/11/2026) : en base, le nom, le
+// complement, le telephone, le fax et le courriel se saisissent ; les participants COCHES dans la liste des mesures reprennent la fiche
+// (la cascade de OPE_EDITION_EXPERT._GestionCascadeUpdate). Le serveur ecrit avec les controles de RIG v2
+// (Serveur/Socle/EcransMain/EcritureExperts.cs) ; fait, l'ecran relit la base ; refuse, le motif de RIG v2.
 // check: branchement neuf (lot 14), pas un correctif -- remplacements cibles, prouves par EcranExperts.test.tsx (vitest).
 
 import { useEffect, useState } from 'react'
 import { appeler } from '../pont'
+import { Annonce, type CompteRendu, type ResultatGesteVue } from './formes/commun'
 import { ProvenanceEcran, type ModeLecture } from '../provenance'
 import { contientSansCasse, distinctsTries, estBlanc } from '../criteres'
 import { CelluleIdentite, EnteteListe, ListeModerne, PiedListe, PointEtat, VuesListe } from '../composants/ListeModerne'
@@ -63,7 +69,12 @@ interface MesureExpert {
   qualifProf: string
   adresse: string
   enCours: boolean
+  /** Lu en base : la ligne PARTICIPANT, celle que « Enregistrer la fiche » met a jour quand elle est cochee. */
+  participant?: string
 }
+
+/** Les champs que la fiche saisit en base (les autres restent en lecture). */
+interface Brouillon { cle: string; nom: string; complementNom: string; tel: string; fax: string; mail: string }
 
 /** Ce que rend le pont (Pont/EcranExpertsBase.cs, VueExperts). */
 export interface VueExperts {
@@ -122,6 +133,11 @@ export function EcranExperts() {
     void appeler<VueExperts>('EcranExperts.Experts').then((v) => { if (!perime) setVue(v) })
     return () => { perime = true }
   }, [])
+  const enBase = vue?.mode === 'serveur'
+  const [brouillon, setBrouillon] = useState<Brouillon | null>(null)
+  const [cochees, setCochees] = useState<ReadonlySet<string>>(new Set())
+  const [annonce, setAnnonce] = useState<CompteRendu>(null)
+  const [envoi, setEnvoi] = useState(false)
   const Experts: Expert[] = vue === null ? [] : vue.mode === 'serveur' ? vue.experts : vue.mode === 'demo' ? ExemplesExperts : []
   const Mesures: MesureExpert[] = vue?.mode === 'serveur' ? vue.mesures : vue?.mode === 'demo' ? ExemplesMesures : []
   const Qualifs = distinctsTries(Experts.map((x) => x.qualif).filter((q) => q !== ''))
@@ -137,6 +153,34 @@ export function EcranExperts() {
   const e = selection
   const mesuresDe = (enCours: boolean) => (e ? Mesures.filter((m) => m.expert === cleDe(e) && m.enCours === enCours) : [])
   const mesures = mesuresDe(mesuresActives)
+  // La saisie de la fiche choisie : son brouillon, sinon ses valeurs lues.
+  const saisie: Brouillon | null = e === null ? null
+    : brouillon?.cle === cleDe(e) ? brouillon
+    : { cle: cleDe(e), nom: e.nom, complementNom: e.complementNom, tel: e.tel, fax: e.fax, mail: e.mail }
+  const saisir = (champ: keyof Omit<Brouillon, 'cle'>, valeur: string) => { if (saisie) setBrouillon({ ...saisie, [champ]: valeur }) }
+  const basculerCochee = (p: string) => setCochees((avant) => { const s = new Set(avant); if (!s.delete(p)) s.add(p); return s })
+
+  /** Le geste : ecrit par le serveur (controles de RIG v2) ; fait, l'ecran relit la base. */
+  async function enregistrer() {
+    if (!e || !saisie) return
+    setEnvoi(true)
+    try {
+      const participants = Mesures.filter((m) => m.expert === cleDe(e) && m.participant && cochees.has(m.participant)).map((m) => m.participant!)
+      const r = await appeler<ResultatGesteVue>('EcranExperts.Enregistrer', cleDe(e), {
+        nom: saisie.nom, complementNom: saisie.complementNom, tel: saisie.tel, fax: saisie.fax, mail: saisie.mail, participants,
+      })
+      setAnnonce(r.fait || r.sansEcrivain ? r.message : { refus: r.message })
+      if (r.fait) {
+        setVue(await appeler<VueExperts>('EcranExperts.Experts'))
+        setBrouillon(null)
+        setCochees(new Set())
+      }
+    } catch {
+      setAnnonce({ refus: "Le pont n'a pas répondu : rien n'est enregistré." })
+    } finally {
+      setEnvoi(false)
+    }
+  }
 
   return (
     <div className="rig-proc__corps">
@@ -243,11 +287,13 @@ export function EcranExperts() {
               <div className="rig-criteres__paire">
                 <label className="rig-saisie-champ">
                   <span className="rig-saisie-champ__libelle">Nom</span>
-                  <input className="rig-saisie-champ__saisie" value={e.nom} readOnly />
+                  <input className="rig-saisie-champ__saisie" value={saisie?.nom ?? e.nom} readOnly={!enBase} maxLength={70}
+                         onChange={(ev) => saisir('nom', ev.target.value)} />
                 </label>
                 <label className="rig-saisie-champ">
                   <span className="rig-saisie-champ__libelle">Complement de nom</span>
-                  <input className="rig-saisie-champ__saisie" value={e.complementNom} readOnly />
+                  <input className="rig-saisie-champ__saisie" value={saisie?.complementNom ?? e.complementNom} readOnly={!enBase} maxLength={70}
+                         onChange={(ev) => saisir('complementNom', ev.target.value)} />
                 </label>
               </div>
               <label className="rig-saisie-champ">
@@ -261,22 +307,31 @@ export function EcranExperts() {
               <div className="rig-criteres__paire">
                 <label className="rig-saisie-champ">
                   <span className="rig-saisie-champ__libelle">Telephone</span>
-                  <input className="rig-saisie-champ__saisie" value={e.tel} readOnly />
+                  <input className="rig-saisie-champ__saisie" value={saisie?.tel ?? e.tel} readOnly={!enBase} maxLength={15}
+                         onChange={(ev) => saisir('tel', ev.target.value)} />
                 </label>
                 <label className="rig-saisie-champ">
                   <span className="rig-saisie-champ__libelle">Fax</span>
-                  <input className="rig-saisie-champ__saisie" value={e.fax} readOnly />
+                  <input className="rig-saisie-champ__saisie" value={saisie?.fax ?? e.fax} readOnly={!enBase} maxLength={15}
+                         onChange={(ev) => saisir('fax', ev.target.value)} />
                 </label>
               </div>
               <label className="rig-saisie-champ">
                 <span className="rig-saisie-champ__libelle">E-mail</span>
-                <input className="rig-saisie-champ__saisie" value={e.mail} readOnly />
+                <input className="rig-saisie-champ__saisie" value={saisie?.mail ?? e.mail} readOnly={!enBase} maxLength={70}
+                       onChange={(ev) => saisir('mail', ev.target.value)} />
               </label>
               {/* alignSelf : le bloc est une colonne flex qui ETIRE ses enfants ; la pastille courait sur toute la
                   largeur de la fiche (capture orange du lot 2 des listes modernes). */}
               <span className={`rig-etat rig-etat--${e.actif ? 'ok' : 'attente'}`} style={{ alignSelf: 'flex-start' }}>
                 {e.actif ? 'Actif' : 'Inactif'}
               </span>
+              {enBase && (
+                <div className="rig-criteres__actions">
+                  <button className="rig-bouton rig-bouton--fort" onClick={() => void enregistrer()} disabled={envoi}>Enregistrer la fiche</button>
+                </div>
+              )}
+              <Annonce texte={annonce} />
             </div>
 
             {/* Les deux listes de mesures de la v2 (OpeMesureActif / OpeMesureInactif) : des puces comptees a la
@@ -292,6 +347,7 @@ export function EcranExperts() {
               <table className="rig-table">
                 <thead>
                   <tr>
+                    {enBase && <th title="Le participant reprend la fiche a l'enregistrement">Reporter</th>}
                     <th>Num mesure</th>
                     <th>Civilite</th>
                     <th>Nom participant</th>
@@ -302,7 +358,13 @@ export function EcranExperts() {
                 </thead>
                 <tbody>
                   {mesures.map((m) => (
-                    <tr key={m.numMesure}>
+                    <tr key={m.participant ?? m.numMesure}>
+                      {enBase && (
+                        <td>
+                          <input type="checkbox" aria-label={`Reporter la fiche sur ${m.numMesure}`} checked={!!m.participant && cochees.has(m.participant)}
+                                 disabled={!m.participant} onChange={() => m.participant && basculerCochee(m.participant)} />
+                        </td>
+                      )}
                       <td className="rig-table__mono">{m.numMesure}</td>
                       <td>{m.civilite}</td>
                       <CelluleIdentite nom={m.nomParticipant} titre={m.nomParticipant} />
@@ -312,7 +374,7 @@ export function EcranExperts() {
                     </tr>
                   ))}
                   {mesures.length === 0 && (
-                    <tr><td colSpan={6} className="rig-table__vide">Aucune mesure dans cette liste.</td></tr>
+                    <tr><td colSpan={enBase ? 7 : 6} className="rig-table__vide">Aucune mesure dans cette liste.</td></tr>
                   )}
                 </tbody>
               </table>

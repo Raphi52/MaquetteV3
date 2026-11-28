@@ -74,6 +74,42 @@ describe('EcranActeurs', () => {
     retirerFauxPont()
     await ouvrirPanne()
   })
+
+  // « Enregistrer les coordonnees » (lot 9 du parcours complet) : en base, telephone, fax et courriel partent au pont avec la cle de
+  // la ligne ; fait, l'ecran relit la base ; refuse, le motif de RIG v2. La demonstration reste en lecture, sans bouton.
+  it('en base, « Enregistrer les coordonnees » envoie la cle et les coordonnees, puis relit ; un refus est dit', async () => {
+    let fait = false
+    const enregistrer = vi.fn((...args: unknown[]) => {
+      const tel = args[1] as string
+      if (tel === '12') return { fait: false, message: '« Téléphone » : Numéro de téléphone invalide.', sansEcrivain: false, ids: [] }
+      fait = true
+      return { fait: true, message: 'Coordonnées du juge J14ANOM enregistrées.', sansEcrivain: false, ids: ['Juge-1'] }
+    })
+    const pont = installerFauxPont({
+      'EcranActeurs.Acteurs': () => ({ mode: 'serveur', message: null, total: 1,
+        acteurs: [{ ...lu('J14A', 'Juge', 'Juge-1'), tel: fait ? '0123456789' : '' }] }),
+      'EcranActeurs.EnregistrerCoordonnees': enregistrer,
+    })
+    render(<EcranActeurs />)
+    await vi.waitFor(() => expect(pont.appels).toHaveBeenCalledWith('EcranActeurs.Acteurs'))
+    const tel = await screen.findByLabelText('Telephone') as HTMLInputElement
+    expect(tel.readOnly).toBe(false)
+    fireEvent.change(tel, { target: { value: '12' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer les coordonnees' }))
+    expect((await screen.findByRole('alert')).textContent).toBe('Refus « Téléphone » : Numéro de téléphone invalide.')
+    fireEvent.change(screen.getByLabelText('Telephone'), { target: { value: '0123456789' } })
+    fireEvent.change(screen.getByLabelText('E-mail'), { target: { value: 'juge@exemple.fr' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer les coordonnees' }))
+    expect((await screen.findByRole('status')).textContent).toBe('Coordonnées du juge J14ANOM enregistrées.')
+    expect(enregistrer).toHaveBeenLastCalledWith('Juge-1', '0123456789', '', 'juge@exemple.fr')
+    expect(pont.appels.mock.calls.filter((x) => x[0] === 'EcranActeurs.Acteurs')).toHaveLength(2)
+    await vi.waitFor(() => expect(valeur('Telephone')).toBe('0123456789'))
+    cleanup()
+    retirerFauxPont()
+    await ouvrir()
+    expect((screen.getByLabelText('Telephone') as HTMLInputElement).readOnly).toBe(true)
+    expect(screen.queryByRole('button', { name: 'Enregistrer les coordonnees' })).toBeNull()
+  })
 })
 
 async function ouvrirPanne() {

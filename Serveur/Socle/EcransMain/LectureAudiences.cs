@@ -19,7 +19,8 @@ namespace RigV3.Serveur.Socle.EcransMain;
 /// AUDIENCE_CABINET comme la recherche d'audience (AudiencesV2.cs) : audiences (AUDNC_AUDIENCE = 1) du jour et apres, par date et
 /// heure, avec le nombre d'affaires au role (APPEL_AFFAIRE). « Publiée sur le web » = non AUDNC_NON_DISPONIBLE_WEB (la case de RIG
 /// v2 dit « Non disponible dans les choix d'Audience WEB », OPE_CREATION_AUDIENCE.Designer.cs:154).
-/// NON FAIT : la creation elle-meme (aucune ecriture d'audience n'est branchee : l'ecran le dit, rien n'est enregistre).
+/// LA CREATION elle-meme : EcritureAudiences.cs (route ModuleAudiences.cs, plan « parcours complet », lot 9, 28/11/2026) ; elle ecrit les
+/// CODES des listes, que la lecture rend avec leur libelle (AudiencesProgrammeesLues.Options).
 /// </summary>
 public static class LectureAudiences
 {
@@ -53,24 +54,37 @@ public static class LectureAudiences
                     Chaine(lu, "Section"), lu["Publique"] is true, lu["NonDisponibleWeb"] is true,
                     Convert.ToInt32(lu["Affaires"], CultureInfo.InvariantCulture)));
             }
-        var types = await ListeAsync(baseGreffe, """
-            SELECT R_TYPEAUDCAB_LIBELLE_ECRAN AS L FROM v2.TYPE_AUD_CAB
-            WHERE R_TYPEAUDCAB_AUDIENCE = 1 AND R_TYPEAUDCAB_UTILISABLE_SAISIE = 1 ORDER BY R_TYPEAUDCAB_LIBELLE_ECRAN
-            """, ct);
-        var chambres = await ListeAsync(baseGreffe,
-            "SELECT R_CHAMBRE_LIBELLE_ECRAN AS L FROM v2.CHAMBRE WHERE R_CHAMBRE_UTILISABLE_SAISIE = 1 ORDER BY R_CHAMBRE_LIBELLE_ECRAN", ct);
-        var sections = await ListeAsync(baseGreffe,
-            "SELECT R_SECTION_LIBELLE_ECRAN AS L FROM v2.SECTION WHERE R_SECTION_UTILISABLE_SAISIE = 1 ORDER BY R_SECTION_LIBELLE_ECRAN", ct);
-        var classements = await ListeAsync(baseGreffe,
-            "SELECT R_TYPECLASSE_LIBELLE_ECRAN AS L FROM v2.TYPE_CLASSEMENT WHERE R_TYPECLASSE_UTILISABLE_SAISIE = 1 ORDER BY R_TYPECLASSE_LIBELLE_ECRAN", ct);
-        return new AudiencesProgrammeesLues([.. lignes], total, types, chambres, sections, classements);
+        var options = new List<OptionAudience>();
+        var types = await ListeAsync(baseGreffe, OptionAudience.Types, """
+            SELECT R_TYPEAUDCAB_VALEUR AS C, R_TYPEAUDCAB_LIBELLE_ECRAN AS L FROM v2.TYPE_AUD_CAB
+            WHERE R_TYPEAUDCAB_AUDIENCE = 1 AND R_TYPEAUDCAB_UTILISABLE_SAISIE = 1 ORDER BY R_TYPEAUDCAB_LIBELLE_ECRAN, R_TYPEAUDCAB_VALEUR
+            """, options, ct);
+        var chambres = await ListeAsync(baseGreffe, OptionAudience.Chambres, """
+            SELECT R_CHAMBRE_VALEUR AS C, R_CHAMBRE_LIBELLE_ECRAN AS L FROM v2.CHAMBRE WHERE R_CHAMBRE_UTILISABLE_SAISIE = 1
+            ORDER BY R_CHAMBRE_LIBELLE_ECRAN, R_CHAMBRE_VALEUR
+            """, options, ct);
+        var sections = await ListeAsync(baseGreffe, OptionAudience.Sections, """
+            SELECT R_SECTION_VALEUR AS C, R_SECTION_LIBELLE_ECRAN AS L FROM v2.SECTION WHERE R_SECTION_UTILISABLE_SAISIE = 1
+            ORDER BY R_SECTION_LIBELLE_ECRAN, R_SECTION_VALEUR
+            """, options, ct);
+        var classements = await ListeAsync(baseGreffe, OptionAudience.Classements, """
+            SELECT R_TYPECLASSE_VALEUR AS C, R_TYPECLASSE_LIBELLE_ECRAN AS L FROM v2.TYPE_CLASSEMENT WHERE R_TYPECLASSE_UTILISABLE_SAISIE = 1
+            ORDER BY R_TYPECLASSE_LIBELLE_ECRAN, R_TYPECLASSE_VALEUR
+            """, options, ct);
+        return new AudiencesProgrammeesLues([.. lignes], total, types, chambres, sections, classements) { Options = [.. options] };
     }
 
-    private static async Task<string[]> ListeAsync(SqlConnection cn, string sql, CancellationToken ct)
+    /// <summary>Les libelles d'une liste (distincts, a l'ecran) ; chaque valeur et son code vont aussi dans <paramref name="options"/>.</summary>
+    private static async Task<string[]> ListeAsync(SqlConnection cn, string liste, string sql, List<OptionAudience> options, CancellationToken ct)
     {
         var valeurs = new List<string>();
         await using var lu = await LectureV2.LireAsync(cn, sql, ct);
-        while (await lu.ReadAsync(ct)) if (Chaine(lu, "L") is { Length: > 0 } v && !valeurs.Contains(v)) valeurs.Add(v);
+        while (await lu.ReadAsync(ct))
+        {
+            if (Chaine(lu, "L") is not { Length: > 0 } v) continue;
+            if (!valeurs.Contains(v)) valeurs.Add(v);
+            options.Add(new OptionAudience(liste, Chaine(lu, "C"), v));
+        }
         return [.. valeurs];
     }
 }

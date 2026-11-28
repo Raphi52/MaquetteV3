@@ -29,12 +29,30 @@ public static partial class EcranGestionAudiences
         return new VueGestionAudiences([.. v.Lignes.Select(Ligne)], lu.Mode, null, v.Total);
     }
 
+    /// <summary>« Rechercher » : la recherche de RIG v2 (OPE_RECHERCHE_GESTAUDS), ses criteres appliques PAR LE SERVEUR (codes : type,
+    /// chambre, section, code cabinet, classement ; le juge par son numero ; dates aaaa-mm-jj). Plan « parcours complet », lot 9, 28/11/2026.</summary>
+    [JSInvokable("EcranGestionAudiences.Rechercher")]
+    public static Task<VueGestionAudiences> Rechercher(RechercheAudiencesSupprimees criteres)
+        => RechercherAsync(ClientServeur.Actif, SessionAgent.CodeGreffe, criteres);
+
+    /// <summary>La recherche sur <paramref name="serveur"/> et le greffe <paramref name="greffe"/> ; sans eux, la demonstration (que l'ecran
+    /// filtre lui-meme : elle n'a pas de base). Le motif de RIG v2 quand rien n'est cherche (aucune date de debut) est dans Message.</summary>
+    public static async Task<VueGestionAudiences> RechercherAsync(ClientServeur? serveur, string? greffe, RechercheAudiencesSupprimees criteres)
+    {
+        var lu = await LectureEcransMain.LireAsync(serveur, greffe, "les audiences supprimées", (s, g) =>
+            s.EnvoyerAsync<RechercheAudiencesSupprimees, AudiencesSupprimeesLues>(RoutesEcransMain.Pour(RoutesRechercheAudiencesSupprimees.Rechercher, g),
+                criteres));
+        if (lu.Mode == LectureEcransMain.Demo) return Exemple();
+        if (lu.Valeur is not { } v) return new VueGestionAudiences([], lu.Mode, lu.Message);
+        return new VueGestionAudiences([.. v.Lignes.Select(Ligne)], lu.Mode, v.Message, v.Total);
+    }
+
     private static LigneGestionAudience Ligne(AudienceSupprimeeLue a)
     {
         string Jour(DateTime? d) => d is { } j ? Francais.TextInfo.ToTitleCase(j.ToString("dddd", Francais)) : "";
         string Date(DateTime? d) => d?.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) ?? "";
         return new LigneGestionAudience(Jour(a.Date), Date(a.Date), a.Heure, a.Type, a.CodeCabinet, a.Cabinet ? a.Type : "",
             a.Juge, a.Section, a.Chambre, a.Greffier, a.TypeClassement, a.Publique, a.AuteurSuppression, Date(a.DateSuppression),
-            Date(a.DateDiffusion), a.Cabinet);
+            Date(a.DateDiffusion), a.Cabinet, a.CodeChambre, a.CodeCabinetSeul, a.IdJuge);
     }
 }

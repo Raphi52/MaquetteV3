@@ -31,7 +31,14 @@
 // (Pont/EcranGestionAudiencesBase.cs → Serveur/Socle/EcransMain/LectureGestionAudiences.cs) : les audiences et cabinets
 // SUPPRIMES (AUDIENCE_CABINET_SUPPRIMEE), comme PROC_GESTAUDS ; la bascule « Recherche par cabinets » choisit le mode de RIG v2
 // (AUDNCS_AUDIENCE). Sans serveur, les cinq audiences de demonstration du pont (sans mode : la bascule ne les filtre pas),
-// marquees « exemple » (ProvenanceEcran) ; en panne, le motif et aucune ligne. Les criteres filtrent a l'ecran, inchanges.
+// marquees « exemple » (ProvenanceEcran) ; en panne, le motif et aucune ligne. Sans serveur, les criteres filtrent la demonstration a l'ecran.
+//
+// EN BASE, LA RECHERCHE DE RIG v2 EST FAITE PAR LE SERVEUR (plan « RIG v3 complet, mesure par le banc du parcours complet », lot 9,
+// 28/11/2026) : « Rechercher » envoie les criteres (codes de la chambre, du code cabinet et des classements, numero du juge, dates
+// d'audience ET de suppression, mode, nombre maximum) au pont (EcranGestionAudiences.Rechercher), et le serveur les applique comme
+// OPE_RECHERCHE_GESTAUDS._Rechercher (Serveur/Socle/EcransMain/LectureGestionAudiences.cs, RechercherAsync) ; sans date de debut,
+// RIG v2 ne cherche rien et l'ecran le dit. A l'ouverture, la liste montre les suppressions du mode choisi (au plus 500). Aucun
+// geste d'ecriture : PROC_GESTAUDS n'en a pas dans RIG v2 (FORM_GESTAUDS.cs:17-18, OPE_RESULTAT_GESTAUDS.cs:167-168).
 
 import { Fragment, useEffect, useState } from 'react'
 import { appeler } from '../pont'
@@ -61,6 +68,36 @@ interface Audience {
   envoiSuppression: string
   /** Le mode de RIG v2 (cabinet ou audience) d'une ligne lue en base ; absent dans la demonstration. */
   cabinet?: boolean | null
+  /** Lus en base : les codes que la recherche du serveur recoit (chambre, code cabinet, numero du juge). */
+  codeChambre?: string
+  codeCab?: string
+  idJuge?: number | null
+}
+
+/** Ce que la recherche du serveur recoit (Contrats/EcransMain/LectureGestionAudiences.cs, RechercheAudiencesSupprimees). */
+interface RechercheAudiencesSupprimees {
+  cabinets: boolean
+  audienceDu: string | null
+  audienceAu: string | null
+  suppressionDu: string | null
+  suppressionAu: string | null
+  type: string | null
+  chambre: string | null
+  section: string | null
+  juge: number | null
+  codeCabinet: string | null
+  typeClassement: string | null
+  max: number
+}
+
+/** Une valeur proposee par un critere : celle que la recherche recoit (le code en base) et son libelle. */
+interface Choix { valeur: string; libelle: string }
+
+/** Les valeurs distinctes d'un critere, triees par libelle ; sans code (demonstration), la valeur est le libelle. */
+function choixDe(paires: Array<[valeur: string, libelle: string]>): Choix[] {
+  const vus = new Map<string, string>()
+  for (const [v, l] of paires) if (v !== '' && !vus.has(v)) vus.set(v, l)
+  return distinctsTries(vus.values()).flatMap((l) => [...vus].filter(([, x]) => x === l).map(([v]) => ({ valeur: v, libelle: l })))
 }
 
 /** Ce que le pont rend (Pont/EcranGestionAudiences.cs, VueGestionAudiences). */
@@ -151,12 +188,45 @@ export function EcranGestionAudiences() {
   }, [])
   const Audiences = vue?.lignes ?? []
   const VuesAudiences = vuesDe(Audiences)
+  const enBase = vue?.mode === 'serveur'
+  // Les dates de suppression (OPE_DATE_AUDCAB2 de RIG v2) ; le resultat de la derniere recherche du serveur (null : aucune).
+  const [suppressionDu, setSuppressionDu] = useState('')
+  const [suppressionAu, setSuppressionAu] = useState('')
+  const [resultat, setResultat] = useState<VueGestionAudiences | null>(null)
+  const [enRecherche, setEnRecherche] = useState(false)
 
   const criteres: CriteresGestion = {
     dateDebut, dateFin, critType, critChambre, critSection, critJuge, critTypeCabinet, critCodeCabinet, critClassement, maxResultats,
   }
   const filtrerIci = (c: CriteresGestion) => filtrer(Audiences, modeCabinet, c)
-  const trouvees = filtrerIci(criteres)
+  // En base : le resultat du serveur, sinon les suppressions du mode choisi ; sans serveur : la demonstration filtree a l'ecran.
+  const trouvees = !enBase ? filtrerIci(criteres) : resultat !== null ? resultat.lignes : Audiences.filter((x) => x.cabinet === modeCabinet)
+
+  // Les criteres en base : leurs CODES (la chambre, le code cabinet, le juge par son numero, chaque classement admis).
+  const parMode = enBase ? Audiences.filter((x) => x.cabinet === modeCabinet) : Audiences
+  const choixChambres = choixDe(parMode.map((x) => [enBase ? x.codeChambre ?? '' : x.chambre, x.chambre]))
+  const choixJuges = choixDe(parMode.map((x) => [enBase ? (x.idJuge == null ? '' : String(x.idJuge)) : x.juge, x.juge]))
+  const choixCodes = choixDe(parMode.map((x) => [enBase ? x.codeCab ?? '' : x.codeCabinet, x.codeCabinet]))
+  const choixClassements = enBase
+    ? choixDe(parMode.flatMap((x) => x.typeClassement.split(';').map((c): [string, string] => [c.trim(), c.trim()])))
+    : choixDe(Audiences.map((x) => [x.typeClassement, x.typeClassement]))
+
+  /** « Rechercher » : les criteres de RIG v2, appliques par le serveur. */
+  async function rechercher(type = modeCabinet ? critTypeCabinet : critType) {
+    const vide = (t: string) => (t.trim() === '' ? null : t.trim())
+    const r: RechercheAudiencesSupprimees = {
+      cabinets: modeCabinet, audienceDu: vide(dateDebut), audienceAu: vide(dateFin), suppressionDu: vide(suppressionDu), suppressionAu: vide(suppressionAu),
+      type: vide(type), chambre: modeCabinet ? null : vide(critChambre), section: modeCabinet ? null : vide(critSection),
+      juge: modeCabinet && critJuge !== '' ? Number(critJuge) : null, codeCabinet: modeCabinet ? vide(critCodeCabinet) : null,
+      typeClassement: vide(critClassement), max: maxResultats,
+    }
+    setEnRecherche(true)
+    try {
+      setResultat(await appeler<VueGestionAudiences>('EcranGestionAudiences.Rechercher', r))
+    } finally {
+      setEnRecherche(false)
+    }
+  }
 
   // La ligne depliee par son chevron (une a la fois) : l'audience elle-meme.
   const [ouverte, setOuverte] = useState<Audience | null>(null)
@@ -178,7 +248,7 @@ export function EcranGestionAudiences() {
         <div className="rig-kicker" style={{ marginBottom: 'var(--rig-esp-3)' }}>Recherche d'une audience</div>
 
         <button className={`rig-bascule${modeCabinet ? ' rig-bascule--actif' : ''}`}
-                onClick={() => setModeCabinet(!modeCabinet)}>
+                onClick={() => { setModeCabinet(!modeCabinet); setResultat(null) }}>
           <span className="rig-bascule__temoin"></span>
           <span>Recherche par cabinets</span>
         </button>
@@ -196,6 +266,19 @@ export function EcranGestionAudiences() {
           </label>
         </div>
 
+        {enBase && (
+          <div className="rig-criteres__paire">
+            <label className="rig-saisie-champ">
+              <span className="rig-saisie-champ__libelle">Supprimee du</span>
+              <input className="rig-saisie-champ__saisie" type="date" value={suppressionDu} onChange={(e) => setSuppressionDu(e.target.value)} />
+            </label>
+            <label className="rig-saisie-champ">
+              <span className="rig-saisie-champ__libelle">Supprimee au</span>
+              <input className="rig-saisie-champ__saisie" type="date" value={suppressionAu} onChange={(e) => setSuppressionAu(e.target.value)} />
+            </label>
+          </div>
+        )}
+
         <label className="rig-saisie-champ">
           <span className="rig-saisie-champ__libelle">Type d'audience</span>
           <select className="rig-saisie-champ__saisie" value={critType} onChange={(e) => setCritType(e.target.value)}>
@@ -209,7 +292,7 @@ export function EcranGestionAudiences() {
             <span className="rig-saisie-champ__libelle">Chambre</span>
             <select className="rig-saisie-champ__saisie" value={critChambre} onChange={(e) => setCritChambre(e.target.value)}>
               <option value="">Toutes</option>
-              {distinctsTries(Audiences.map((x) => x.chambre)).map((c) => <option key={c} value={c}>{c}</option>)}
+              {choixChambres.map((c) => <option key={c.valeur} value={c.valeur}>{c.libelle}</option>)}
             </select>
           </label>
           <label className="rig-saisie-champ">
@@ -225,7 +308,7 @@ export function EcranGestionAudiences() {
           <span className="rig-saisie-champ__libelle">Juge</span>
           <select className="rig-saisie-champ__saisie" value={critJuge} onChange={(e) => setCritJuge(e.target.value)}>
             <option value="">Tous</option>
-            {distinctsTries(Audiences.map((x) => x.juge)).map((j) => <option key={j} value={j}>{j}</option>)}
+            {choixJuges.map((j) => <option key={j.valeur} value={j.valeur}>{j.libelle}</option>)}
           </select>
         </label>
 
@@ -242,8 +325,7 @@ export function EcranGestionAudiences() {
             <span className="rig-saisie-champ__libelle">Code de cabinet</span>
             <select className="rig-saisie-champ__saisie" value={critCodeCabinet} onChange={(e) => setCritCodeCabinet(e.target.value)}>
               <option value="">Tous</option>
-              {distinctsTries(Audiences.map((x) => x.codeCabinet).filter((c) => c.length > 0))
-                .map((c) => <option key={c} value={c}>{c}</option>)}
+              {choixCodes.map((c) => <option key={c.valeur} value={c.valeur}>{c.libelle}</option>)}
             </select>
           </label>
         </div>
@@ -252,7 +334,7 @@ export function EcranGestionAudiences() {
           <span className="rig-saisie-champ__libelle">Type de classement</span>
           <select className="rig-saisie-champ__saisie" value={critClassement} onChange={(e) => setCritClassement(e.target.value)}>
             <option value="">Tous</option>
-            {distinctsTries(Audiences.map((x) => x.typeClassement)).map((c) => <option key={c} value={c}>{c}</option>)}
+            {choixClassements.map((c) => <option key={c.valeur} value={c.valeur}>{c.libelle}</option>)}
           </select>
         </label>
 
@@ -261,6 +343,13 @@ export function EcranGestionAudiences() {
           <input className="rig-saisie-champ__saisie" type="number" min="1" max="999" value={maxTexte}
                  onChange={(e) => saisirMax(e.target.value)} />
         </label>
+
+        {enBase && (
+          <div className="rig-criteres__actions">
+            <button className="rig-bouton rig-bouton--fort" onClick={() => void rechercher()} disabled={enRecherche}>Rechercher</button>
+          </div>
+        )}
+        {resultat?.message && <p className="rig-eg-annonce" role="status">{resultat.message}</p>}
       </aside>
 
       <ListeModerne etiquette="Audiences trouvees">
@@ -271,9 +360,17 @@ export function EcranGestionAudiences() {
 
         {vue && <ProvenanceEcran mode={vue.mode} message={vue.message} quoi="Audiences" />}
 
-        <VuesListe vues={VuesAudiences.map((v) => ({ cle: v.cle, libelle: v.libelle, compte: filtrerIci({ ...criteres, critType: v.critType }).length }))}
+        {/* Les vues : le critere « Type d'audience » preregle ; en base, choisir une vue relance la recherche du serveur. */}
+        <VuesListe vues={VuesAudiences.map((v) => ({ cle: v.cle, libelle: v.libelle,
+                     compte: enBase ? trouvees.filter((x) => v.critType === '' || x.type === v.critType).length
+                                    : filtrerIci({ ...criteres, critType: v.critType }).length }))}
                    active={VuesAudiences.find((v) => v.critType === critType)?.cle ?? null}
-                   choisir={(cle) => { const v = VuesAudiences.find((x) => x.cle === cle); if (v) setCritType(v.critType) }} />
+                   choisir={(cle) => {
+                     const v = VuesAudiences.find((x) => x.cle === cle)
+                     if (!v) return
+                     setCritType(v.critType)
+                     if (enBase && resultat !== null) void rechercher(v.critType)
+                   }} />
 
         <div className="rig-table-cadre">
           <table className="rig-table rig-lm-table">

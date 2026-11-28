@@ -18,7 +18,33 @@ public static class RoutesGestionAudiences
 /// </summary>
 public sealed record AudienceSupprimeeLue(bool Cabinet, DateTime? Date, string Heure, string Type, string CodeCabinet, string Juge, string Greffier,
                                           string Chambre, string Section, string TypeClassement, bool Publique, string AuteurSuppression,
-                                          DateTime? DateSuppression, DateTime? DateDiffusion, bool NonDisponibleWeb);
+                                          DateTime? DateSuppression, DateTime? DateDiffusion, bool NonDisponibleWeb)
+{
+    /// <summary>Les CODES des criteres de la recherche (<see cref="RechercheAudiencesSupprimees"/>, plan « parcours complet », lot 9) :
+    /// la chambre (AUDNCS_CHAMBRE), le code cabinet (AUDNCS_CODE_CABINET) et le juge (AUDNCS_ID_JUG) de la ligne.</summary>
+    public string CodeChambre { get; init; } = "";
+    public string CodeCabinetSeul { get; init; } = "";
+    public int? IdJuge { get; init; }
+}
 
-/// <summary>Les lignes lues (au plus le plafond) et leur total.</summary>
-public sealed record AudiencesSupprimeesLues(AudienceSupprimeeLue[] Lignes, int Total);
+/// <summary>Les lignes lues (au plus le plafond) et leur total ; <see cref="Message"/> : pourquoi la recherche n'a rien cherche.</summary>
+public sealed record AudiencesSupprimeesLues(AudienceSupprimeeLue[] Lignes, int Total)
+{
+    public string? Message { get; init; }
+}
+
+/// <summary>
+/// La RECHERCHE de PROC_GESTAUDS (OPE_RECHERCHE_GESTAUDS._Rechercher), appliquee par le serveur (POST
+/// <see cref="RoutesRechercheAudiencesSupprimees.Rechercher"/>, plan « parcours complet », lot 9, 28/11/2026) : le mode (cabinets ou
+/// audiences), les dates d'audience et de suppression (aaaa-mm-jj), le type, la chambre, la section, le juge (son numero), le code
+/// cabinet, UN type de classement (code), et le nombre maximum de lignes.
+/// </summary>
+public sealed record RechercheAudiencesSupprimees(bool Cabinets, string? AudienceDu = null, string? AudienceAu = null, string? SuppressionDu = null,
+                                                  string? SuppressionAu = null, string? Type = null, string? Chambre = null, string? Section = null,
+                                                  int? Juge = null, string? CodeCabinet = null, string? TypeClassement = null, int Max = 200);
+
+/// <summary>L'adresse de la recherche : POST <see cref="RechercheAudiencesSupprimees"/> -> <see cref="AudiencesSupprimeesLues"/>.</summary>
+public static class RoutesRechercheAudiencesSupprimees
+{
+    public const string Rechercher = "/ecrans-main/{greffe}/audiences-supprimees/recherche";
+}

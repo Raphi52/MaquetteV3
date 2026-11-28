@@ -17,4 +17,16 @@ public sealed record AudienceProgrammeeLue(DateTime? Date, string Heure, string 
 /// <summary>Les audiences a venir (au plus le plafond), leur total, et les listes de saisie de la creation : types d'audience,
 /// chambres, sections, types de classement.</summary>
 public sealed record AudiencesProgrammeesLues(AudienceProgrammeeLue[] Lignes, int Total, string[] Types, string[] Chambres, string[] Sections,
-                                              string[] Classements);
+                                              string[] Classements)
+{
+    /// <summary>Les memes listes avec leur CODE, celui que la creation ecrit (RoutesCreationAudience, plan « parcours complet », lot 9) :
+    /// deux sections de RIG_DEV portent le meme libelle (« audience interactive » : INT.LU et INT.VE), le libelle seul ne les distingue pas.</summary>
+    public OptionAudience[] Options { get; init; } = [];
+}
+
+/// <summary>Une valeur d'une liste de la creation : <paramref name="Liste"/> = « type », « chambre », « section » ou « classement »
+/// (<see cref="Types"/>...), son code (R_*_VALEUR) et son libelle a l'ecran.</summary>
+public sealed record OptionAudience(string Liste, string Code, string Libelle)
+{
+    public const string Types = "type", Chambres = "chambre", Sections = "section", Classements = "classement";
+}
