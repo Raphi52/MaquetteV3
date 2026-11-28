@@ -231,10 +231,9 @@ if (descripteurs.Count > 0)
 // Les entrees du menu qu'on ne porte PAS encore, a dessein. Chacune garde sa raison : tant qu'elle
 // est au menu sans ecran, elle est toleree. Une exception qui ne sert plus (le code n'est plus au
 // menu, ou il a enfin son ecran) est ROUGE : il faut la retirer de cette liste.
-var exceptions = new Dictionary<string, string>
-{
-    ["PROC_PARAM_LISTEEXCEL"] = "fiche RIG v2 vide, « une coquille, pas une couche OPE » (decision du chef)",
-};
+// PROC_PARAM_LISTEEXCEL en est sorti le 28/11/2026 (lot 2 du plan-f4fb097f) : sa fonction est dans le programme client
+// RIG_CLIENT_PARAM_LISTEEXCEL, que la fiche RIG v2 n'avait pas lu ; il a son descripteur (Pont/EcransGeneres/Configurer.cs).
+var exceptions = new Dictionary<string, string>();
 foreach (var (code, raison) in exceptions)
     Exiger(codesMenu.Contains(code) && !casAiguillage.Contains(code) && !parCode.ContainsKey(code),
         $"exception {code} perimee : elle n'est plus au menu sans ecran, la retirer de la liste ({raison})");

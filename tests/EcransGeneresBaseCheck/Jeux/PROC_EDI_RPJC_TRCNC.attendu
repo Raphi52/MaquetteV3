@@ -14,6 +14,8 @@
 Rôle 2026F13001 · DELTA SARL c/ EPSILON SAS | Me ALPHA Irène · transmise le {J-3} · CCL13 - Conclusions | À traiter | AFaire | []
 Rôle 2026F13003 · ZETA CONSEIL SAS | Mme DELTA Lina · transmise le {J-1} · 3 pièces | À traiter | AFaire | []
 Rôle 2026F13003 · ZETA CONSEIL SAS | Me ALPHA Irène · transmise le {J-2} · PIE13 - Pièces · verrouillée par agent.trcnc | En cours | EnCours | [0,1]
+# 1300107 : en cours, tenue par l'agent du banc -- celle que PROC_EDI_RPJC_TRCNC.gestes rend aux affaires a traiter.
+Rôle 2026F13001 · DELTA SARL c/ EPSILON SAS | Me ALPHA Irène · transmise le {J-2} · CCL13 - Conclusions · verrouillée par banc.ecrans | En cours | EnCours | [0,1]
 Rôle 2026F13001 · DELTA SARL c/ EPSILON SAS | Me ALPHA Irène · transmise le {J-1} · CCL13 - Conclusions · intégrée le {J+0} | Historique | Validee | [0,1,2,4]
 Rôle 2026F13009 | Me ALPHA Irène · transmise le {J-6} · CCL13 - Conclusions · intégrée le {J-5} · réponse rejetée par Extelia le {J-4} | Historique | Validee | [0,1,2,3,4]
 Rôle 2026F13003 · ZETA CONSEIL SAS | mandataire non trouvé (CNBF 130002) · transmise le {J-4} · PIE13 - Pièces · refusée le {J-2} · Pièce illisible | Historique | Validee | [0,1,2,4]

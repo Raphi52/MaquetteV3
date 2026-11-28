@@ -1,0 +1,43 @@
+# Gestes de « Listes Excel » (EcrivainParametrageListesExcel.cs), lot 2 du plan-f4fb097f, sur le jeu PROC_PARAM_LISTEEXCEL.sql.
+# « Exporter » = EXPORT de RIG v2 (FORM_PARAM_LISTEEXCEL.cs:23-33, OPE_LISTE.Exporter, OPE_LISTE.cs:90-145) : RIG v2 ecrit un script .sql
+# sur le poste ; RIG v3 le pose dans la file des editions (decision du plan, lot 3). Les listes ne changent pas (la V2 n'ecrit rien
+# dans la base) : les « lignes: » sont celles du jeu ; ce qui se relit est la demande d'edition, son script et la trace.
+#
+# Refus 1 : MC n'a qu'un champ SELECT -- « 2 champs minimum sont requis » (OPE_LISTE.cs:147-150). Jumeau accepte : le bloc 4 (IEF, deux).
+geste: Agir Exporter
+ids: 3200102
+resultat: refuse
+message: 2 champs minimum sont requis
+---
+# Refus 2 : PRV n'a aucun champ (sa ligne LISTE et l'absence de FROM n'y changent rien) -- meme controle. Jumeau accepte : le bloc 4.
+geste: Agir Exporter
+ids: 3200103
+resultat: refuse
+message: 2 champs minimum sont requis
+---
+# Refus 3 : 3200108 n'est pas une liste Excel (PRMLS_LISTE « TYPE_L2Y », hors du filtre de la recherche de la V2, OPE_RECHERCHE.cs:48)
+# -- message de la V3. Jumeau accepte : 3200101, « LISTEXLS_IEF » (bloc 4).
+geste: Agir Exporter
+ids: 3200108
+resultat: refuse
+message: Liste Excel introuvable (3200108) : relisez les listes.
+---
+# FAIT : IEF, deux champs SELECT et sa clause FROM. La demande d'edition porte le fichier de la V2, EMISSION_SIMPLE (le service ne
+# l'execute pas), le processus PARAM_LISTEEXCEL ; son script garde la liste, le FROM puis les champs dans l'ordre initial (L2_IEF2,
+# ordre 1, avant L2_IEF1), sans la ligne LISTE (L2_IEFL, pas un champ SELECT).
+geste: Agir Exporter
+ids: 3200101
+resultat: fait
+message: Fichier exporté : exportListeExcel_IEF.sql, placé dans la file des éditions.
+lignes:
+Liste des instances par évènement futur | type IEF · 2 champs | Instances | Validee | []
+Liste des parutions au JAL | type JAL · 2 champs | BODACC et JAL | Validee | []
+Liste du banc lot 2 | type L2X · 2 champs · sans clause FROM · type que l'export Excel ne sort pas | Divers | Validee | []
+Liste des mesures en cours | type MC · 1 champ | Mesures | EnCours | []
+Liste des PC en cours | type PCC · 3 champs | Procédures | Validee | []
+Liste des préventions | type PRV · aucun champ · sans clause FROM | Préventions | AFaire | []
+VR | type VR · 2 champs | Divers | Validee | []
+controle: SELECT COUNT(*) FROM v2.DEMANDE_EDITION WHERE DMNED_LIBELLE_DOCUMENT = N'exportListeExcel_IEF.sql' AND DMNED_CODE_PROCESSUS = 'PARAM_LISTEEXCEL' AND DMNED_TYPE_GENERATION = 'EMISSION_SIMPLE' AND DMNED_PHASE_TRAITEMENT = 'C' AND DMNED_ID_DMND IS NULL => 1
+controle: SELECT CONCAT(x.value('(/PARAMETRES/@TYPE_LISTE)[1]', 'varchar(50)'), '|', x.value('(/PARAMETRES/@NB_CHAMPS)[1]', 'int'), '|', x.value('(/PARAMETRES/@FICHIER)[1]', 'varchar(80)')) FROM (SELECT CAST(DMNED_PARAMETRE_GENERATION AS xml) AS x FROM v2.DEMANDE_EDITION WHERE DMNED_LIBELLE_DOCUMENT = N'exportListeExcel_IEF.sql') AS d => IEF|2|exportListeExcel_IEF.sql
+controle: SELECT CASE WHEN a > 0 AND a < f AND f < c2 AND c2 < c1 AND l = 0 THEN 'liste < FROM < L2_IEF2 < L2_IEF1, sans L2_IEFL' ELSE CONCAT('script faux : ', a, ' ', f, ' ', c2, ' ', c1, ' ', l) END FROM (SELECT CHARINDEX('PRMLS_VALEUR = ''IEF''', s) AS a, CHARINDEX('''L2_IEFF''', s) AS f, CHARINDEX('''L2_IEF2''', s) AS c2, CHARINDEX('''L2_IEF1''', s) AS c1, CHARINDEX('L2_IEFL', s) AS l FROM (SELECT x.value('(/PARAMETRES/@SCRIPT)[1]', 'nvarchar(max)') AS s FROM (SELECT CAST(DMNED_PARAMETRE_GENERATION AS xml) AS x FROM v2.DEMANDE_EDITION WHERE DMNED_LIBELLE_DOCUMENT = N'exportListeExcel_IEF.sql') AS d) AS t) AS p => liste < FROM < L2_IEF2 < L2_IEF1, sans L2_IEFL
+controle: SELECT COUNT(*) FROM soc.Journal WHERE Ecran = 'Listes Excel' AND Famille = 'demande' AND Objet = N'l''export « exportListeExcel_IEF.sql »' AND Verbe = 'a cree' => 1

@@ -1,0 +1,53 @@
+# Recherches de « Listes Excel » (LecteurParametrageListesExcel.ChercherAsync), lot 2 du plan-f4fb097f : le champ « Recherche par
+# code » de RIG v2 (RIG_CLIENT_PARAM_LISTEEXCEL Recherche\OPE_RECHERCHE.cs:54, 82-98), plein texte AmiFullText sur « type libelle » :
+# chaque mot saisi, sans accent ni casse, doit COMMENCER un mot du texte (StartWith, AmiFullTextObj.cs:71-96) ; la ponctuation compte
+# comme un blanc (NoAccentPourCompareSql, AmiString.cs:424-456). Lignes du jeu : PROC_PARAM_LISTEEXCEL.sql.
+#
+# Deux mots, accent et casse differents de la base : « Évène » commence « évènement », « INST » commence « instances » -- IEF seule.
+texte: Évène INST
+lignes:
+Liste des instances par évènement futur | type IEF · 2 champs | Instances | Validee | []
+---
+# « stances » est DANS « instances », pas au debut d'un mot : aucune ligne -- jumeau bloc 1 (« INST », au debut).
+texte: stances
+lignes:
+---
+# Tous les mots doivent etre trouves (intersection) : « liste mesures » -- MC seule ; jumeau bloc 4 (« liste » seul : six lignes).
+texte: liste mesures
+lignes:
+Liste des mesures en cours | type MC · 1 champ | Mesures | EnCours | []
+---
+# « liste » : toutes les listes qui ont un libelle ; VR, sans libelle, n'a que son type -- ecartee (jumelle bloc 5).
+texte: liste
+lignes:
+Liste des instances par évènement futur | type IEF · 2 champs | Instances | Validee | []
+Liste des parutions au JAL | type JAL · 2 champs | BODACC et JAL | Validee | []
+Liste du banc lot 2 | type L2X · 2 champs · sans clause FROM · type que l'export Excel ne sort pas | Divers | Validee | []
+Liste des mesures en cours | type MC · 1 champ | Mesures | EnCours | []
+Liste des PC en cours | type PCC · 3 champs | Procédures | Validee | []
+Liste des préventions | type PRV · aucun champ · sans clause FROM | Préventions | AFaire | []
+---
+# Le type se cherche aussi : « vr » -- VR seule.
+texte: vr
+lignes:
+VR | type VR · 2 champs | Divers | Validee | []
+---
+# La ponctuation de la saisie est un blanc : « parutions-au » cherche « parutions » et « au » -- JAL seule.
+texte: parutions-au
+lignes:
+Liste des parutions au JAL | type JAL · 2 champs | BODACC et JAL | Validee | []
+---
+# Le critere « Type de liste » cherche dans le seul type : « p » -- PCC et PRV ; IEF, dont le LIBELLE a « par », est ecartee
+# (jumelle : le texte « p » la retiendrait, il lit les deux colonnes).
+critere: Type de liste = p
+lignes:
+Liste des PC en cours | type PCC · 3 champs | Procédures | Validee | []
+Liste des préventions | type PRV · aucun champ · sans clause FROM | Préventions | AFaire | []
+---
+# Le critere « Libellé » cherche dans le seul libelle : « banc » -- L2X ; le meme mot en « Type de liste » ne trouve rien (bloc suivant).
+critere: Libellé = banc
+lignes:
+Liste du banc lot 2 | type L2X · 2 champs · sans clause FROM · type que l'export Excel ne sort pas | Divers | Validee | []
+---
+critere: Type de liste = banc
+lignes:
