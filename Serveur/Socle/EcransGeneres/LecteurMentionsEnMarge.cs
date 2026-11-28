@@ -35,13 +35,15 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// le nom de la demande. NON CHERCHES (nommes) : « Débiteur » et « Créancier », que la V2 lit dans les debiteurs et creanciers
 /// de l'inscription (etapes Debiteurs, Creance), non lus par cet ecran.
 ///
-/// FICHE (IFicheEcran), EN LECTURE : Mention en marge (la derniere mention de l'inscription, MENTION_MARGINALE par date
-/// decroissante, proc_mma.md « Chargement des mentions marginales ») et Décision (l'issue lue de l'etat de la demande).
+/// FICHE (IFicheEcran) : « Mention en marge » -- la mention de la demande : vierge et SAISISSABLE (type, texte, date) tant que la
+/// demande est ouverte (RIG v2 ajoute une mention vierge pour la saisie, _AddOpeMentionMarginaleVierge, PROC_MMA.cs:62-66), celle
+/// que la demande a ecrite (DMND_ID_FMEDT -> FORMALITE_ENDETTEMENT -> MENTION_MARGINALE, PROC_MMA.cs:134-138) une fois close ; et
+/// « Dernière mention de l'inscription », en lecture (MENTION_MARGINALE par date decroissante, proc_mma.md « Chargement des
+/// mentions marginales ») ; « Décision » -- l'issue lue de l'etat de la demande, saisissable tant qu'elle est ouverte.
 ///
-/// GESTES : AUCUN ECRIVAIN (nomme). Valider et Refuser sont FACTURES dans RIG v2 (DoGetArticles : article de l'inscription,
-/// certificat « 21-98 » pour les types V, N, G, O, K, NP ; droits de rejet au refus) et produisent des editions (lettres,
-/// bordereau, LRAR) ; Reclamer et Attendre produisent une lettre. Une demande facturee ne se remplace pas par le journal des
-/// gestes (decision du chef) et ni la facturation ni les editions ne sont reprises : l'ecran dit « Démonstration ».
+/// GESTES : EcrivainMentionsEnMarge.cs (lot 6 du plan « RIG v3 complet », 28/11/2026) -- Valider ecrit la mention et valide la
+/// demande, sans la facture ni les editions (nommees) ; Réclamer, Refuser et Attendre sont refuses en le disant (les motifs de
+/// l'evenement attendu et les lettres ne sont pas repris).
 /// </summary>
 internal sealed class LecteurMentionsEnMarge : IRechercheEcran, IFicheEcran
 {
@@ -56,7 +58,8 @@ internal sealed class LecteurMentionsEnMarge : IRechercheEcran, IFicheEcran
     /// <summary>Les sections et champs de la fiche, aux titres et libelles du descripteur (ModifierAffaire.cs).</summary>
     internal const string SectionMention = "Mention en marge", SectionDecision = "Décision";
 
-    internal const string ChampMention = "Mention marginale", ChampDate = "Date de la mention", ChampDecision = "Décision";
+    internal const string ChampType = "Type de mention", ChampMention = "Mention marginale", ChampDate = "Date de la mention",
+                          ChampDerniere = "Dernière mention de l'inscription", ChampDecision = "Décision";
 
     public IReadOnlyCollection<string> Criteres { get; } = [CritereNumero];
 
@@ -128,21 +131,41 @@ internal sealed class LecteurMentionsEnMarge : IRechercheEcran, IFicheEcran
     public async Task<FicheEcran?> LireFicheAsync(SqlConnection baseGreffe, string id, DateTime maintenant, CancellationToken ct)
     {
         if (!int.TryParse(id, NumberStyles.None, CultureInfo.InvariantCulture, out var n)) return null;
-        await using var r = await LectureV2.LireAsync(baseGreffe, """
-            SELECT d.DMND_NOM, d.DMND_ETAT_DEMANDE, i.NumeroInscription AS INEDT_NUM_INSCRIPTION, m.MNMRG_TEXTE_MENTION, m.MNMRG_DATE
+        // La mention de la demande close : sa formalite (DMND_ID_FMEDT) ; une base sans cette colonne (un banc) n'en a pas.
+        var avecFormalite = await LectureV2.ValeurAsync(baseGreffe, "SELECT COL_LENGTH('v2.DEMANDE', 'DMND_ID_FMEDT')", ct) is not null
+                            && await LectureV2.ValeurAsync(baseGreffe, "SELECT OBJECT_ID(N'v2.FORMALITE_ENDETTEMENT')", ct) is not null;
+        var mentionDemande = avecFormalite
+            ? """
+              OUTER APPLY (SELECT TOP (1) md.MNMRG_TYPE_MMA, md.MNMRG_TEXTE_MENTION, md.MNMRG_DATE FROM v2.FORMALITE_ENDETTEMENT AS f
+                           JOIN v2.MENTION_MARGINALE AS md ON md.MNMRG_ID_MNMRG = f.FMEDT_ID_MNMRG
+                           WHERE f.FMEDT_ID_FMEDT = d.DMND_ID_FMEDT) AS md
+              """
+            : "OUTER APPLY (SELECT CAST(NULL AS varchar(5)) AS MNMRG_TYPE_MMA, CAST(NULL AS varchar(max)) AS MNMRG_TEXTE_MENTION, CAST(NULL AS datetime) AS MNMRG_DATE) AS md";
+        await using var r = await LectureV2.LireAsync(baseGreffe, $"""
+            SELECT d.DMND_NOM, d.DMND_ETAT_DEMANDE, i.NumeroInscription AS INEDT_NUM_INSCRIPTION, m.MNMRG_TEXTE_MENTION, m.MNMRG_DATE,
+                   md.MNMRG_TYPE_MMA AS TypeDemande, md.MNMRG_TEXTE_MENTION AS TexteDemande, md.MNMRG_DATE AS DateDemande
             FROM v2.DEMANDE AS d
             JOIN rec.Inscription AS i ON i.Id = d.DMND_ID_INSCR
             OUTER APPLY (SELECT TOP (1) mm.MNMRG_TEXTE_MENTION, mm.MNMRG_DATE FROM v2.MENTION_MARGINALE AS mm
                          WHERE mm.MNMRG_ID_INSCR = i.Id ORDER BY mm.MNMRG_DATE DESC, mm.MNMRG_ID_MNMRG DESC) AS m
+            {mentionDemande}
             WHERE d.DMND_ID_DMND = @id AND d.DMND_CODE_PROSS = 'MMA'
             """, ct, new SqlParameter("@id", n));
         if (!await r.ReadAsync(ct)) return null;
         var nom = FormeLigne.Texte(r, "DMND_NOM") is { Length: > 0 } x ? x : $"MMA sur l'inscription {FormeLigne.Texte(r, "INEDT_NUM_INSCRIPTION")}";
+        // Ouverte (ni validee, ni terminee, ni refusee) : la mention vierge et la decision se saisissent (EcrivainMentionsEnMarge).
+        var etat = FormeLigne.Texte(r, "DMND_ETAT_DEMANDE");
+        var ouverte = etat is not ("V" or "T" or "O");
+        static ChampFiche M(string libelle, string valeur, bool modifiable) => new(libelle, valeur) { Modifiable = modifiable };
         return new FicheEcran(Procedure, id, nom,
         [
             new SectionFiche(SectionMention,
-                [new(ChampMention, FormeLigne.Texte(r, "MNMRG_TEXTE_MENTION")), new(ChampDate, FormeLigne.DateFiche(FormeLigne.DateDe(r, "MNMRG_DATE")))]),
-            new SectionFiche(SectionDecision, [new(ChampDecision, Decision(FormeLigne.Texte(r, "DMND_ETAT_DEMANDE")))]),
+            [
+                M(ChampType, FormeLigne.Texte(r, "TypeDemande"), ouverte), M(ChampMention, FormeLigne.Texte(r, "TexteDemande"), ouverte),
+                M(ChampDate, FormeLigne.DateFiche(FormeLigne.DateDe(r, "DateDemande")), ouverte),
+                new(ChampDerniere, FormeLigne.Joindre(FormeLigne.Date(FormeLigne.DateDe(r, "MNMRG_DATE")), FormeLigne.Texte(r, "MNMRG_TEXTE_MENTION"))),
+            ]),
+            new SectionFiche(SectionDecision, [M(ChampDecision, Decision(etat), ouverte)]),
         ]);
     }
 }

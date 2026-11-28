@@ -1,0 +1,92 @@
+# Les gestes de EcrivainChangementJuge (« Changer le juge-commissaire », PROC_CHM), joues dans l'ordre par la route POST, sur les PC
+# de PROC_CHM.sql ; le parametrage, le code affaire OPCHJ20, les types de decision et les series JROP6 / JGAFF sont poses en fin de
+# PROC_MMA.sql (les tables de reference y existent, voir son en-tete de section). Format : en tete de tests/EcransGeneresBaseCheck/
+# Program.cs (section 3c). Un refus n'ecrit rien ; chaque refus a son jumeau accepte (meme borne, autre cote).
+
+# 1. Sans juge a remplacer : la recherche de RIG v2 l'exige (OPE_RECHERCHE_CHJCM.cs:99-104). Jumeau accepte : bloc 4, JUGEUN.
+geste: Confirmer Valider
+ids: 1400107
+valeur: Nouveau juge › Nouveau juge-commissaire = JTR14
+valeur: Nouveau juge › Date de l'acte = 2022-03-02
+valeur: Décision › Type de décision = OPCHJ6
+valeur: Décision › Date prévue = 2022-03-10
+valeur: Décision › Nature doc GED = ORDONNANCE
+valeur: Décision › Nom déposant GED = Greffe du banc
+resultat: refuse
+message: Vous devez saisir un juge à remplacer pour lancer la recherche
+---
+# 2. Une date de l'acte apres le jour (OPE_SAISIE_CHJCM.cs:81-85). Jumeau accepte : bloc 4, le 02/03/2022.
+geste: Confirmer Valider
+ids: 1400107
+valeur: Juge à remplacer = JUGEUN
+valeur: Nouveau juge › Nouveau juge-commissaire = JTR14
+valeur: Nouveau juge › Date de l'acte = 2099-01-01
+valeur: Décision › Type de décision = OPCHJ6
+valeur: Décision › Date prévue = 2099-01-10
+valeur: Décision › Nature doc GED = ORDONNANCE
+valeur: Décision › Nom déposant GED = Greffe du banc
+resultat: refuse
+message: La date de l'acte doit être inférieure ou égale à la date du jour.
+---
+# 3. Un type de decision dont les minutes ne sont pas celles des ordonnances du president (JGOP, OPE_DECISION_JUDICIAIRE.cs:67-71).
+#    Jumeau accepte : bloc 4, OPCHJ6.
+geste: Confirmer Valider
+ids: 1400107
+valeur: Juge à remplacer = JUGEUN
+valeur: Nouveau juge › Nouveau juge-commissaire = JTR14
+valeur: Nouveau juge › Date de l'acte = 2022-03-02
+valeur: Décision › Type de décision = OPCHJ6X
+valeur: Décision › Date prévue = 2022-03-10
+valeur: Décision › Nature doc GED = ORDONNANCE
+valeur: Décision › Nom déposant GED = Greffe du banc
+resultat: refuse
+message: Le type de numéros pour l'affectation d'un numéros de minute est incorrect pour la décision OPCHJ6X. Le type de numéros paramétré doit être : n° de répertoire général des ordo. du président.
+---
+# 4. La PC 1990P14107 (au forfait) : l'ordonnance du president numerotee (role JROP6, repertoire JGAFF), ses parties, sa decision et
+#    son edition, la demande CHJCM validee fille de celle du processus, le changement en attente JUGEUN -> JUGETROIS. C'est le bloc
+#    que rejoue le parcours : la ligne passe « Changement en attente ».
+#    Acte de 2022 : ses numeros (annee de saisine) ne decalent pas les series 2026 des autres jeux (voir PROC_MMA.sql).
+geste: Confirmer Valider
+ids: 1400107
+valeur: Juge à remplacer = JUGEUN
+valeur: Statut titulaire ou suppléant = titulaire
+valeur: Nouveau juge › Nouveau juge-commissaire = JTR14
+valeur: Nouveau juge › Date de l'acte = 2022-03-02
+valeur: Décision › Type de décision = OPCHJ6
+valeur: Décision › Date prévue = 2022-03-10
+valeur: Décision › Nature doc GED = ORDONNANCE
+valeur: Décision › Nom déposant GED = Greffe du banc
+resultat: fait
+message: Une ordonnance générée pour le changement du juge-commissaire titulaire 'JUGEUN Jean' par 'JUGETROIS Luc' : rôle 2022OP00001 ; changement de juge en attente de l'ordonnance signée ; 1 édition dans la file des éditions. Les mots directeurs et le rapport Excel ne sont pas repris par la V3.
+controle: SELECT COUNT(*) FROM v2.ETRE_JUGE_COMM_EN_ATTENTE AS a JOIN v2.DECISION_JUDICIAIRE AS d ON d.DCJDC_ID_DCJDC = a.ETJCMA_ID_DCJDC JOIN v2.INSTANCE AS i ON i.INSTN_ID_INSTN = d.DCJDC_ID_INSTN WHERE a.ETJCMA_ID_PRCLL = 1400107 AND a.ETJCMA_ID_JUG_A_REMPLACER = 1400501 AND a.ETJCMA_ID_JUG_NOUVEAU = 1400503 AND a.ETJCMA_TYPE_CHANGEMENT_JUGE = 'JCT' AND a.ETJCMA_DATE_ORDOSIGN IS NULL AND i.INSTN_ID_PRCLL = 1400107 AND i.INSTN_CODE_AFFAIRE = 'OPCHJ20' AND i.INSTN_TYPE_INSTANCE = 'RP' AND i.INSTN_NUM_ROLE = '2022OP00001' AND d.DCJDC_TYPE_DECISION = 'OPCHJ6' AND d.DCJDC_DATE IS NULL AND d.DCJDC_DATE_PREVUE = '20220310' AND d.DCJDC_NOM_DEPOSANT_GED = 'Greffe du banc' => 1
+controle: SELECT COUNT(*) FROM v2.PARTIE AS p JOIN v2.INSTANCE AS i ON i.INSTN_ID_INSTN = p.PRT_ID_INSTN WHERE i.INSTN_NUM_ROLE = '2022OP00001' AND ((p.PRT_QUALIF_PARTIE = 'D' AND p.PRT_DESIGNATION = 'Saisine d''office') OR (p.PRT_QUALIF_PARTIE = 'F' AND p.PRT_DESIGNATION = 'CHM ETA' AND p.PRT_CIVILITE = 'PM')) => 2
+controle: SELECT COUNT(*) FROM v2.DEMANDE AS d JOIN v2.DEMANDE AS m ON m.DMND_ID_DMND = d.DMND_ID_DMND_MERE WHERE d.DMND_CODE_PROSS = 'CHJCM' AND d.DMND_ETAT_DEMANDE = 'V' AND d.DMND_NUM_INDICATIF = '2022OP00001' AND m.DMND_CODE_PROSS = 'CHJCM' AND m.DMND_ETAT_DEMANDE = 'V' => 1
+controle: SELECT COUNT(*) FROM v2.DEMANDE_EDITION AS e JOIN v2.DEMANDE AS d ON d.DMND_ID_DMND = e.DMNED_ID_DMND WHERE d.DMND_NUM_INDICATIF = '2022OP00001' AND e.DMNED_LIBELLE_DOCUMENT = 'Ordonnance de changement de juge-commissaire' AND e.DMNED_PHASE_TRAITEMENT = 'C' => 1
+controle: SELECT COUNT(*) FROM soc.Journal WHERE Ecran = 'Changer le juge-commissaire' AND Famille = 'affaire' AND Verbe = 'a cree' => 1
+---
+# 5. Une PC ou un changement est deja en attente pour le juge a remplacer (ChangementJugeCommissairePc.cs:225 : elle ne se coche pas).
+#    Jumeau accepte : bloc 4, une PC sans changement en attente.
+geste: Confirmer Valider
+ids: 1400105
+valeur: Juge à remplacer = JUGEUN
+valeur: Nouveau juge › Nouveau juge-commissaire = JTR14
+valeur: Nouveau juge › Date de l'acte = 2022-03-02
+valeur: Décision › Type de décision = OPCHJ6
+valeur: Décision › Date prévue = 2022-03-10
+valeur: Décision › Nature doc GED = ORDONNANCE
+valeur: Décision › Nom déposant GED = Greffe du banc
+resultat: refuse
+message: PC 1990P14105 : Il y a déjà un changement de juge en attente dans la PC pour le juge à remplacer.
+---
+# 6. Le nouveau juge est le juge a remplacer (OPE_SAISIE_CHJCM.cs:57-60). Jumeau accepte : bloc 4, JUGETROIS.
+geste: Confirmer Valider
+ids: 1400102
+valeur: Juge à remplacer = JUGEUN
+valeur: Nouveau juge › Nouveau juge-commissaire = JUN14
+valeur: Nouveau juge › Date de l'acte = 2022-03-02
+valeur: Décision › Type de décision = OPCHJ6
+valeur: Décision › Date prévue = 2022-03-10
+valeur: Décision › Nature doc GED = ORDONNANCE
+valeur: Décision › Nom déposant GED = Greffe du banc
+resultat: refuse
+message: Le juge à remplacer et le nouveau juge sont les mêmes.

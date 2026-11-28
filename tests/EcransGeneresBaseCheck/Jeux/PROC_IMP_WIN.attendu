@@ -1,0 +1,12 @@
+# « Imprimantes du greffe » (PROC_IMP_WIN) : les imprimantes lot 1 (IMPRIMANTE_PS) puis lot 2 (IMPRIMANTE_EDITION), par nom, toutes
+# (la V2 ne filtre pas : ImprimanteLot1.cs:97, ImprimanteLot2.cs:262). Etats : sans imprimante physique -> À rediriger (AFaire) ;
+# lot 1 inactive -> Inactive (EnCours) ; sinon Active (Validee). Les types de papier : les tags BAC_* sans le prefixe ; AGRAFE n'est
+# pas un bac. Les trois « Imprimante ... » viennent des jeux PROC_COURRIERM et PROC_SIGNJUD (la meme table du greffe).
+Banc lot 6 Accueil | vers PS · utilisable pour les différés | Lot 1 | Validee | [] | valeurs: Banc lot 6 Accueil ; PS ; oui ; oui ;  ; Lot 1
+Banc lot 6 Copieuse | sans imprimante physique | Lot 1 | AFaire | [] | valeurs: Banc lot 6 Copieuse ;  ;  ; oui ;  ; Lot 1
+Banc lot 6 Plieuse | vers Plieuse 12 · inactive | Lot 1 | EnCours | [] | valeurs: Banc lot 6 Plieuse ; Plieuse 12 ;  ;  ;  ; Lot 1
+Banc lot 6 Archives | sans imprimante physique · aucun type de papier | Lot 2 | AFaire | [] | valeurs: Banc lot 6 Archives ;  ;  ;  ;  ; Lot 2
+Banc lot 6 Greffe | vers RL · papier LRAR, NORMAL, SECURISE | Lot 2 | Validee | [] | valeurs: Banc lot 6 Greffe ; RL ;  ;  ; LRAR, NORMAL, SECURISE ; Lot 2
+Imprimante Amitel | vers RL · aucun type de papier · réservée à Amitel | Lot 2 | Validee | []
+Imprimante Amitel banc 10 | vers RL · aucun type de papier · réservée à Amitel | Lot 2 | Validee | []
+Imprimante banc 10 | vers RL · aucun type de papier | Lot 2 | Validee | []

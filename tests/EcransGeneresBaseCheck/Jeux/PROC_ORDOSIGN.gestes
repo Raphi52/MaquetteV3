@@ -84,6 +84,8 @@ ORDO E | Rôle 2026OS20105 · Ordonnance sans minute du banc · signée le {J+0}
 ORDO Q | Rôle 2026OS20117 · Ordonnance sans minute du banc · prévue le {J+17} | OP | AFaire | []
 ORDO R | Rôle 2026OS20118 · Ordonnance du banc lot 10 · prévue le {J+18} · minute 2501000001 | OP | AFaire | []
 ORDO F | Rôle 2026OS20106 · Ordonnance du banc lot 10 · prévue le {J+6} | OP (liée à une PC) | AFaire | []
+# L'ordonnance que PROC_CHM.gestes (joue avant) cree pour la PC CHM ETA (lot 6 du plan « RIG v3 complet ») : RP avec PC, code CHJCM_CODE_AFFAIRE.
+Saisine d'office # CHM ETA | Rôle 2022OP00001 · Ordonnance de changement de juge-commissaire · prévue le 10/03/2022 | OP (changement de juge) | AFaire | []
 ORDO G | Rôle 2026OS20107 · Ordonnance sans minute du banc · prévue le {J+7} | OP (changement de juge) | AFaire | []
 ORDO H | Rôle 2026OS20108 · Ordonnance sans minute du banc · signée le {J+0} | Prévention | Validee | []
 ORDO K | Rôle 2026OS20111 · Ordonnance sans minute du banc · prévue le {J+11} | JC | AFaire | []

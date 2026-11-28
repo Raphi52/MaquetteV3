@@ -1,0 +1,15 @@
+# Les recherches de LecteurImprimantesGreffe (IRechercheEcran), jouees sur les lignes de PROC_IMP_WIN.sql (et des autres jeux).
+# Format : en tete de tests/EcransGeneresBaseCheck/Program.cs (section 3c). La recherche s'AJOUTE a la liste.
+
+# 1. Le critere « Lot » et le champ (le nom ou l'imprimante physique).
+texte: banc lot 6
+critere: Lot = Lot 1
+lignes:
+Banc lot 6 Accueil | vers PS · utilisable pour les différés | Lot 1 | Validee | []
+Banc lot 6 Copieuse | sans imprimante physique | Lot 1 | AFaire | []
+Banc lot 6 Plieuse | vers Plieuse 12 · inactive | Lot 1 | EnCours | []
+---
+# 2. Le critere « Imprimante physique ».
+critere: Imprimante physique = plieuse
+lignes:
+Banc lot 6 Plieuse | vers Plieuse 12 · inactive | Lot 1 | EnCours | []

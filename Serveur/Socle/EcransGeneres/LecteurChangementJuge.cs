@@ -84,6 +84,15 @@ internal sealed class LecteurChangementJuge : IRechercheEcran, IFicheEcran
     public Task<LignesLues> LireAsync(SqlConnection baseGreffe, DateTime aujourdhui, int plafond, CancellationToken ct)
         => LectureEcran.LireAsync(baseGreffe, Requete(FonctionsTitulaire, "", ""), Ligne, ct, new SqlParameter("@plafond", plafond));
 
+    /// <summary>Pour l'ecrivain (EcrivainChangementJuge.cs) : la ligne de la PC @id dans la recherche du juge @juge (son id) dans la
+    /// fonction titulaire ou suppleante, aux colonnes de la liste (ErreursBloquantes, EnAttente).</summary>
+    internal static string RequetePc(bool suppleant)
+        => Requete(suppleant ? FonctionsSuppleant : FonctionsTitulaire, "AND j.JUG_ID_JUG = @juge", "AND p.PRCLL_ID_PRCLL = @id")
+            .Replace("TOP (@plafond)", "TOP (1)", StringComparison.Ordinal);
+
+    /// <summary>Les fonctions du juge a remplacer (:190-200) : titulaire 'JCT', 'JC' ; suppleant 'JCS'.</summary>
+    internal static string Fonctions(bool suppleant) => suppleant ? FonctionsSuppleant : FonctionsTitulaire;
+
     public Task<LignesLues> ChercherAsync(SqlConnection baseGreffe, RechercheEcran recherche, DateTime aujourdhui, int plafond, CancellationToken ct)
     {
         var suppleant = recherche.Critere(CritereStatut) is { } statut && statut.StartsWith("supp", StringComparison.OrdinalIgnoreCase);

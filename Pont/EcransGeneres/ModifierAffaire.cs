@@ -136,17 +136,20 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
                      new EtatEcran("EnAttente", "En attente", "en-attente"),
                      new EtatEcran("Rejetee", "Refusée", "rejetee")],
             Groupes = ["Inscriptions maritimes", "Autres inscriptions"],
+            // Lot 6 du plan « RIG v3 complet » (28/11/2026) : la mention se saisit (LecteurMentionsEnMarge.cs, EcrivainMentionsEnMarge.cs) --
+            // « Type de mention » et le texte sont obligatoires (OPE_MENTION_MARGINALE.Designer.cs:85, :97), la date vide prend la date de
+            // travail des inscriptions (Inscription.cs:1838-1839) ; la derniere mention de l'inscription se lit a cote.
             Sections =
             [
-                Marche("Mention en marge", "Obligatoire pour valider. Si l'inscription n'a pas encore de mention, une mention vierge est proposée pour guider la saisie.", true,
-                    Champ.Zone("Mention marginale"), "Date de la mention"),
+                Marche("Mention en marge", "Obligatoire pour valider : le type et le texte. Date vide : la date de travail des inscriptions. Facture et éditions de la validation : dans RIG v2.", true,
+                    "Type de mention", Champ.Zone("Mention marginale"), Champ.Date("Date de la mention"), Champ.Zone("Dernière mention de l'inscription")),
                 Marche("Bateau", "Données du bateau, pour une inscription maritime seulement.", false,
                     Champ.Tableau("Données du bateau")),
                 Marche("Débiteurs et biens", "Débiteurs et biens concernés par l'inscription.", false,
                     Champ.Tableau("Débiteurs"), Champ.Tableau("Biens concernés")),
                 Marche("Créance et facturation", "Créance ou endettement. Le certificat est facturé automatiquement pour certains types d'inscription ; les frais postaux s'affichent en saisie.", false,
                     "Créance ou endettement", Champ.Tableau("Facturation"), Champ.Montant("Frais postaux")),
-                Marche("Décision", "Valider accepte la mention. Réclamer demande une correction au déposant. Refuser rejette la demande. Attendre la met en attente.", true,
+                Marche("Décision", "Valider accepte la mention. Réclamer, Refuser et Attendre (motifs et lettres) se font dans RIG v2.", true,
                     Champ.Liste("Décision", "Valider", "Réclamer", "Refuser", "Attendre")),
             ],
             Lignes =
@@ -499,8 +502,9 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
             ],
         },
 
-        // PROC_CHM (PROC_CHJCM) : la liste et ses controles sont lus (LecteurChangementJuge.cs) ; VALIDER fabrique dans RIG v2
-        // une ordonnance numerotee par PC, une facture et un changement en attente : non ecrit par la V3, raison dans le lecteur.
+        // PROC_CHM (PROC_CHJCM) : la liste et ses controles sont lus (LecteurChangementJuge.cs) ; VALIDER fabrique par PC une ordonnance
+        // du president numerotee, sa decision et le changement en attente (EcrivainChangementJuge.cs, lot 6 du plan « RIG v3 complet »,
+        // 28/11/2026) ; la facture d'une PC hors forfait, les mots directeurs et le rapport Excel ne sont pas repris (nommes).
         new DescripteurEcran
         {
             Code = "PROC_CHM", Titre = "Changer le juge-commissaire", Sujet = "procédures collectives",
@@ -523,10 +527,11 @@ public sealed class DomaineModifierAffaire : IDomaineEcrans
             [
                 Marche("Paramètres", "Lecture seule par défaut. Seuls le code affaire et le mode de facturation sont enregistrés.", true,
                     "Code affaire", "Mode de facturation"),
-                Marche("Nouveau juge", "Date de l'acte jamais postérieure à aujourd'hui. Le nouveau juge doit être différent de l'ancien, et pas déjà juge de la PC.", true,
-                    "Nouveau juge-commissaire", "Date de l'acte"),
-                Marche("Décision", "Types proposés selon le code affaire ; s'il n'y en a qu'un, il est choisi seul.", false,
-                    "Type de décision"),
+                Marche("Nouveau juge", "Date de l'acte jamais postérieure à aujourd'hui. Le nouveau juge (son abrégé ou son nom) doit être différent de l'ancien.", true,
+                    "Nouveau juge-commissaire", Champ.Date("Date de l'acte")),
+                // OPE_DECISION_JUDICIAIRE.Designer.cs:80-153 : type, date prevue, nature et deposant GED obligatoires ; le juge de la decision.
+                Marche("Décision", "Un type avec son édition et la série de minutes JGOP. Date prévue jamais avant la date de l'acte.", true,
+                    "Type de décision", Champ.Date("Date prévue"), "Juge de la décision", "Nature doc GED", "Nom déposant GED"),
                 Marche("Ordonnances et résumé", "Une ordonnance du président par PC, puis un rapport de suivi. Une facture en échec n'arrête pas le traitement.", false,
                     Champ.Tableau("Ordonnances du président"), Champ.Tableau("Rapport de suivi")),
                 Marche("Juges et mandataires", "Les juges-commissaires et les mandataires en mission dans la PC.", false,

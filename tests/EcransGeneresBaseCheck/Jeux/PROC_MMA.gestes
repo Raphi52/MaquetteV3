@@ -1,0 +1,77 @@
+# Les gestes de EcrivainMentionsEnMarge (« Mentions en marge », PROC_MMA), joues dans l'ordre par la route POST, sur les lignes de
+# PROC_MMA.sql. Format : en tete de tests/EcransGeneresBaseCheck/Program.cs (section 3c). Un refus n'ecrit rien ; chaque refus a son
+# jumeau accepte (meme borne, autre cote).
+
+# 1. Valider sans type de mention : la mention est obligatoire (PROC_MMA.cs:37), son type aussi (ultTypeMention.MetierObligatoire,
+#    OPE_MENTION_MARGINALE.Designer.cs:85). Jumeau accepte : bloc 2, un type et un texte saisis.
+geste: Enregistrer
+ids: 1317103
+valeur: Mention en marge › Mention marginale = Transfert du siège au 3 rue du Banc
+valeur: Décision › Décision = Valider
+resultat: refuse
+message: « Type de mention » est obligatoire.
+---
+# 2. Valider la demande en reclamation de l'inscription 2026-13701 : la mention (registre EAR 2026), sa formalite, la demande
+#    validee, nommee de ses debiteurs, ses numeros = le SIREN du premier (PROC_MMA.cs:114-139). C'est le bloc que rejoue le parcours.
+geste: Enregistrer
+ids: 1317103
+valeur: Mention en marge › Type de mention = ADR
+valeur: Mention en marge › Mention marginale = Transfert du siège au 3 rue du Banc
+valeur: Mention en marge › Date de la mention = 2026-03-12
+valeur: Décision › Décision = Valider
+resultat: fait
+message: Mention en marge « Changement d'adresse » enregistrée sur l'inscription 2026-13701 (registre 26e0000001, du 12/03/2026) ; demande 26017000003 validée. La facture (article de l'inscription, certificat 21-98) et les éditions (lettre d'envoi, certificat de mention en marge, bordereau de numérisation) ne sont pas reprises par la V3.
+fiche: 1317103
+Mention en marge › Type de mention = ADR
+Mention en marge › Mention marginale = Transfert du siège au 3 rue du Banc
+Mention en marge › Date de la mention = 2026-03-12
+Mention en marge › Dernière mention de l'inscription = 12/03/2026 · Transfert du siège au 3 rue du Banc
+Décision › Décision = Valider
+controle: SELECT COUNT(*) FROM v2.DEMANDE AS d JOIN v2.FORMALITE_ENDETTEMENT AS f ON f.FMEDT_ID_FMEDT = d.DMND_ID_FMEDT JOIN v2.MENTION_MARGINALE AS m ON m.MNMRG_ID_MNMRG = f.FMEDT_ID_MNMRG WHERE d.DMND_ID_DMND = 1317103 AND d.DMND_ETAT_DEMANDE = 'V' AND d.DMND_EN_COURS = 0 AND m.MNMRG_ID_INSCR = 1317001 AND m.MNMRG_TYPE_MMA = 'ADR' AND m.MNMRG_NUM_REGISTRE = '26e0000001' AND f.FMEDT_NUM_REGISTRE = '26e0000001' AND m.MNMRG_DATE = '20260312' => 1
+controle: SELECT DMND_NOM FROM v2.DEMANDE WHERE DMND_ID_DMND = 1317103 => MMA sur l'inscription 2026-13701 - Alpha Banc SARL (123456789) / Paul MARTIN
+controle: SELECT DMND_LES_NUMEROS FROM v2.DEMANDE WHERE DMND_ID_DMND = 1317103 => 123456789
+controle: SELECT COUNT(*) FROM soc.Journal WHERE Ecran = 'Mentions en marge' AND IdObjet = '1317103' AND Famille = 'dossier' AND Verbe = 'a modifie' => 1
+---
+# 3. Valider sans texte : obligatoire (ultTexte.MetierObligatoire, OPE_MENTION_MARGINALE.Designer.cs:97). Jumeau accepte : bloc 2.
+geste: Enregistrer
+ids: 1317104
+valeur: Mention en marge › Type de mention = ADR
+valeur: Décision › Décision = Valider
+resultat: refuse
+message: « Mention marginale » est obligatoire.
+---
+# 4. Un type qui n'est pas dans TYPE_MMA (la combo de la V2, OPE_MENTION_MARGINALE.cs:118). Jumeau accepte : bloc 2, ADR.
+geste: Enregistrer
+ids: 1317104
+valeur: Mention en marge › Type de mention = ZZZ
+valeur: Mention en marge › Mention marginale = Mention inconnue
+valeur: Décision › Décision = Valider
+resultat: refuse
+message: « Type de mention » : ZZZ n'est pas un type de mention de la base du greffe (TYPE_MMA).
+---
+# 5. Une inscription maritime (1317002, un bateau) : sa validation suit la blockchain des hypotheques maritimes (Inscription.cs:876-879),
+#    non reprise. Jumeau accepte : bloc 2, l'inscription 2026-13701 sans bateau.
+geste: Enregistrer
+ids: 1317104
+valeur: Mention en marge › Type de mention = CONS
+valeur: Mention en marge › Mention marginale = Contestation du banc
+valeur: Décision › Décision = Valider
+resultat: refuse
+message: L'inscription 2026-13702 est maritime : sa mention suit l'état de transmission blockchain des hypothèques maritimes, que la V3 ne reprend pas. Valider cette demande dans RIG v2.
+---
+# 6. Réclamer : non repris -- les motifs de l'evenement attendu (ETP_RECLAM_REFUS) et la lettre de reclamation (LOT2_RECLAM_INS).
+#    Jumeau accepte : bloc 2, Valider.
+geste: Enregistrer
+ids: 1317104
+valeur: Décision › Décision = Réclamer
+resultat: refuse
+message: « Réclamer » n'est pas repris par la V3 : RIG v2 y saisit les motifs de l'événement attendu et édite la lettre de réclamation. Traiter cette demande dans RIG v2.
+---
+# 7. Une demande validee : RIG v2 la rouvre en consultation. Jumeau accepte : bloc 2, une demande ouverte.
+geste: Enregistrer
+ids: 1317101
+valeur: Mention en marge › Type de mention = ADR
+valeur: Mention en marge › Mention marginale = Encore une
+valeur: Décision › Décision = Valider
+resultat: refuse
+message: La demande 26017000001 est close (« Validée ») : RIG v2 la rouvre en consultation, rien ne s'y enregistre.

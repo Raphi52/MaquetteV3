@@ -1,0 +1,84 @@
+# Les gestes de EcrivainImprimantesGreffe (« Imprimantes du greffe », PROC_IMP_WIN), joues dans l'ordre par la route POST, sur les
+# lignes de PROC_IMP_WIN.sql. Format : en tete de tests/EcransGeneresBaseCheck/Program.cs (section 3c). Un refus n'ecrit rien ;
+# chaque refus a son jumeau accepte (meme borne, autre cote).
+
+# 1. L'imprimante physique videe : obligatoire (ultCboNomPhysique.MetierObligatoire, OPE_SAISIE_IMP_LOT1.Designer.cs:93).
+#    Jumeau accepte : bloc 2, une imprimante physique saisie.
+geste: Modifier
+ids: 1:Banc lot 6 Plieuse
+valeur: Redirigée vers l'imprimante physique =
+resultat: refuse
+message: « Redirigée vers l'imprimante physique » est obligatoire.
+---
+# 2. Lot 1 : redirigee vers une autre imprimante physique, activee (OPE_SAISIE_IMP_LOT1._Valider, :129-140 ; Imprimante.Sauve).
+#    C'est le bloc que rejoue le parcours complet : la fiche et la table se relisent.
+geste: Modifier
+ids: 1:Banc lot 6 Plieuse
+valeur: Redirigée vers l'imprimante physique = Plieuse 14
+valeur: Active = oui
+resultat: fait
+message: Imprimante lot 1 'Banc lot 6 Plieuse' enregistrée dans le greffe.
+fiche: 1:Banc lot 6 Plieuse
+Imprimante › Redirigée vers l'imprimante physique = Plieuse 14
+Lot 1 : différés et activation › Active = oui
+Lot 1 : différés et activation › Utilisable pour les différés =
+controle: SELECT COUNT(*) FROM v2.IMPRIMANTE_PS WHERE R_IMPRIMANTE_VALEUR = 'Banc lot 6 Plieuse' AND R_IMPRIMANTE_EMPLACEMENT_IMP = 'Plieuse 14' AND R_IMPRIMANTE_ACTIVATION = 1 AND R_IMPRIMANTE_DIFFEREE = 0 => 1
+controle: SELECT COUNT(*) FROM soc.Journal WHERE Ecran = 'Imprimantes du greffe' AND IdObjet = '1:Banc lot 6 Plieuse' AND Famille = 'reglage' AND Verbe = 'a modifie' => 1
+---
+# 3. Le nom d'une imprimante enregistree : en lecture seule (ultNomImprimante.MetierReadOnly, OPE_SAISIE_IMP_LOT2.cs:121).
+#    Jumeau accepte : bloc 2, la meme imprimante modifiee sans changer son nom.
+geste: Modifier
+ids: 2:Banc lot 6 Greffe
+valeur: Nom = Banc lot 6 Greffe RDC
+resultat: refuse
+message: Le nom d'une imprimante enregistrée ne se change pas : RIG v2 le met en lecture seule. Ajoutez 'Banc lot 6 Greffe RDC' puis supprimez 'Banc lot 6 Greffe' dans RIG v2.
+---
+# 4. Un type de papier saisi deux fois (« bac_A3 » et « A3 » : la V2 retire « BAC_ » et met en majuscules, puis refuse le doublon,
+#    _AjouterTypePapier, OPE_SAISIE_IMP_LOT2.cs:148-155). Jumeau accepte : bloc 5, chaque type une fois.
+geste: Modifier
+ids: 2:Banc lot 6 Greffe
+valeur: Types de papier = normal, bac_A3, A3
+resultat: refuse
+message: Le type de papier 'A3' existe déjà.
+---
+# 5. Lot 2 : les types de papier changes -- tous les tags « bac_ » supprimes puis recrees (OPE_SAISIE_IMP_LOT2.cs:194-206) ;
+#    AGRAFE, qui n'est pas un bac, reste.
+geste: Modifier
+ids: 2:Banc lot 6 Greffe
+valeur: Types de papier = normal, A3
+resultat: fait
+message: Imprimante lot 2 'Banc lot 6 Greffe' enregistrée dans le greffe.
+fiche: 2:Banc lot 6 Greffe
+Lot 2 : types de papier › Types de papier = A3, NORMAL
+controle: SELECT COUNT(*) FROM v2.TAG_POSTSCRIPT WHERE TAGPS_NOM_IMPRIMANTE = 'Banc lot 6 Greffe' AND TAGPS_NOM_TAG IN ('BAC_NORMAL', 'BAC_A3', 'AGRAFE') => 3
+controle: SELECT COUNT(*) FROM v2.TAG_POSTSCRIPT WHERE TAGPS_NOM_IMPRIMANTE = 'Banc lot 6 Greffe' => 3
+---
+# 6. Ajout sans nom : obligatoire (ultNomImprimante.MetierObligatoire, OPE_SAISIE_IMP_LOT2.Designer.cs:105). Jumeau accepte : bloc 8.
+geste: Ajouter
+valeur: Redirigée vers l'imprimante physique = RL
+valeur: Lot = Lot 2
+resultat: refuse
+message: « Nom » est obligatoire.
+---
+# 7. Ajout d'une imprimante deja portee par la table : la V2 n'a pas de controle (l'insertion casse sur PK_IMPRIMANTE_PS), la V3
+#    refuse. Jumeau accepte : bloc 8, un nom libre.
+geste: Ajouter
+valeur: Nom = Banc lot 6 Accueil
+valeur: Redirigée vers l'imprimante physique = PS
+valeur: Lot = Lot 1
+resultat: refuse
+message: L'imprimante lot 1 'Banc lot 6 Accueil' existe déjà dans le greffe.
+---
+# 8. Ajout lot 2 : l'imprimante, puis ses trois types de papier d'office, BAC_NORMAL, BAC_SECURISE, BAC_LRAR
+#    (OPE_SAISIE_IMP_LOT2.cs:185-193).
+geste: Ajouter
+valeur: Nom = Banc lot 6 Courrier
+valeur: Redirigée vers l'imprimante physique = RL
+valeur: Lot = Lot 2
+resultat: fait
+message: Imprimante lot 2 'Banc lot 6 Courrier' ajoutée dans le greffe, redirigée vers RL, types de papier NORMAL, SECURISE, LRAR.
+fiche: 2:Banc lot 6 Courrier
+Imprimante › Redirigée vers l'imprimante physique = RL
+Lot 2 : types de papier › Types de papier = LRAR, NORMAL, SECURISE
+controle: SELECT COUNT(*) FROM v2.TAG_POSTSCRIPT WHERE TAGPS_NOM_IMPRIMANTE = 'Banc lot 6 Courrier' AND TAGPS_NOM_TAG LIKE 'BAC[_]%' AND TAGPS_BAC_MANUEL = 0 => 3
+controle: SELECT COUNT(*) FROM soc.Journal WHERE Ecran = 'Imprimantes du greffe' AND IdObjet = '2:Banc lot 6 Courrier' AND Verbe = 'a cree' => 1

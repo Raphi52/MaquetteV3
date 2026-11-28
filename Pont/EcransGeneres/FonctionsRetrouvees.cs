@@ -434,46 +434,48 @@ public sealed class DomaineFonctionsRetrouvees : IDomaineEcrans
             ],
         },
 
-        // Pas de fiche : Outils\Impression\PROC_IMP_WIN (« Paramétrage des imprimantes greffe » : lots 1 et 2,
-        // bacs, devmodes) et PROC_ImprimanteWindows (pilotes, imprimantes absentes du serveur ou de la base).
-        // Lot 16 (27/11/2026) : RESTE EN EXEMPLE, cause nommee -- les imprimantes, leurs bacs et leurs reglages nommes sont
-        // les tables IMPRIMANTE_WINDOWS, IMPRIMANTE_BAC, IMPRIMANTE_DEVMOD et RIG_IMPRIMANTE_WINDOWS de COMMUN_RIG (classes
-        // RigTools\SQL\COMMON\*.cs ; connexion CodeGreffeBaseCommmunRig, OPE_IMP_MANQUANTE.cs:147), absente de la base du
-        // greffe ; les pilotes viennent du serveur Windows (PrinterManagement, OPE_IMP_MANQUANTE.cs:47). Seuls les lots 1 et 2
-        // sont dans la base du greffe : IMPRIMANTE_PS (ImprimanteLot1.cs:97) et IMPRIMANTE_EDITION (ImprimanteLot2.cs:262,
-        // lue en V3 par EcrivainFileEditions.cs:131) -- de quoi lire la seule marche « Lots d'édition », pas la liste.
+        // Outils\Impression\PROC_IMP_WIN (« Paramétrage des imprimantes greffe »). Lot 6 du plan « RIG v3 complet » (28/11/2026) :
+        // l'ecran montre l'onglet « Lots » de RIG v2 -- les imprimantes LOGIQUES lot 1 (IMPRIMANTE_PS, ImprimanteLot1.cs:97) et lot 2
+        // (IMPRIMANTE_EDITION, ImprimanteLot2.cs:262, types de papier dans TAG_POSTSCRIPT), tables de la BASE DU GREFFE, lues par
+        // LecteurImprimantesGreffe.cs et ecrites par EcrivainImprimantesGreffe.cs (Ajouter, Modifier ; Supprimer reste une
+        // demonstration : la V2 exige une imprimante de remplacement, OPE_IMP_LOT1.cs:208-226). Colonnes : les grilles et la saisie de
+        // la V2 (OPE_IMP_LOT1.cs:77-101, OPE_IMP_LOT2.cs:79-96, OPE_SAISIE_IMP_LOT1.Designer.cs:94-120).
+        // NON MONTRES (lot 16 du plan precedent, 27/11/2026) : les onglets des imprimantes Windows, de leurs bacs (« Bacs papier »)
+        // et de leurs reglages nommes (DEVMOD) -- tables IMPRIMANTE_WINDOWS, IMPRIMANTE_BAC, IMPRIMANTE_DEVMOD et
+        // RIG_IMPRIMANTE_WINDOWS de COMMUN_RIG (connexion CodeGreffeBaseCommmunRig, OPE_IMP_MANQUANTE.cs:147), par serveur
+        // d'impression, absentes de la base V3 du greffe ; les pilotes viennent du serveur Windows (PrinterManagement,
+        // OPE_IMP_MANQUANTE.cs:47). D'ou le retrait des marches « Bacs papier », « Réglages nommés », « Code OMR » et du groupe
+        // « Autres imprimantes » : aucune donnee de la base du greffe ne les porte.
         new DescripteurEcran
         {
-            Code = "PROC_IMP_WIN", Titre = "Imprimantes du greffe", Sujet = "imprimantes",
+            Code = "PROC_IMP_WIN", Titre = "Imprimantes du greffe", Sujet = "imprimantes lot 1 et lot 2",
             Forme = FormeEcran.Referentiel,
-            Colonnes = ["Nom", "Pilote", "Port", "Bac", "Type de papier", "Code OMR"],
-            Recherche = "Rechercher une imprimante, un pilote, un bac…",
-            Criteres = ["Imprimantes du serveur", "Imprimantes absentes en base", "Imprimantes absentes du serveur"],
-            Valider = "Modifier", // PROC_IMP_WIN : boutons « Ajouter une nouvelle imprimante », « Modifier », « Supprimer ».
+            Colonnes = ["Nom", "Redirigée vers l'imprimante physique", Champ.Case("Utilisable pour les différés"), Champ.Case("Active"),
+                        "Types de papier", Champ.Liste("Lot", "Lot 1", "Lot 2")],
+            Recherche = "Rechercher une imprimante ou l'imprimante physique vers laquelle elle sort…",
+            Criteres = ["Lot", "Imprimante physique"],
+            Valider = "Enregistrer", // OPE_SAISIE_IMP_LOT1.cs:84-86 et LOT2.cs:93-95 : le bouton VALIDER de la saisie s'appelle « Enregistrer ».
             Rang = 7,
-            Etats = [.. EtatsEcran.Trois("À paramétrer", "En cours", "Paramétrée"), new EtatEcran("EnAttente", "Absente du serveur", "en-attente")],
-            Groupes = ["Lot 1", "Lot 2", "Autres imprimantes"],
+            Etats = EtatsEcran.Trois("À rediriger", "Inactive", "Active"),
+            Groupes = ["Lot 1", "Lot 2"],
             Sections =
             [
-                Marche("Imprimante", "Ajouter une imprimante du serveur, ou supprimer celle qui n'y est plus. Un pilote différent du serveur est signalé : « Les drivers sont différents ».", true,
-                    "Nom", "Pilote", "Port"),
-                Marche("Bacs papier", "Les bacs de l'imprimante et le papier de chacun.", true,
-                    "Bac", "Type de papier"),
-                Marche("Réglages nommés", "Un réglage d'impression nommé par usage (recto verso, agrafage).", false,
-                    "Nom du réglage"),
-                Marche("Lots d'édition", "L'imprimante qui sort le lot 1 et celle qui sort le lot 2 du greffe.", true,
-                    "Lot 1", "Lot 2"),
-                Marche("Code OMR", "Le code OMR pour la mise sous pli, par greffe.", false,
-                    "Code OMR", "Code greffe"),
+                Marche("Imprimante", "Le nom et le lot ne changent plus une fois l'imprimante enregistrée. L'imprimante physique est obligatoire.", true,
+                    "Nom", Champ.Liste("Lot", "Lot 1", "Lot 2"), "Redirigée vers l'imprimante physique"),
+                Marche("Lot 1 : différés et activation", "Pour une imprimante lot 1 seulement.", false,
+                    Champ.Case("Utilisable pour les différés"), Champ.Case("Active")),
+                Marche("Lot 2 : types de papier", "Pour une imprimante lot 2 : les types séparés par des virgules (NORMAL, SECURISE, LRAR à l'ajout).", false,
+                    "Types de papier"),
             ],
+            // Les cellules, dans l'ordre des colonnes : des imprimantes de RIG_DEV (IMPRIMANTE_PS, IMPRIMANTE_EDITION), anonymes.
             Lignes =
             [
-                Ligne("Accueil-RDC", "Pilote à jour · bacs 1 et 2 · exemple : tables d'imprimantes de COMMUN_RIG, absentes de la base du greffe", "Lot 1", "Validee", 0, 1, 3),
-                Ligne("Greffe-1er", "Bac 2 sans papier défini · exemple : tables d'imprimantes de COMMUN_RIG, absentes de la base du greffe", "Lot 1", "EnCours", 0),
-                Ligne("Audiences", "Recto verso · agrafage · exemple : tables d'imprimantes de COMMUN_RIG, absentes de la base du greffe", "Lot 2", "Validee", 0, 1, 2, 3),
-                Ligne("Service RCS", "Nouvelle imprimante du serveur · exemple : tables d'imprimantes de COMMUN_RIG, absentes de la base du greffe", "Lot 2", "AFaire"),
-                Ligne("Direction", "Pilote différent du serveur · exemple : tables d'imprimantes de COMMUN_RIG, absentes de la base du greffe", "Autres imprimantes", "EnCours", 0, 1),
-                Ligne("Ancienne-Archives", "Retirée du serveur · exemple : tables d'imprimantes de COMMUN_RIG, absentes de la base du greffe", "Autres imprimantes", "EnAttente", 0, 1),
+                new LigneEcran("Accueil", "vers PS · utilisable pour les différés", "Lot 1", "Validee", []) { Valeurs = ["Accueil", "PS", "oui", "oui", "", "Lot 1"] },
+                new LigneEcran("Plieuse", "vers Plieuse 12 · inactive", "Lot 1", "EnCours", []) { Valeurs = ["Plieuse", "Plieuse 12", "", "", "", "Lot 1"] },
+                new LigneEcran("Nouvelle copieuse", "sans imprimante physique", "Lot 1", "AFaire", []) { Valeurs = ["Nouvelle copieuse", "", "", "oui", "", "Lot 1"] },
+                new LigneEcran("Greffe RCS", "vers RL · papier LRAR, NORMAL, SECURISE", "Lot 2", "Validee", []) { Valeurs = ["Greffe RCS", "RL", "", "", "LRAR, NORMAL, SECURISE", "Lot 2"] },
+                new LigneEcran("Audiences", "vers RL · papier NORMAL", "Lot 2", "Validee", []) { Valeurs = ["Audiences", "RL", "", "", "NORMAL", "Lot 2"] },
+                new LigneEcran("Archives", "sans imprimante physique · aucun type de papier", "Lot 2", "AFaire", []) { Valeurs = ["Archives", "", "", "", "", "Lot 2"] },
             ],
         },
     ];
