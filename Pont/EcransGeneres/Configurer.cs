@@ -29,9 +29,12 @@ namespace RigV3Desktop.Pont.EcransGeneres;
 // ecrans dont la V2 lit une base absente du greffe (COMMUN_RIG, base WIKI) ou un service externe restent en exemple, la cause nommee
 // dans leur descripteur.
 //
-// PROC_PARAM_LISTEEXCEL n'a PAS de descripteur : sa fiche RIG v2 ne decrit aucune fonction
-// (« Nature reelle du plugin : une coquille, pas une couche OPE »). Un ecran inventerait du
-// contenu, ce que le plan interdit : il reste « a venir » dans le menu, a trancher par le chef.
+// PROC_PARAM_LISTEEXCEL (lot 2 du plan-f4fb097f, 28/11/2026) : sa fiche RIG v2 decrit une coquille (« Nature reelle du plugin :
+// une coquille, pas une couche OPE ») parce qu'elle n'a lu que le plugin du menu ; la fonction est dans le programme client du meme
+// nom de classe, Source\Judiciaire\Exe\RIG_CLIENT_PARAM_LISTEEXCEL. Elle ne lit la base du greffe qu'en LECTURE (son export est un
+// script .sql pose sur le poste) : forme Consultation, LecteurParametrageListesExcel.cs ; l'export, EcrivainParametrageListesExcel.cs.
+// fix-ok: pas un correctif -- ecran neuf du lot 2, mesure manquant le 28/11/2026 par le banc ParcoursCompletCheck (« aucun ecran : ni
+// descripteur ni composant ») ; son geste Exporter suit la decision du lot 3 (un export de la V2 pose son edition dans la file).
 
 public sealed class DomaineConfigurer : IDomaineEcrans
 {
@@ -760,6 +763,52 @@ public sealed class DomaineConfigurer : IDomaineEcrans
 
         new DescripteurEcran
         {
+            Code = "PROC_PARAM_LISTEEXCEL", Titre = "Listes Excel", Sujet = "listes Excel",
+            // Lot 2 du plan-f4fb097f (28/11/2026). RIG v2 : D:\RigApplication\Source\Judiciaire\Exe\RIG_CLIENT_PARAM_LISTEEXCEL (le plugin
+            // Source\RIG\DLL\Processus\PROC_PARAM_LISTEEXCEL n'a aucune etape, proc_param_listeexcel.md). Une recherche (« Recherche par
+            // code », Recherche\OPE_RECHERCHE.Designer.cs:72) sur les listes PARAMETRAGE_LISTE « LISTEXLS_* », puis la liste ouverte :
+            // son code et son libelle, ses champs dans leur ordre, sa clause FROM (Edition\). Lecteur : LecteurParametrageListesExcel.cs.
+            // CONSULTATION, pas Referentiel : la V2 n'ecrit rien dans la base -- ses saisies ne changent que la memoire de l'ecran et son
+            // seul bouton, EXPORT (FORM_PARAM_LISTEEXCEL.cs:18-33), ecrit un script .sql sur le poste (OPE_LISTE.cs:90-145), joue ensuite
+            // par Amitel. Le texte SQL des champs est execute par l'« Export Excel » : la V3 ne le laisse pas saisir a l'ecran.
+            // « Exporter » (decision du plan, lot 3 : un export de la V2 pose son edition dans la file des editions) : sur la liste ouverte,
+            // refuse sous deux champs (« 2 champs minimum sont requis », OPE_LISTE.cs:147-150), EcrivainParametrageListesExcel.cs.
+            Forme = FormeEcran.Consultation,
+            Gestes = ["Exporter"],
+            Recherche = "Recherche par code : type ou libellé de la liste…",
+            // Les deux colonnes de la grille de la V2 (Recherche\OPE_RECHERCHE.cs:42-43), celles que sa recherche plein texte lit ensemble :
+            // chacune cherche ici dans sa seule colonne, a la meme regle (debut de mot, sans accent ni casse).
+            Criteres = ["Type de liste", "Libellé"],
+            // VALIDER est cache par la V2 (FORM_PARAM_LISTEEXCEL.cs:19) : le seul bouton de la fiche lue est son geste, « Exporter ».
+            Valider = "Valider",
+            Rang = 7,
+            // Le controle de l'export de la V2, « 2 champs minimum sont requis » (Edition\OPE_LISTE.cs:147-150) : regle en tete du lecteur.
+            Etats = EtatsEcran.Trois("Sans champ", "Un seul champ", "Exportable"),
+            // La famille d'objets que l'« Export Excel » sort pour chaque type (#region de PROC_LISTEEXCEL OPE_RECHERCHE.cs:76-221).
+            Groupes = ["Instances", "Procédures", "Mesures", "Préventions", "BODACC et JAL", "Divers"],
+            Sections =
+            [
+                // OPE_EDITION (Edition\OPE_EDITION.Designer.cs:69-78) ; un code deja pris : OPE_EDITION.cs:26.
+                new MarcheEcran("Édition", "Le code de la liste (son type) et son libellé. Dans RIG v2, un code déjà pris est refusé : « Ce code de liste XLS existe déjà ».", true,
+                    ["Code", "Libellé"]),
+                // OPE_LISTE (« Ordre des champs », « From », Edition\OPE_LISTE.Designer.cs:73-84) et OPE_CHAMP (Code, Libellé, Ordre init, SQL).
+                new MarcheEcran("Liste des champs", "Les champs SELECT de la liste dans leur ordre initial : code, libellé, texte SQL et ordre ; puis la clause FROM. Il en faut deux au moins pour exporter la liste : « 2 champs minimum sont requis ».", true,
+                    [Champ.Tableau("Ordre des champs"), Champ.Zone("From")]),
+            ],
+            Lignes =
+            [
+                new LigneEcran("Liste des instances", "type INS · 27 champs", "Instances", "Validee", []),
+                new LigneEcran("Liste des affaires en cours", "type AFF · 30 champs", "Instances", "Validee", []),
+                new LigneEcran("Liste des procédures", "type PC · 2 champs", "Procédures", "Validee", []),
+                new LigneEcran("Liste des mesures en cours", "type MC · 1 champ", "Mesures", "EnCours", []),
+                new LigneEcran("Liste des préventions", "type PRV · aucun champ · sans clause FROM", "Préventions", "AFaire", []),
+                new LigneEcran("Liste des parutions au JAL", "type JAL · 9 champs", "BODACC et JAL", "Validee", []),
+                new LigneEcran("Liste des appels et des recours", "type VR · 12 champs", "Divers", "Validee", []),
+            ],
+        },
+
+        new DescripteurEcran
+        {
             Code = "PROC_REQUETES", Titre = "Requetes metier", Sujet = "requêtes",
             // Lot 15 (27/11/2026) : RESTE EN EXEMPLE, cause nommee -- le catalogue des requetes est la table REQUETE de COMMUN_RIG (RigTools
             // SQL\COMMON\REQUETE.cs:13 ; Requete.Delete ecrit sur Common.CodeGreffeBaseCommmunRig, proc_requetes.md:231-232), absente de la
@@ -949,10 +998,15 @@ public sealed class DomaineConfigurer : IDomaineEcrans
         new DescripteurEcran
         {
             Code = "PROC_EDI_RPJC_TRCNC", Titre = "EDI RPJC", Sujet = "affaires RPJC",
-            // Lot 15 (27/11/2026) : lu par LecteurTraitementRpjc.cs ; AUCUN GESTE BRANCHE, cause nommee -- integrer ou refuser une
-            // transmission n'est permis qu'apres avoir VISUALISE ses pieces (OPE_AFFAIRE_A_TRAITER.cs:687, une ligne non vue est sautee),
-            // extraites du flux entrant de la base EDI (EDIGREFFE, l. 495-506), absente de la base du greffe ; integrer insere en GED.
+            // Lot 15 (27/11/2026) : lu par LecteurTraitementRpjc.cs. Integrer ou refuser une transmission RESTE NON BRANCHE, cause nommee --
+            // ce n'est permis qu'apres avoir VISUALISE ses pieces (OPE_AFFAIRE_A_TRAITER.cs:687, une ligne non vue est sautee), extraites
+            // du flux entrant de la base EDI (EDIGREFFE, l. 492-506), absente de la base du greffe ; integrer insere en GED.
+            // Lot 2 du plan-f4fb097f (28/11/2026) : le geste de la grille « Affaires en cours » de la V2, « Annuler traitement »
+            // (Affaires en cours\OPE_AFFAIRE_EN_COURS.cs:126-140), qui ne lit pas la base EDI : EcrivainTraitementRpjc.cs. Il ne vise que
+            // les affaires en cours (la seule grille qui porte ce bouton), seul l'agent qui tient l'affaire l'annule (l. 160-161).
             Forme = FormeEcran.File,
+            Gestes = ["Annuler le traitement"],
+            EtatsGestes = new Dictionary<string, string[]> { ["Annuler le traitement"] = ["EnCours"] },
             Recherche = "Rechercher une affaire, un numéro de dossier…",
             Criteres = ["Numéro d'affaire", "Mandataire", "État de traitement"],
             // Bouton final cite par la fiche v2 : VALIDER (proc_edi_rpjc_trcnc.md, Detail OPE)
@@ -964,7 +1018,7 @@ public sealed class DomaineConfigurer : IDomaineEcrans
             [
                 new MarcheEcran("Visualisation", "Les documents doivent être visualisés avant le traitement, sauf choix explicite de l'utilisateur sur les documents non vus.", true,
                     ["Documents", "Visualisation"]),
-                new MarcheEcran("Verrouillage", "L'affaire est verrouillée au nom de l'utilisateur qui la traite : elle passe dans les affaires en cours.", true,
+                new MarcheEcran("Verrouillage", "L'affaire est verrouillée au nom de l'utilisateur qui la traite : elle passe dans les affaires en cours. « Annuler le traitement » la rend aux affaires à traiter ; seul l'utilisateur qui la tient peut l'annuler.", true,
                     ["Verrou"]),
                 new MarcheEcran("Traitement", "Le type de partie (demandeur ou défendeur) et la date de transmission déterminent l'événement créé.", true,
                     ["Type de partie", "Date de transmission"]),

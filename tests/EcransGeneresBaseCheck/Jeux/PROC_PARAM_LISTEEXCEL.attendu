@@ -1,0 +1,13 @@
+# « Listes Excel » (LecteurParametrageListesExcel) sur le jeu PROC_PARAM_LISTEEXCEL.sql : les listes PARAMETRAGE_LISTE dont
+# PRMLS_LISTE est « LISTEXLS » suivi d'un caractere (RIG_CLIENT_PARAM_LISTEEXCEL Recherche\OPE_RECHERCHE.cs:48), par type
+# (ORDER BY PRMLS_VALEUR). Ecartees : 3200108 (une autre liste de reference) et 3200109 (« LISTEXLS » seul) -- jumelle 3200101.
+# Groupe : la famille de l'export (PROC_LISTEEXCEL OPE_RECHERCHE.cs:76-221) ; L2X, qu'il ne nomme pas, va dans « Divers ».
+# Etat : le nombre de champs SELECT (« 2 champs minimum sont requis », OPE_LISTE.cs:147-150) -- 0 AFaire, 1 EnCours, 2 et plus Validee.
+# IEF : 2 champs (la ligne LISTE ne compte pas, ni le FROM). VR n'a pas de libelle : son type le nomme. L2X n'a pas de FROM.
+Liste des instances par évènement futur | type IEF · 2 champs | Instances | Validee | []
+Liste des parutions au JAL | type JAL · 2 champs | BODACC et JAL | Validee | []
+Liste du banc lot 2 | type L2X · 2 champs · sans clause FROM · type que l'export Excel ne sort pas | Divers | Validee | []
+Liste des mesures en cours | type MC · 1 champ | Mesures | EnCours | []
+Liste des PC en cours | type PCC · 3 champs | Procédures | Validee | []
+Liste des préventions | type PRV · aucun champ · sans clause FROM | Préventions | AFaire | []
+VR | type VR · 2 champs | Divers | Validee | []

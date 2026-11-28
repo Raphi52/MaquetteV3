@@ -61,6 +61,9 @@ INSERT INTO v2.DEMAT_RPJC_TRCNC (RPJCC_ID_RPJCC, RPJCC_ETAT, RPJCC_ETAT_TRAITEME
     (1300105, '1', NULL, NULL, NULL, NULL, DATEADD(DAY, -1, @aujourdhui), '130004', '2026F13003', NULL, NULL, 3),
     -- EN COURS (etat 1, un agent dessus) : EnCours, visualisation et verrou
     (1300106, '1', NULL, NULL, NULL, NULL, DATEADD(DAY, -2, @aujourdhui), '130001', '2026F13003', 'agent.trcnc', 'PIE13', 1),
+    -- EN COURS, tenue par l'agent du banc (« banc.ecrans ») : celle que « Annuler le traitement » rend aux affaires a traiter
+    -- (PROC_EDI_RPJC_TRCNC.gestes, jumeau accepte de 1300106, tenue par un autre agent ; lot 2 du plan-f4fb097f)
+    (1300107, '1', NULL, NULL, NULL, NULL, DATEADD(DAY, -2, @aujourdhui), '130001', '2026F13001', 'banc.ecrans', 'CCL13', 1),
     -- HISTORIQUE : acceptee, traitee au jour moins 15 jours a 0 h (borne basse de la V2, incluse) : Validee
     (1300108, '2', 'A', DATEADD(DAY, -15, @aujourdhui), NULL, NULL, DATEADD(DAY, -20, @aujourdhui), '130001', '2026F13001', NULL, 'CCL13', 1),
     -- acceptee, traitee la veille de la borne basse a 23 h 59 : ecartee -- jumeau 1300108 (a la borne)

@@ -115,6 +115,11 @@ internal sealed class LecteurTraitementRpjc : ILecteurEcran
             transmise.Length > 0 ? $"transmise le {transmise}" : null,
             document,
             regle.Statut);
-        return new LigneLue(nom, precisions, regle.Groupe, regle.Etat, regle.Faites);
+        // L'identifiant de la transmission (RPJCC_ID_RPJCC, la colonne « Identifiant » des grilles de la V2) : le geste « Annuler le
+        // traitement » vise la ligne cochee par lui (EcrivainTraitementRpjc.cs).
+        return new LigneLue(nom, precisions, regle.Groupe, regle.Etat, regle.Faites)
+        {
+            Id = Convert.ToString(r["RPJCC_ID_RPJCC"], System.Globalization.CultureInfo.InvariantCulture),
+        };
     }
 }
