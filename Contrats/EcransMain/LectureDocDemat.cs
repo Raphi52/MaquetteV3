@@ -7,6 +7,17 @@ namespace RigV3.Contrats.EcransMain;
 public static class RoutesDocDemat
 {
     public const string Pieces = "/ecrans-main/{greffe}/pieces-dematerialisees";
+
+    /// <summary>
+    /// POST un geste (<c>RigV3.Contrats.EcransGeneres.GesteEcran</c>, Ids = [l'identifiant de la pièce, DMCOPJ_ID_DMCOPJ]) : Type
+    /// Supprimer = mettre la pièce en état « Supprimé » ; Type Agir, Nom <see cref="RemettreEnVigueur"/> = la remettre en vigueur
+    /// (menu de l'arbre de RIG v2, UltTreeViewDocDemat.cs:290-316). Rend un <c>ResultatGeste</c> (422 : le refus de RIG v2).
+    /// L'écriture : Serveur/Socle/EcransMain/EcritureDocDemat.cs (plan « RIG v3 complet, mesuré par le banc du parcours complet », lot 10).
+    /// </summary>
+    public const string Etat = "/ecrans-main/{greffe}/pieces-dematerialisees/etat";
+
+    /// <summary>Le nom du geste « Remettre en vigueur » (le libellé du menu de RIG v2, UltTreeViewDocDemat.Designer.cs:252).</summary>
+    public const string RemettreEnVigueur = "Remettre en vigueur";
 }
 
 /// <summary>

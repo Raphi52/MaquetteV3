@@ -21,9 +21,14 @@
 // deposes depuis 2014 pas encore ranges dans la GED, criteres envoyes a la base. Une note le dit au-dessus de la liste (le
 // titre reste celui du menu) ; « Avec anomalie seulement » vise les bilans, que la base V3 ne porte pas : la note le dit.
 // Sans serveur, la demonstration du pont, marquee « exemple » ; en panne, le motif et aucune ligne.
+// GESTE (plan « RIG v3 complet, mesure par le banc du parcours complet », lot 10, 28/11/2026) : le menu d'un acte de la base porte
+// « Definir le document comme non numerisable » (ou « numerisable » dans la liste des non numerisables), le menu de la grille de
+// RIG v2 (OPE_RESULTAT.cs:176-186, :253-284) ; le pont le fait ecrire par le serveur (Pont/EcranActesBase.cs, ModifierSansDocument ;
+// refus : sans la fonction ACTENUM_NUMERISABLE), puis la liste est relue.
 
 import { Fragment, useEffect, useState } from 'react'
 import { appeler } from '../pont'
+import type { ResultatGesteVue } from './formes/commun'
 import { ProvenanceEcran, type ModeLecture } from '../provenance'
 import { dateSaisie, useNombreSaisi } from '../saisie'
 import {
@@ -51,6 +56,8 @@ export interface LigneActe {
   demat: boolean
   anomalie: string
   numerisable: boolean
+  /** L'acte de la base (ACTDP_ID_ACDPS) ; vide en demonstration : la ligne n'a pas de geste. */
+  id?: string
 }
 
 export interface VueActes {
@@ -105,6 +112,10 @@ export function EcranActes({ ouvrirDossier }: ProprietesEcranActes) {
   const [vue, setVue] = useState<VueActes | null>(null)
   // La ligne depliee par son chevron (une a la fois), par son rang.
   const [ouverte, setOuverte] = useState<number | null>(null)
+  // Le geste « (non) numerisable » : son compte rendu, l'envoi en cours et la relecture de la liste qui le suit.
+  const [annonce, setAnnonce] = useState<string | null>(null)
+  const [envoi, setEnvoi] = useState(false)
+  const [relecture, setRelecture] = useState(0)
 
   useEffect(() => {
     let perime = false
@@ -114,7 +125,20 @@ export function EcranActes({ ouvrirDossier }: ProprietesEcranActes) {
       critNonNumerisables, critAnomalies, critTopMax: topMax.valeur,
     }).then((v) => { if (!perime) setVue(v) })
     return () => { perime = true }
-  }, [critActeCritere, critAbrege, critTypeDepot, critDu, critAu, critNonNumerisables, critAnomalies, topMax.valeur])
+  }, [critActeCritere, critAbrege, critTypeDepot, critDu, critAu, critNonNumerisables, critAnomalies, topMax.valeur, relecture])
+
+  async function definirNumerisable(a: LigneActe) {
+    setEnvoi(true)
+    try {
+      const r = await appeler<ResultatGesteVue>('EcranActes.ModifierSansDocument', a.id, a.numerisable)
+      setAnnonce(r.message)
+      if (r.fait) setRelecture((n) => n + 1)
+    } catch {
+      setAnnonce("Le pont n'a pas répondu : rien n'est enregistré.")
+    } finally {
+      setEnvoi(false)
+    }
+  }
 
   const trouves = vue?.lignes ?? []
 
@@ -226,6 +250,7 @@ export function EcranActes({ ouvrirDossier }: ProprietesEcranActes) {
 
         {vue && <ProvenanceEcran mode={vue.mode} message={vue.message} quoi="Actes" />}
         {vue?.mode === 'serveur' && vue.message && <p className="rig-eg-note" role="note">{vue.message}</p>}
+        {annonce !== null && <p className="rig-eg-note" role="status">{annonce}</p>}
 
         <VuesListe vues={VuesActes.map((v) => ({ cle: v.cle, libelle: v.libelle }))}
                    active={VuesActes.find((v) => v.nonNumerisables === critNonNumerisables && v.anomalies === critAnomalies)?.cle ?? null}
@@ -258,6 +283,10 @@ export function EcranActes({ ouvrirDossier }: ProprietesEcranActes) {
                                 estOuverte ? 'rig-lm-ouverte' : ''].filter((c) => c !== '').join(' ')
                 const actions: ActionLigne[] = [
                   { libelle: 'Ouvrir le dossier', fort: true, desactive: !a.numerisable, agir: () => ouvrir(a) },
+                  ...(a.id ? [{
+                    libelle: a.numerisable ? 'Définir le document comme non numérisable' : 'Définir le document comme numérisable',
+                    desactive: envoi, agir: () => { void definirNumerisable(a) },
+                  }] : []),
                 ]
                 return (
                   <Fragment key={`${i}:${a.rang}`}>

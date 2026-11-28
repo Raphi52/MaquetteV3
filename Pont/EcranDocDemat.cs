@@ -1,3 +1,4 @@
+using RigV3.Contrats.EcransGeneres;
 using RigV3.Contrats.EcransMain;
 
 namespace RigV3Desktop.Pont;
@@ -20,6 +21,9 @@ public sealed record VueDocDemat(PieceDematVue[] Pieces, int Total, string Mode,
 /// Branche au serveur, l'ecran montre les pieces dematerialisees du greffe (Serveur/Socle/EcransMain/LectureDocDemat.cs :
 /// DEMAT_CREFO_PJ et son type, la demande de sa demat), groupees par dossier. SANS serveur : aucune piece, mode « demo » -- la
 /// demonstration reste celle de l'ecran, marquee « exemple ». En panne : le motif et aucune piece.
+/// Les gestes « Supprimer » et « Remettre en vigueur » une piece (le menu de l'arbre de RIG v2) s'ecrivent dans la base du greffe par
+/// le serveur (<see cref="ModifierEtatAsync"/>, Serveur/Socle/EcransMain/EcritureDocDemat.cs) ; sans serveur, rien n'est ecrit (plan
+/// « RIG v3 complet, mesuré par le banc du parcours complet », lot 10, 28/11/2026).
 /// </summary>
 public static class EcranDocDemat
 {
@@ -33,6 +37,23 @@ public static class EcranDocDemat
             s.LireAsync<PiecesDematLues>(RoutesEcransMain.Pour(RoutesDocDemat.Pieces, g)));
         if (lu.Valeur is not { } v) return new VueDocDemat([], 0, lu.Mode, lu.Message);
         return new VueDocDemat([.. v.Lignes.Select(Vue)], v.Total, lu.Mode, null);
+    }
+
+    /// <summary>« Supprimer » (<paramref name="supprimer"/> vrai) ou « Remettre en vigueur » la piece <paramref name="id"/>.</summary>
+    [JSInvokable("EcranDocDemat.ModifierEtat")]
+    public static Task<ResultatGeste> ModifierEtat(string id, bool supprimer)
+        => ModifierEtatAsync(ClientServeur.Actif, SessionAgent.CodeGreffe, id, supprimer);
+
+    /// <summary>Le geste sur <paramref name="serveur"/> et le greffe <paramref name="greffe"/> : sans eux, « Démonstration ».</summary>
+    public static async Task<ResultatGeste> ModifierEtatAsync(ClientServeur? serveur, string? greffe, string id, bool supprimer)
+    {
+        if (serveur is null || string.IsNullOrWhiteSpace(greffe))
+            return new ResultatGeste(false, $"{EcranGenere.Demonstration} : RIG n'est pas branché sur la base d'un greffe.") { SansEcrivain = true };
+        return await EcranGenere.EnvoyerGesteAsync(serveur, greffe, RoutesEcransMain.Pour(RoutesDocDemat.Etat, greffe),
+            new GesteEcran(supprimer ? TypeGeste.Supprimer : TypeGeste.Agir, [id?.Trim() ?? ""], new Dictionary<string, string>())
+            {
+                Nom = supprimer ? null : RoutesDocDemat.RemettreEnVigueur,
+            });
     }
 
     private static PieceDematVue Vue(PieceDematLue p) => new(

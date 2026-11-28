@@ -1,4 +1,5 @@
 using System.Globalization;
+using RigV3.Contrats.EcransGeneres;
 using RigV3.Contrats.EcransMain;
 
 namespace RigV3Desktop.Pont;
@@ -24,8 +25,11 @@ public sealed record VueCoffreFort(string Mode, string? Message, DepotCoffre[] D
 /// LectureCoffreFort.cs : requete, colonnes et couleurs d'OPE_RECHERCHE_HISTORIQUE / OPE_RESULTAT_HISTORIQUE citees).
 /// « A transmettre » reste VIDE : RIG v2 le compose de quatre requetes (evenements, editions, decisions numerisees) que la V3
 /// ne reprend pas ; « Date envoi infogreffe » et l'historique des envois sont dans la base EDI du greffe, absente. Le coffre-fort
-/// electronique est un SERVICE EXTERNE, jamais appele : l'ecran n'ecrit rien. SANS serveur : mode « demo », aucun depot (l'ecran
-/// garde ses exemples, marques). En panne : le motif et aucun depot.
+/// electronique est un SERVICE EXTERNE, jamais appele. Le geste « Re-transmettre » de RIG v2 (des depots deja transmis) s'ecrit dans la
+/// base du greffe par le serveur (<see cref="RelancerTransmissionAsync"/>, Serveur/Socle/EcransMain/EcritureCoffreFort.cs : etat « 2 -
+/// Traite par le greffe », que le service du coffre-fort reprend) ; sans serveur, rien n'est ecrit (plan « RIG v3 complet, mesuré par
+/// le banc du parcours complet », lot 10, 28/11/2026). SANS serveur : mode « demo », aucun depot (l'ecran garde ses exemples,
+/// marques). En panne : le motif et aucun depot.
 /// </summary>
 public static class EcranCoffreFort
 {
@@ -39,6 +43,23 @@ public static class EcranCoffreFort
             s.LireAsync<DepotsCoffreLus>(RoutesEcransMain.Pour(RoutesCoffreFort.Depots, g)));
         if (lu.Valeur is not { } v) return new VueCoffreFort(lu.Mode, lu.Message, [], 0);
         return new VueCoffreFort(lu.Mode, null, [.. v.Lignes.Select(Depot)], v.Total);
+    }
+
+    /// <summary>« Re-transmettre » les depots <paramref name="ids"/> (DepotCoffre.Code) de l'historique.</summary>
+    [JSInvokable("EcranCoffreFort.RelancerTransmission")]
+    public static Task<ResultatGeste> RelancerTransmission(string[] ids)
+        => RelancerTransmissionAsync(ClientServeur.Actif, SessionAgent.CodeGreffe, ids);
+
+    /// <summary>Le geste sur <paramref name="serveur"/> et le greffe <paramref name="greffe"/> : sans eux, « Démonstration ».</summary>
+    public static async Task<ResultatGeste> RelancerTransmissionAsync(ClientServeur? serveur, string? greffe, string[] ids)
+    {
+        if (serveur is null || string.IsNullOrWhiteSpace(greffe))
+            return new ResultatGeste(false, $"{EcranGenere.Demonstration} : RIG n'est pas branché sur la base d'un greffe.") { SansEcrivain = true };
+        return await EcranGenere.EnvoyerGesteAsync(serveur, greffe, RoutesEcransMain.Pour(RoutesCoffreFort.Retransmission, greffe),
+            new GesteEcran(TypeGeste.Agir, [.. (ids ?? []).Select(i => i?.Trim() ?? "")], new Dictionary<string, string>())
+            {
+                Nom = RoutesCoffreFort.Retransmettre,
+            });
     }
 
     private static DepotCoffre Depot(DepotCoffreLu d)

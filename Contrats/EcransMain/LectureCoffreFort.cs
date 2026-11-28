@@ -7,6 +7,17 @@ namespace RigV3.Contrats.EcransMain;
 public static class RoutesCoffreFort
 {
     public const string Depots = "/ecrans-main/{greffe}/coffre-fort";
+
+    /// <summary>
+    /// POST un geste (<c>RigV3.Contrats.EcransGeneres.GesteEcran</c>, Type Agir, Nom <see cref="Retransmettre"/>, Ids = les dépôts
+    /// cochés, CFEC_ID_CFEC) : le bouton « Re-transmettre » de RIG v2 (FORM_COFFRE_FORT.cs:30, :76-80 ; OPE_TREEVIEW_RETRANSMETTRE.reTransmettre).
+    /// Rend un <c>ResultatGeste</c> (422 : le refus de RIG v2). L'écriture : Serveur/Socle/EcransMain/EcritureCoffreFort.cs (plan « RIG v3
+    /// complet, mesuré par le banc du parcours complet », lot 10).
+    /// </summary>
+    public const string Retransmission = "/ecrans-main/{greffe}/coffre-fort/retransmettre";
+
+    /// <summary>Le nom du geste : le libellé du bouton de RIG v2 (FORM_COFFRE_FORT.cs:30).</summary>
+    public const string Retransmettre = "Re-transmettre";
 }
 
 /// <summary>

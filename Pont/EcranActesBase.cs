@@ -1,4 +1,5 @@
 using System.Globalization;
+using RigV3.Contrats.EcransGeneres;
 using RigV3.Contrats.EcransMain;
 
 namespace RigV3Desktop.Pont;
@@ -15,6 +16,9 @@ namespace RigV3Desktop.Pont;
 /// ViewDcaEnAnomalie absente de la base V3) : aucune ligne, et la note le dit. La date de cloture, la confidentialite et les
 /// anomalies (mode Bilan) restent vides. SANS serveur : la demonstration (Trouver, JeuDemo.Actes), marquee « exemple ». En
 /// panne : le motif et aucune ligne.
+/// Le geste « Définir le document comme (non) numérisable » d'un acte (menu de la grille de RIG v2) s'ecrit dans la base du greffe
+/// par le serveur (<see cref="ModifierSansDocumentAsync"/>, Serveur/Socle/EcransMain/EcritureActes.cs) ; sans serveur, rien n'est
+/// ecrit (plan « RIG v3 complet, mesuré par le banc du parcours complet », lot 10, 28/11/2026).
 /// </summary>
 public static partial class EcranActes
 {
@@ -46,9 +50,28 @@ public static partial class EcranActes
         return new VueActes(categories, [.. v.Lignes.Select((a, i) => Ligne(i + 1, a))], lu.Mode, NoteBase, v.Total);
     }
 
+    /// <summary>« Définir le document comme non numérisable » (<paramref name="sansDocument"/> vrai) ou « numérisable » l'acte
+    /// <paramref name="id"/> (LigneActe.Id).</summary>
+    [JSInvokable("EcranActes.ModifierSansDocument")]
+    public static Task<ResultatGeste> ModifierSansDocument(string id, bool sansDocument)
+        => ModifierSansDocumentAsync(ClientServeur.Actif, SessionAgent.CodeGreffe, id, sansDocument);
+
+    /// <summary>Le geste sur <paramref name="serveur"/> et le greffe <paramref name="greffe"/> : sans eux, « Démonstration ».</summary>
+    public static async Task<ResultatGeste> ModifierSansDocumentAsync(ClientServeur? serveur, string? greffe, string id, bool sansDocument)
+    {
+        if (serveur is null || string.IsNullOrWhiteSpace(greffe))
+            return new ResultatGeste(false, $"{EcranGenere.Demonstration} : RIG n'est pas branché sur la base d'un greffe.") { SansEcrivain = true };
+        return await EcranGenere.EnvoyerGesteAsync(serveur, greffe, RoutesEcransMain.Pour(RoutesActes.SansDocument, greffe),
+            new GesteEcran(TypeGeste.Agir, [id?.Trim() ?? ""], new Dictionary<string, string>())
+            {
+                Nom = sansDocument ? RoutesActes.NonNumerisable : RoutesActes.Numerisable,
+            });
+    }
+
     private static string Jour(DateTime? d) => d?.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture) ?? "";
 
     private static LigneActe Ligne(int rang, ActeLu a)
         => new(rang, a.NumeroGestion, a.NumeroDepot, a.Designation, a.CategorieLibelle, a.Abrege, a.Description, Jour(a.DateDepot),
-               Jour(a.DateActe), Cloture: "", Confidentiel: false, a.Demat, Anomalie: "", Numerisable: !a.SansDocument);
+               Jour(a.DateActe), Cloture: "", Confidentiel: false, a.Demat, Anomalie: "", Numerisable: !a.SansDocument,
+               Id: a.Id.ToString(CultureInfo.InvariantCulture));
 }

@@ -16,12 +16,16 @@
 // fichier et son etat Infogreffe (les colonnes de DEMAT_CREFO_PJ) ; le controle de la piece n'en est pas une.
 // Les actions autres que « Voir » sont des traitements de fichier ou des services de RIG v2 (visionneuse, impression,
 // controle de la piece) : elles ne s'enregistrent pas et le disent (« Demonstration : rien n'est enregistre »).
+// SAUF « Supprimer » et « Remettre en vigueur » une piece de la base (plan « RIG v3 complet, mesure par le banc du parcours
+// complet », lot 10, 28/11/2026) : apres les deux confirmations de RIG v2 (UltTreeViewDocDemat.cs:292-293, :307-308), le pont
+// les fait ecrire par le serveur (Pont/EcranDocDemat.cs, ModifierEtat ; refus : hors Amitel, l'arbre est en lecture seule), puis
+// relit les pieces.
 
 import { useEffect, useState } from 'react'
 import { appeler } from '../pont'
 import { contientSansCasse, dateCourte, estBlanc } from '../criteres'
 import { ProvenanceEcran, type ModeLecture } from '../provenance'
-import { refus } from './formes/commun'
+import { refus, type ResultatGesteVue } from './formes/commun'
 
 interface Piece {
   dossier: string
@@ -96,6 +100,12 @@ export function EcranDocDemat({ ouvrirDossier }: ProprietesEcranDocDemat) {
   // sans cela, la moitie basse de l'ecran restait vide tant qu'on n'avait
   // rien clique dans l'arbre.
   const [selection, setSelection] = useState<Piece | null>(Pieces[0] ?? null)
+  // « Supprimer » ou « Remettre en vigueur » une piece de la base : la confirmation en cours (1re ou 2e question de RIG v2) et
+  // l'envoi au pont ; apres un geste fait, les pieces sont relues et la piece reste choisie.
+  const [confirmation, setConfirmation] = useState<{ supprimer: boolean; etape: 1 | 2 } | null>(null)
+  const [envoi, setEnvoi] = useState(false)
+  // Chaque lecture des pieces ; apres un geste, la piece a garder choisie (son etat relu).
+  const [relecture, setRelecture] = useState<{ n: number; garder: string | undefined }>({ n: 0, garder: undefined })
 
   useEffect(() => {
     let perime = false
@@ -103,6 +113,8 @@ export function EcranDocDemat({ ouvrirDossier }: ProprietesEcranDocDemat) {
       .then((v) => {
         if (perime || v.mode === 'demo' || v.mode === undefined) return
         setVue(v)
+        const gardee = relecture.garder !== undefined ? v.pieces.find((p) => p.id === relecture.garder) : undefined
+        if (gardee) { setSelection(depuisBase(gardee)); return }
         // La base remplace la demonstration : son premier dossier deplie, sa premiere piece choisie.
         const premiere = v.pieces[0]
         setOuverts(new Set(premiere ? [premiere.dossier] : []))
@@ -110,7 +122,21 @@ export function EcranDocDemat({ ouvrirDossier }: ProprietesEcranDocDemat) {
       })
       .catch(() => { /* pas de pont (tests, page hors WebView2) : la demonstration reste */ })
     return () => { perime = true }
-  }, [])
+  }, [relecture])
+
+  async function modifierEtat(piece: Piece, supprimer: boolean) {
+    setConfirmation(null)
+    setEnvoi(true)
+    try {
+      const r = await appeler<ResultatGesteVue>('EcranDocDemat.ModifierEtat', piece.id, supprimer)
+      setAction(r.message)
+      if (r.fait) setRelecture((x) => ({ n: x.n + 1, garder: piece.id }))
+    } catch {
+      setAction("Le pont n'a pas répondu : rien n'est enregistré.")
+    } finally {
+      setEnvoi(false)
+    }
+  }
 
   const pieces = vue ? vue.pieces.map(depuisBase) : Pieces
   const groupes = groupesDe(pieces)
@@ -157,7 +183,7 @@ export function EcranDocDemat({ ouvrirDossier }: ProprietesEcranDocDemat) {
                   {piecesDuGroupe.filter(correspond).map((piece) => (
                     <li key={piece.id ?? piece.abrege + piece.libelle}>
                       <button className={`rig-menu__lien${memePiece(selection, piece) ? ' rig-menu__lien--actif' : ''}`}
-                              onClick={() => setSelection(piece)}>
+                              onClick={() => { setSelection(piece); setConfirmation(null) }}>
                         <span className="rig-menu__code">{piece.abrege}</span>{piece.libelle}
                       </button>
                     </li>
@@ -232,8 +258,27 @@ export function EcranDocDemat({ ouvrirDossier }: ProprietesEcranDocDemat) {
               <button className="rig-bouton rig-bouton--plat" onClick={() => setAction(refus('Demander le controle'))}>Demander le controle</button>{' '}
               <button className="rig-bouton rig-bouton--plat" onClick={() => setAction(refus('Verifier le justificatif'))}>Verifier le justificatif</button>{' '}
               <button className="rig-bouton rig-bouton--plat" onClick={() => setAction(refus("Verifier la carte d'identite"))}>Verifier la carte d'identite</button>{' '}
-              <button className="rig-bouton rig-bouton--plat" onClick={() => setAction(refus('Supprimer'))}>Supprimer</button>
+              {s.id === undefined
+                ? <button className="rig-bouton rig-bouton--plat" onClick={() => setAction(refus('Supprimer'))}>Supprimer</button>
+                : s.etat === 'Supprimée'
+                  ? <button className="rig-bouton rig-bouton--plat" disabled={envoi}
+                            onClick={() => { setAction(null); setConfirmation({ supprimer: false, etape: 1 }) }}>Remettre en vigueur</button>
+                  : <button className="rig-bouton rig-bouton--plat" disabled={envoi}
+                            onClick={() => { setAction(null); setConfirmation({ supprimer: true, etape: 1 }) }}>Supprimer</button>}
             </div>
+
+            {confirmation !== null && s.id !== undefined && (
+              <div className="rig-criteres__actions" role="alertdialog">
+                <p className="rig-nonmaq__texte">
+                  {confirmation.etape === 2 ? 'En êtes-vous sûr ?'
+                    : confirmation.supprimer ? `Mettre la pièce '${s.libelle}' en état 'Supprimé' dans la base de données du greffe ?`
+                      : `Remettre en vigueur la pièce '${s.libelle}' dans la base de données du greffe ?`}
+                </p>
+                <button className="rig-bouton" disabled={envoi}
+                        onClick={() => confirmation.etape === 1 ? setConfirmation({ ...confirmation, etape: 2 }) : void modifierEtat(s, confirmation.supprimer)}>Oui</button>{' '}
+                <button className="rig-bouton rig-bouton--plat" onClick={() => setConfirmation(null)}>Non</button>
+              </div>
+            )}
 
             {action !== null && <p className="rig-nonmaq__texte">{action}</p>}
           </div>

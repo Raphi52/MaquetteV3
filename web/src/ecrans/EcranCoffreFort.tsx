@@ -29,11 +29,16 @@
 // (Pont/EcranCoffreFortBase.cs). En base, « Deja transmis » est l'HISTORIQUE des depots de RIG v2 (DEMAT_CFEC, requete,
 // colonnes et couleurs d'OPE_RESULTAT_HISTORIQUE : Serveur/Socle/EcransMain/LectureCoffreFort.cs) ; « A transmettre » reste
 // vide et le dit (quatre requetes de RIG v2 non reprises) ; « Date envoi infogreffe » et l'historique des envois sont dans la
-// base EDI du greffe, absente. Le coffre-fort electronique est un service externe, jamais appele : l'ecran n'ecrit rien.
+// base EDI du greffe, absente. Le coffre-fort electronique est un service externe, jamais appele.
 // Sans serveur, les depots d'exemple ci-dessous, marques ; en panne, le motif et aucun depot.
+// GESTE (plan « RIG v3 complet, mesure par le banc du parcours complet », lot 10, 28/11/2026) : un depot de l'historique se
+// « Re-transmet » (le bouton de RIG v2, FORM_COFFRE_FORT.cs:30) depuis sa ligne depliee ; le pont le fait ecrire par le serveur
+// (Pont/EcranCoffreFortBase.cs, RelancerTransmission : etat « 2 - Traite par le greffe », que le service du coffre-fort reprend ;
+// refus de RIG v2 : « En attente de transmission », « Document non numerise », « Pas de copie generee »), puis relit les depots.
 
 import { Fragment, useEffect, useState } from 'react'
 import { appeler } from '../pont'
+import type { ResultatGesteVue } from './formes/commun'
 import { ProvenanceEcran, type ModeLecture } from '../provenance'
 import { contientSansCasse, dateCourte, distinctsTries, entierLisible, estBlanc } from '../criteres'
 import {
@@ -129,6 +134,10 @@ export function EcranCoffreFort() {
 
   // La vue du pont : null tant qu'il n'a pas repondu (aucun depot). En base, l'ecran s'ouvre sur l'historique.
   const [vue, setVue] = useState<VueCoffreFort | null>(null)
+  // « Re-transmettre » : son compte rendu, l'envoi en cours et la relecture des depots qui le suit.
+  const [annonce, setAnnonce] = useState<string | null>(null)
+  const [envoi, setEnvoi] = useState(false)
+  const [relecture, setRelecture] = useState(0)
   useEffect(() => {
     let perime = false
     void appeler<VueCoffreFort>('EcranCoffreFort.Depots').then((v) => {
@@ -137,7 +146,20 @@ export function EcranCoffreFort() {
       if (v.mode === 'serveur') setATransmettre(false)
     })
     return () => { perime = true }
-  }, [])
+  }, [relecture])
+
+  async function retransmettre(dep: DepotCoffre) {
+    setEnvoi(true)
+    try {
+      const r = await appeler<ResultatGesteVue>('EcranCoffreFort.RelancerTransmission', [dep.code])
+      setAnnonce(r.message)
+      if (r.fait) setRelecture((n) => n + 1)
+    } catch {
+      setAnnonce("Le pont n'a pas répondu : rien n'est enregistré.")
+    } finally {
+      setEnvoi(false)
+    }
+  }
   const enBase = vue?.mode === 'serveur'
   const Depots: DepotCoffre[] = vue === null ? [] : enBase ? vue.depots : vue.mode === 'demo' ? Exemples : []
   const Coffres = distinctsTries(Depots.map((d) => d.coffre).filter((c) => c !== ''))
@@ -243,6 +265,7 @@ export function EcranCoffreFort() {
       <ListeModerne etiquette="Depots">
         <ProvenanceEcran mode={vue?.mode} message={vue?.message} quoi="Depots" />
         {enBase && aTransmettre && <p className="rig-eg-note" role="note">{ATransmettreNonLu}</p>}
+        {annonce !== null && <p className="rig-eg-note" role="status">{annonce}</p>}
         <EnteteListe titre="Depots"
                      synthese={<>{trouves.length}{trouves.length > 1 ? ' depots ' : ' depot '}
                        {aTransmettre ? 'a transmettre' : 'deja transmis'}{' · '}<b>{enErreur}</b>{' en erreur'}</>}
@@ -288,7 +311,9 @@ export function EcranCoffreFort() {
                   </tr>
                   {estOuverte && (
                     <LigneDetail colonnes={NbColonnes}
-                                 actions={[{ libelle: 'Voir l\'historique', fort: true, agir: () => setSelection(dep) }]} champs={[
+                                 actions={[{ libelle: 'Voir l\'historique', fort: true, agir: () => setSelection(dep) },
+                                           ...(enBase && !aTransmettre
+                                             ? [{ libelle: 'Re-transmettre', desactive: envoi, agir: () => { void retransmettre(dep) } }] : [])]} champs={[
                       { libelle: 'Date AR Infogreffe', valeur: jour(dep.arInfogreffe) },
                       { libelle: 'Date AR destinataire', valeur: jour(dep.arDestinataire) },
                       { libelle: 'Date lecture destinataire', valeur: jour(dep.lectureDestinataire) },

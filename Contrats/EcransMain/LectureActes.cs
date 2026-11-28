@@ -7,6 +7,20 @@ namespace RigV3.Contrats.EcransMain;
 public static class RoutesActes
 {
     public const string Actes = "/ecrans-main/{greffe}/actes";
+
+    /// <summary>
+    /// POST un geste (<c>RigV3.Contrats.EcransGeneres.GesteEcran</c>, Type Agir, Ids = [l'identifiant de l'acte, ACTDP_ID_ACDPS]) : Nom
+    /// <see cref="NonNumerisable"/> ou <see cref="Numerisable"/>, le menu de la grille de RIG v2 (OPE_RESULTAT.cs:253-284). Rend un
+    /// <c>ResultatGeste</c> (422 : le refus de RIG v2). L'écriture : Serveur/Socle/EcransMain/EcritureActes.cs (plan « RIG v3 complet,
+    /// mesuré par le banc du parcours complet », lot 10).
+    /// </summary>
+    public const string SansDocument = "/ecrans-main/{greffe}/actes/sans-document";
+
+    /// <summary>Le menu « sans document » de RIG v2 (OPE_RESULTAT.Designer.cs:184) : ACTDP_SANS_DOCUMENT = 1.</summary>
+    public const string NonNumerisable = "Définir le document comme non numérisable";
+
+    /// <summary>Le menu « avec document » de RIG v2 (OPE_RESULTAT.Designer.cs:177) : ACTDP_SANS_DOCUMENT = 0.</summary>
+    public const string Numerisable = "Définir le document comme numérisable";
 }
 
 /// <summary>

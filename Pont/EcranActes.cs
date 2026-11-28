@@ -8,11 +8,12 @@ public sealed record CriteresActes(string CritActeCritere, string CritAbrege, st
                                    DateOnly? CritDu, DateOnly? CritAu, bool CritNonNumerisables,
                                    bool CritAnomalies, int CritTopMax);
 
-/// <summary>Une ligne de la grille, colonnes de RESULTAT/DataGridviewActes.cs (v2).</summary>
+/// <summary>Une ligne de la grille, colonnes de RESULTAT/DataGridviewActes.cs (v2) ; <paramref name="Id"/> : l'acte de la base
+/// (ACTDP_ID_ACDPS, colonne cachee colIdActe de la V2), vide en demonstration.</summary>
 public sealed record LigneActe(int Rang, string Dossier, string Depot, string Denomination,
                                string CategorieLisible, string Abrege, string Description,
                                string Depose, string Acte, string Cloture, bool Confidentiel,
-                               bool Demat, string Anomalie, bool Numerisable);
+                               bool Demat, string Anomalie, bool Numerisable, string Id = "");
 
 /// <summary>Ce que l'ecran affiche : la liste des categories et la grille ; d'ou elle vient (Pont/LectureEcranMain.cs), son
 /// total et une remarque sur ce que la base ne porte pas (lot 6 du plan « RIG v3 100 % fonctionnel »).</summary>
