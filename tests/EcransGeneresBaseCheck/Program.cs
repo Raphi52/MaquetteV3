@@ -61,6 +61,9 @@ using RigV3Desktop.Pont.EcransGeneres;
 //          fiche: <id>                              facultatif : puis des « Section › Libelle = valeur » que la fiche relue porte ;
 //                                                   la ligne n d'une sous-liste (Tableau) : « Section › Libelle › n = cellule | cellule »
 //          controle: <SELECT d'une valeur> => <attendu>   facultatif : ce que RIG v2 ecrit en plus (dates, etats...)
+//          fichier: <nom>                           facultatif (fait) : le fichier que le geste rend pour le poste (ResultatGeste.
+//                                                   Fichier, un export de RIG v2), puis ses lignes non vides, sans les blancs de fin
+//                                                   (lot 16 du plan-f4fb097f : « exportListeExcel_<type>.sql » des Listes Excel)
 //          agent: <compte Windows>                  facultatif : le bloc est joue au nom de ce compte (cree par le .sql du jeu,
 //                                                   admis dans le greffe) au lieu de l'agent du banc -- un geste que la V2 reserve a
 //                                                   un utilisateur Amitel (PROC_REDAA, les sections : OPE_EDT_SECTION.cs:64-72, lot 15)
@@ -95,6 +98,8 @@ await using var greffe = await BaseJetable.CreerAsync("EcrGenGreffe");
 await Migrateur.AppliquerAsync(commune.Connexion, Path.Combine(racine, "Base", "migrations"));
 await Migrateur.AppliquerAsync(greffe.Connexion, Path.Combine(racine, "Base", "migrations"));
 const string Greffe = "9201", GreffeMuet = "9203", GreffeAbsent = "9299", Agent = "banc.ecrans";
+// La fin de ligne d'un fichier que RIG v2 ecrit sur le poste (StreamWriter.WriteLine sous Windows) : « fichier: » des .gestes (6).
+const string Fdl = "\r\n";
 
 async Task Executer(string connexion, string sql, params (string Nom, object? Valeur)[] p)
 {
@@ -648,6 +653,14 @@ foreach (var fichier in Directory.GetFiles(dossierJeux, "*.gestes").Order(String
         var statut = obtenu == "refuse" ? HttpStatusCode.UnprocessableEntity : HttpStatusCode.OK;
         Exiger(obtenu == bloc.Resultat && reponse.StatusCode == statut && (bloc.Message is null || r?.Message == bloc.Message),
             $"{quoi} : {bloc.Resultat} « {bloc.Message} » (obtenu {obtenu} {(int)reponse.StatusCode} « {r?.Message} »)");
+        if (bloc.Fichier is { } nomFichier)
+        {
+            // Le fichier rendu : son nom, une fin de ligne au bout (le WriteLine de RIG v2), ses lignes non vides sans les blancs de fin.
+            var contenu = r?.Fichier?.Contenu ?? "";
+            var lignesFichier = contenu.Split(Fdl).Select(x => x.TrimEnd()).Where(x => x.Length > 0).ToArray();
+            Exiger(r?.Fichier?.Nom == nomFichier && contenu.EndsWith(Fdl, StringComparison.Ordinal) && lignesFichier.SequenceEqual(bloc.LignesFichier),
+                $"{quoi} : le fichier rendu « {nomFichier} », {bloc.LignesFichier.Count} lignes (rendu « {r?.Fichier?.Nom ?? "aucun"} » : {string.Join(" / ", lignesFichier)})");
+        }
         var apres = (await Lire(code)).Lignes;
         var journalApres = await Valeur("SELECT COUNT(*) FROM soc.Journal");
         if (bloc.Resultat == "fait")

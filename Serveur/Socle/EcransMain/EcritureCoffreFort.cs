@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Xml.Linq;
 using Microsoft.Data.SqlClient;
 using RigV3.Contrats.EcransGeneres;
 using RigV3.Contrats.EcransMain;
@@ -25,11 +26,21 @@ namespace RigV3.Serveur.Socle.EcransMain;
 ///     l'évènement hors audience et cabinet (VIDIGED_INDEX.VGIDX_ID_EVNPR, :591-592) ou de la décision numérisée (VGIDX_ID_DCJDC, :593-594) ;
 ///     pour un autre type (édition, audience), RIG v2 n'en cherche pas et pose un document vide (:588, :604) : la V3 fait de même.
 ///     selectOneString lit la première ligne sans ordre : la V3 prend l'index le plus récent (VGIDX_ID_VGIDX le plus grand).
-/// NON REPRIS (nommés) : le compte rendu Word « Transmission effectuée le … par … » enregistré dans le dossier commun CoffreFort du greffe
-/// (:532-570, :620-635), document de poste ; le contrôle « Nature Doc Ged non paramétré » (:114-117, correspondance Experian de
+///   - le COMPTE RENDU Word de la transmission (lot 16 du plan-f4fb097f, 28/11/2026 : décision du chef « posé dans la file des éditions
+///     comme le certificat de dépôt ») : RIG v2 le remplit sur le poste (RigWord, :512-570), en-tête « COFFRE FORT » puis « Transmission
+///     effectuée le jj/mm/aaaa à HH:mm par &lt;utilisateur&gt; (&lt;n&gt; dépôts) » (:544-549), un tableau Numéro entité / Type document / Nom
+///     entité / Destinataire, une ligne par dépôt (:551-562, :597-606), et l'enregistre sous « Transmission EP_DJ le aaaammjj à
+///     HH'h'mm'm'ss's' par &lt;utilisateur&gt; » dans le dossier commun CoffreFort (:622-628). Une édition de la V3 est une demande dans
+///     la file des éditions (EditionsV2.SansParametre, décision du lot 1) : FUSION_ASPOSE (un Word de données), libellé = le nom du fichier,
+///     et dans ses paramètres (un élément PARAMETRES, un attribut par clé) ENTETE, TITRE et TABLEAU (une LIGNE par dépôt : NUMERO_ENTITE,
+///     TYPE_DOCUMENT = la nature, DESTINATAIRE = le mandataire du dépôt, sinon son type de destinataire, comme l'historique le lit).
+/// NON REPRIS (nommés) : dans le tableau du compte rendu, le nom de l'entité et le libellé du type de document (« nature - libellé »,
+/// TableRef.GetLibelleTypeDocumentCoffreFort, :601), que RIG v2 tire de la recherche des entités à transmettre (OPE_RECHERCHE_COFFRE.cs:
+/// 339-535) et non du dépôt ; le dossier commun CoffreFort et l'ouverture dans Word (document de poste) ; le contrôle « Nature Doc Ged non
+/// paramétré » (:114-117, correspondance Experian de
 /// VIDIGED_PARAMETRAGE et DEMAT_CFEC_PARAMETRAGE) : un dépôt de l'historique a déjà été transmis avec sa nature (CFEC_NATURE_DOC et le
 /// nom du document dans le coffre en viennent) ; l'envoi lui-même, fait par le service du coffre-fort électronique (externe, jamais appelé).
-/// TRACE : famille « affaire », « a modifie », une par dépôt.
+/// TRACE : famille « affaire », « a modifie », une par dépôt ; famille « demande », « a cree », le compte rendu posé.
 /// </summary>
 public static class EcritureCoffreFort
 {
@@ -54,14 +65,17 @@ public static class EcritureCoffreFort
         if (utilisateur.Length > 255) utilisateur = utilisateur[..255];
         var maintenant = geste.Maintenant;
         var traces = new List<TraceGeste>();
+        var tableau = new XElement("TABLEAU");
         foreach (var id in ids)
         {
-            string etat, type, numero, nature;
+            string etat, type, numero, nature, destinataire;
             int entite;
             Guid? avant;
             await using (var r = await geste.LireAsync("""
-                SELECT CFEC_ETAT, CFEC_TYPE_ENTITE, CFEC_ID_ENTITE, CFEC_NUM_ENTITE, CFEC_NATURE_DOC, CFEC_GUID_DOCUMENT
-                FROM v2.DEMAT_CFEC WITH (UPDLOCK) WHERE CFEC_ID_CFEC = @id
+                SELECT c.CFEC_ETAT, c.CFEC_TYPE_ENTITE, c.CFEC_ID_ENTITE, c.CFEC_NUM_ENTITE, c.CFEC_NATURE_DOC, c.CFEC_GUID_DOCUMENT,
+                       COALESCE(NULLIF(LTRIM(RTRIM(m.MNDPC_NOM)), ''), c.CFEC_TYPE_DE_DESTINATAIRE) AS Destinataire
+                FROM v2.DEMAT_CFEC AS c WITH (UPDLOCK) LEFT JOIN v2.MANDATAIRE_PC AS m ON c.CFEC_ID_DESTINATAIRE = m.MNDPC_ID_MNDPC
+                WHERE c.CFEC_ID_CFEC = @id
                 """, ct, new SqlParameter("@id", id)))
             {
                 if (!await r.ReadAsync(ct)) return IssueGeste.Refuser($"Dépôt introuvable dans l'historique du coffre-fort (n° {id}) : rien n'est re-transmis.");
@@ -70,6 +84,7 @@ public static class EcritureCoffreFort
                 entite = r["CFEC_ID_ENTITE"] is int e ? e : 0;
                 numero = FormeLigne.Texte(r, "CFEC_NUM_ENTITE").Trim();
                 nature = FormeLigne.Texte(r, "CFEC_NATURE_DOC").Trim();
+                destinataire = FormeLigne.Texte(r, "Destinataire").Trim();
                 avant = r["CFEC_GUID_DOCUMENT"] is Guid g ? g : null;
             }
             var quoi = $"le dépôt {numero} {nature}".TrimEnd();
@@ -119,11 +134,31 @@ public static class EcritureCoffreFort
             traces.Add(new TraceGeste("affaire", quoi, id.ToString(CultureInfo.InvariantCulture), "a modifie",
                 new { Etat = etat, Document = avant },
                 new { Etat = EtatTraite, Document = document, Traitement = maintenant.ToString("dd/MM/yyyy HH:mm", CultureInfo.InvariantCulture), Utilisateur = utilisateur }));
+            // La ligne du compte rendu (:597-606), dans l'ordre des dépôts cochés.
+            tableau.Add(new XElement("LIGNE", new XAttribute("NUMERO_ENTITE", numero), new XAttribute("TYPE_DOCUMENT", nature),
+                new XAttribute("DESTINATAIRE", destinataire)));
         }
 
-        return IssueGeste.Ecrit(ids.Length == 1
+        // Le compte rendu (en tête) : son nom de fichier (:622) et son titre (:548), dans la file des éditions.
+        // fix-ok: pas un correctif à l'aveugle -- décision du chef du plan (lot 16) sur l'écart nommé par le lot 10 (« NON REPRIS : le compte
+        // rendu Word ») ; source V2 lue (OPE_TREEVIEW_RETRANSMETTRE.cs:512-635), banc de la sonde CoffreFort.
+        var fichier = $"Transmission EP_DJ le {maintenant.ToString("yyyyMMdd", CultureInfo.InvariantCulture)} à "
+                      + $"{maintenant.ToString("HH'h'mm'm'ss's'", CultureInfo.InvariantCulture)} par {utilisateur}";
+        var titre = $"Transmission effectuée le {maintenant.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture)} à "
+                    + $"{maintenant.ToString("HH:mm", CultureInfo.InvariantCulture)} par {utilisateur} ({ids.Length} dépôts)";
+        var parametres = new XElement("PARAMETRES", new XAttribute("ENTETE", "COFFRE FORT"),
+                new XAttribute("TABLEAU", tableau.ToString(SaveOptions.DisableFormatting)), new XAttribute("TITRE", titre))
+            .ToString(SaveOptions.DisableFormatting);
+        var idEdition = await EditionsV2.DemandeEditionAsync(geste, null, EditionsV2.SansParametre(fichier, "FUSION_ASPOSE"), fichier, null, null, null, null, ct,
+            new Dictionary<string, object?> { ["DMNED_PARAMETRE_GENERATION"] = parametres });
+        var idTexte = EditionsV2.Texte(idEdition);
+        traces.Add(new TraceGeste("demande", $"l'édition « {fichier} »", idTexte, "a cree", null,
+            new { Document = fichier, Titre = titre, Depots = ids.Length, File = "file des éditions" }));
+
+        return IssueGeste.Ecrit((ids.Length == 1
                 ? "1 dépôt re-transmis : il est à l'état « 2 - Traité par le greffe », le service du coffre-fort le reprend."
-                : $"{ids.Length} dépôts re-transmis : ils sont à l'état « 2 - Traité par le greffe », le service du coffre-fort les reprend.",
+                : $"{ids.Length} dépôts re-transmis : ils sont à l'état « 2 - Traité par le greffe », le service du coffre-fort les reprend.")
+                + $" Compte rendu « {fichier} » placé dans la file des éditions.",
             [.. ids.Select(i => i.ToString(CultureInfo.InvariantCulture))], [.. traces]);
     }
 

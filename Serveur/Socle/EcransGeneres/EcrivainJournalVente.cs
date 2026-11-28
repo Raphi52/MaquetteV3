@@ -23,8 +23,8 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// Expresso_JVente.rpt (:523-524, hors « PC seuls », filtre que la V3 n'a pas). REQUETE : les colonnes de l'edition detaillee
 /// (:254-262), sur les articles edites, dans l'ordre de la V2 (:407). TOTAL : la somme des montants TTC (ARTUT_MONTANT_TTC) ; TOTAL_HT :
 /// celle des HT (prix unitaire x quantite, :258), comme les colonnes du lecteur.
-/// LA PERIODE : la saisie « Période » (« du|au ») si l'ecran l'envoie ; l'Etat de la V3 n'envoie que les lignes affichees (FormeEtat.tsx,
-/// un geste par groupe) : la periode est alors celle des articles edites, a la date de leur facture, ou a la leur pour un article tarife
+/// LA PERIODE : la saisie « Période » (« du|au ») si l'ecran l'envoie ; l'Etat de la V3 l'envoie avec toutes les lignes affichees
+/// (FormeEtat.tsx, un geste, lot 16 du plan-f4fb097f) ; non saisie, la periode est celle des articles edites, a la date de leur facture, ou a la leur pour un article tarife
 /// (JournalVente.cs:297-303, comme le lecteur). NON REPRIS (nommes) : les editions « Par titre », « Résumée », « Par facture » et
 /// « Analytique » (le lecteur ne les affiche pas) ; l'affichage commentaires / libelles (JVENTE_AFF_ARTICLE).
 /// TRACE : famille « demande », « a cree », l'etat pose (titre, etat Crystal, nombre d'articles, totaux).

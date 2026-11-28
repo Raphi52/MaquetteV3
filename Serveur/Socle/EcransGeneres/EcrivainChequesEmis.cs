@@ -24,8 +24,8 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// REQUETE : celle de LancerEmisTropPercus (:93-101), sur les remboursements edites. TOTAL : la somme des ENCMT_MONTANT, un remboursement
 /// une fois (la V2 dedoublonne par encaissement, :148-157).
 /// LES CASES ET LA PERIODE : les saisies « Trop-perçus », « Notifications » (« oui ») et « Période » (« du|au ») si l'ecran les envoie ;
-/// l'Etat de la V3 n'envoie que les lignes affichees (FormeEtat.tsx, un geste par groupe : trop-perçus, notifications) : les cases sont
-/// alors l'origine des remboursements edites (toutes notifications, aucune, ou les deux), la periode du premier au dernier.
+/// l'Etat de la V3 les envoie avec toutes les lignes affichees, en un geste (FormeEtat.tsx, lot 16 du plan-f4fb097f). Cases non saisies :
+/// l'origine des remboursements edites (toutes notifications, aucune, ou les deux) ; periode non saisie : du premier au dernier.
 /// TRACE : famille « demande », « a cree », l'etat pose (titre, nombre de remboursements, total).
 /// </summary>
 internal sealed class EcrivainChequesEmis : IEcrivainEcran

@@ -63,4 +63,11 @@ public sealed record ResultatGeste(bool Fait, string Message)
 
     /// <summary>Les objets ecrits (un objet cree porte ici son nouvel identifiant).</summary>
     public string[] Ids { get; init; } = [];
+
+    /// <summary>Le fichier que le geste produit pour le POSTE, comme RIG v2 l'ecrit dans un dossier choisi (un export) ; l'ecran
+    /// l'enregistre (web/src/ecrans/formes/commun.tsx, useGeste). Null : aucun fichier. Lot 16 du plan-f4fb097f (28/11/2026).</summary>
+    public FichierGeste? Fichier { get; init; }
 }
+
+/// <summary>Un fichier rendu par un geste : son nom (celui de RIG v2) et son texte entier.</summary>
+public sealed record FichierGeste(string Nom, string Contenu);

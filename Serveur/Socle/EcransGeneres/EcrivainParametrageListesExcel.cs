@@ -28,8 +28,14 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// Le script est celui que la V2 ecrit pour une liste NEUVE, sur la liste lue en base : l'ecran de la V3 est en lecture, rien n'y est
 /// change -- l'export « des seuls changements » de la V2 serait vide. Chaque ordre reprend la forme de la V2 (IF NOT EXISTS sur le code,
 /// puis l'INSERT, requeteInsert de SqlBase.RequeteSauve, Outils\DLL\RigTools\SQL\SqlBase.cs:505-509), apostrophes doublees (:108).
-/// NON REPRIS (nommes) : le dossier du poste et son fichier (FolderBrowserDialog, :125-128 ; un fichier deja present n'est pas ecrase,
-/// sans message, :130) -- le serveur n'ecrit rien sur le poste ; la saisie et l'ordre des champs, que l'ecran de la V3 ne modifie pas ; le
+/// LE FICHIER (lot 16 du plan-f4fb097f, 28/11/2026 -- ecart releve a la reception du lot 2 : « la demande n'est jamais executee, aucun
+/// fichier ») : le geste REND le fichier de la V2 (IssueGeste.Fait.Fichier -> ResultatGeste.Fichier), que l'ecran enregistre sur le poste
+/// (le telechargement de la fenetre, web/src/ecrans/formes/commun.tsx, useGeste) : « exportListeExcel_&lt;type&gt;.sql », le texte des trois
+/// StreamWriter.WriteLine de la V2 (:131-135 : la liste, la clause FROM, les champs, chacun suivi d'une fin de ligne) -- le SCRIPT plus la
+/// fin de ligne de son dernier WriteLine. RIG v2 ne produit PAS de classeur Excel ici : c'est l'« Export Excel » (PROC_LISTEEXCEL) qui
+/// sort les listes d'instances dans Excel, avec ce parametrage.
+/// NON REPRIS (nommes) : le choix du dossier (FolderBrowserDialog, :125-128 : le telechargement de la fenetre le remplace) et le fichier
+/// deja present non ecrase, sans message (:130) ; la saisie et l'ordre des champs, que l'ecran de la V3 ne modifie pas ; le
 /// droit d'executer le processus (FORM_ACCUEIL.cs:1624) : PARAM_LISTEEXCEL n'est pas une fonction de la base V3 (soc.Fonction), le droit
 /// par procedure reste celui d'EcrivainEcran.cs (en tete).
 /// TRACE : famille « demande », « a cree », l'export pose (fichier, type, champs).
@@ -86,7 +92,9 @@ internal sealed class EcrivainParametrageListesExcel : IEcrivainEcran
         {
             while (await r.ReadAsync(ct))
             {
-                var champ = new Champ(FormeLigne.Texte(r, "PRMLX_CODE_CHAMP"), FormeLigne.Texte(r, "PRMLX_LIBELLE"), FormeLigne.Texte(r, "PRMLX_TEXTE"),
+                // Le texte SQL tel qu'en base, blancs compris : la V2 l'ecrit tel quel (ToSQL), et la clause FROM y commence par un blanc
+                // (« ' FROM INSTANCE ...' » dans RIG_DEV) que l'export Excel colle apres les champs SELECT (FormeLigne.Texte le couperait).
+                var champ = new Champ(FormeLigne.Texte(r, "PRMLX_CODE_CHAMP"), FormeLigne.Texte(r, "PRMLX_LIBELLE"), r["PRMLX_TEXTE"] as string ?? "",
                     CriteresConsultation.EntierDe(r, "PRMLX_NUM_ORDRE"), CriteresConsultation.EntierDe(r, "PRMLX_NUM_ORDRE_INIT") ?? 0,
                     FormeLigne.Texte(r, "PRMLX_TYPE_TEXTE"));
                 if (champ.TypeTexte == "FROM") from ??= champ;
@@ -112,8 +120,10 @@ internal sealed class EcrivainParametrageListesExcel : IEcrivainEcran
         var idTexte = EditionsV2.Texte(idEdition);
         var trace = new TraceGeste("demande", $"l'export « {fichier} »", idTexte, "a cree", null,
             new { Fichier = fichier, Liste = type, Champs = champs.Count, File = "file des éditions" });
-        // « Fichier exporté : <chemin> » (OPE_LISTE.cs:138) : le fichier est dans la file des editions, pas sur le poste.
-        return IssueGeste.Ecrit($"Fichier exporté : {fichier}, placé dans la file des éditions.", [idTexte], trace);
+        // « Fichier exporté : <chemin> » (OPE_LISTE.cs:138) : l'ecran enregistre le fichier rendu sur le poste (en tete, « LE FICHIER »).
+        // fix-ok: pas un correctif a l'aveugle -- ecart mesure a la reception du lot 2 (aucun fichier produit) ; source V2 lue (OPE_LISTE.cs:90-145).
+        return new IssueGeste.Fait($"Fichier exporté : {fichier} (le script SQL de la liste, enregistré sur le poste) ; l'export est aussi placé dans la file des éditions.",
+            [trace], [idTexte]) { Fichier = new FichierGeste(fichier, script + "\r\n") };
     }
 
     private sealed record Champ(string Code, string Libelle, string Texte, int? Ordre, int OrdreInit, string TypeTexte);

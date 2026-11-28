@@ -42,11 +42,13 @@ public sealed record CodesDepotLus(string Role, CodeDepotLu[] Codes, string Type
 /// <summary>
 /// Les champs du geste « nouvel evenement survenu » de PROC_DEPOTJUD, sous leurs titres de RIG v2 : l'etape « Evénement survenu »
 /// (PROC_DEPOTJUD.Designer.cs:71), ses champs « Code évènement de procédure » et « Date » (OPE_EVENEMENT.Designer.cs:362, :169).
-/// La date est aaaa-mm-jj.
+/// La date est aaaa-mm-jj. La case <see cref="Certificat"/> de l'operation du depot (OPE_DEPOT.Designer.cs:109), decochee par defaut
+/// (OPE_EVENEMENT.Designer.cs:571), vaut « oui » ou « non » (lot 16 du plan-f4fb097f).
 /// </summary>
 public static class DepotEvenement
 {
     public const string Section = "Evénement survenu";
     public const string Code = "Code évènement de procédure";
     public const string Date = "Date";
+    public const string Certificat = "Editer un certificat de dépôt";
 }

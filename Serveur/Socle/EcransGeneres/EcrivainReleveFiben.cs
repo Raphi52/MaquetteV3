@@ -26,7 +26,7 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// CONTROLES, avant toute ecriture :
 ///   1. le droit d'executer FIBEN (EditionsEtatsV2.ProcessusAutoriseAsync ; FORM_ACCUEIL.cs:1624, au mot pres) ;
 ///   2. une periode : RIG v2 genere le mois, ou le trimestre, choisi dans sa combo -- un releve par clic. L'Etat de la V3 envoie les
-///      lignes affichees d'un groupe ; sans ligne, ou avec plusieurs periodes, rien ne part et l'ecran dit de choisir la periode
+///      lignes affichees, en un geste (FormeEtat.tsx) ; sans ligne, ou avec plusieurs periodes, rien ne part et l'ecran dit de choisir la periode
 ///      (message de la V3 : la combo de la V2 ne peut pas etre vide ni multiple) ;
 ///   3. la ligne est un releve de l'ecran (son Id), sinon refus.
 /// REQUETE : la requete de comptage de la V2 sur la periode (ReleveFIBEN._CompterGreffe ; ReleveBODACC._CompterAnnonces), dans la base

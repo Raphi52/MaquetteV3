@@ -17,6 +17,9 @@ sealed class Bloc
     public string? Fiche { get; set; }
     public List<(string Cle, string Valeur)> ValeursFiche { get; } = [];
     public List<(string Sql, string Attendu)> Controles { get; } = [];
+    /// <summary>« fichier: » : le nom du fichier que le geste rend, et ses lignes attendues (non vides, sans blancs de fin).</summary>
+    public string? Fichier { get; set; }
+    public List<string> LignesFichier { get; } = [];
     public string? Agent { get; set; }
     public string? Texte { get; set; }
     public Dictionary<string, string> Criteres { get; } = new(StringComparer.Ordinal);
@@ -25,7 +28,7 @@ sealed class Bloc
 /// <summary>La lecture des jeux .gestes et .recherches : des blocs separes par « --- », des lignes « cle: valeur ».</summary>
 static class Blocs
 {
-    private static readonly string[] Cles = ["geste:", "ids:", "valeur:", "resultat:", "message:", "lignes:", "fiche:", "controle:", "agent:", "texte:", "critere:"];
+    private static readonly string[] Cles = ["geste:", "ids:", "valeur:", "resultat:", "message:", "lignes:", "fiche:", "controle:", "agent:", "texte:", "critere:", "fichier:"];
 
     /// <summary>« cle = valeur » (le premier « = » precede d'un blanc ; une valeur vide est permise).</summary>
     private static (string, string) Paire(string texte)
@@ -38,7 +41,7 @@ static class Blocs
     {
         var blocs = new List<Bloc>();
         var b = new Bloc();
-        string? suite = null;   // « lignes » ou « fiche » : les lignes qui suivent leur appartiennent
+        string? suite = null;   // « lignes », « fiche » ou « fichier » : les lignes qui suivent leur appartiennent
         TypeGeste type = default;
         string? nom = null;
         var ids = new List<string>();
@@ -59,6 +62,7 @@ static class Blocs
             {
                 if (suite == "lignes") b.Lignes!.Add(l);
                 else if (suite == "fiche") b.ValeursFiche.Add(Paire(l));
+                else if (suite == "fichier") b.LignesFichier.Add(l);
                 else throw new InvalidOperationException($"Ligne hors bloc : « {l} »");
                 continue;
             }
@@ -77,6 +81,7 @@ static class Blocs
                 case "message:": b.Message = v; break;
                 case "lignes:": b.Lignes = []; suite = "lignes"; break;
                 case "fiche:": b.Fiche = v; suite = "fiche"; break;
+                case "fichier:": b.Fichier = v; suite = "fichier"; break;
                 case "controle:":
                     var i = v.LastIndexOf(" => ", StringComparison.Ordinal);
                     b.Controles.Add((v[..i].Trim(), v[(i + 4)..].Trim()));

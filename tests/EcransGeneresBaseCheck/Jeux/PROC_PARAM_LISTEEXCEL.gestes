@@ -28,7 +28,18 @@ message: Liste Excel introuvable (3200108) : relisez les listes.
 geste: Agir Exporter
 ids: 3200101
 resultat: fait
-message: Fichier exporté : exportListeExcel_IEF.sql, placé dans la file des éditions.
+message: Fichier exporté : exportListeExcel_IEF.sql (le script SQL de la liste, enregistré sur le poste) ; l'export est aussi placé dans la file des éditions.
+# Lot 16 : le FICHIER de RIG v2, rendu au poste (ResultatGeste.Fichier), les trois WriteLine d'OPE_LISTE.Exporter (OPE_LISTE.cs:131-135) :
+# la liste, la clause FROM, puis les champs dans l'ordre initial, chacun garde par son code.
+fichier: exportListeExcel_IEF.sql
+IF NOT EXISTS(SELECT PRMLS_VALEUR FROM PARAMETRAGE_LISTE WHERE PRMLS_VALEUR = 'IEF')
+INSERT INTO PARAMETRAGE_LISTE (PRMLS_VALEUR, PRMLS_LIBELLE, PRMLS_LISTE) VALUES ('IEF', 'Liste des instances par évènement futur', 'LISTEXLS_IEF')
+IF NOT EXISTS(SELECT PRMLX_CODE_CHAMP FROM PARAMETRAGE_LISTE_XLS WHERE PRMLX_CODE_CHAMP = 'L2_IEFF')
+INSERT INTO PARAMETRAGE_LISTE_XLS (PRMLX_TYPE_LISTE, PRMLX_TEXTE, PRMLX_NUM_ORDRE, PRMLX_LIBELLE, PRMLX_TYPE_TEXTE, PRMLX_NUM_ORDRE_INIT, PRMLX_CODE_CHAMP) VALUES ('IEF', ' FROM INSTANCE INNER JOIN EVENEMENT_PROCEDURE ON EVNPR_ID_INSTN = INSTN_ID_INSTN', 1, 'FROM_IEF', 'FROM', 1, 'L2_IEFF')
+IF NOT EXISTS(SELECT PRMLX_CODE_CHAMP FROM PARAMETRAGE_LISTE_XLS WHERE PRMLX_CODE_CHAMP = 'L2_IEF2')
+INSERT INTO PARAMETRAGE_LISTE_XLS (PRMLX_TYPE_LISTE, PRMLX_TEXTE, PRMLX_NUM_ORDRE, PRMLX_LIBELLE, PRMLX_TYPE_TEXTE, PRMLX_NUM_ORDRE_INIT, PRMLX_CODE_CHAMP) VALUES ('IEF', 'EVNPR_DATE AS [Date évènement]', 1, 'Date évènement', 'SELECT', 1, 'L2_IEF2');
+IF NOT EXISTS(SELECT PRMLX_CODE_CHAMP FROM PARAMETRAGE_LISTE_XLS WHERE PRMLX_CODE_CHAMP = 'L2_IEF1')
+INSERT INTO PARAMETRAGE_LISTE_XLS (PRMLX_TYPE_LISTE, PRMLX_TEXTE, PRMLX_NUM_ORDRE, PRMLX_LIBELLE, PRMLX_TYPE_TEXTE, PRMLX_NUM_ORDRE_INIT, PRMLX_CODE_CHAMP) VALUES ('IEF', 'INSTN_NUM_ROLE AS [Num Rôle]', 2, 'Num Rôle', 'SELECT', 2, 'L2_IEF1');
 lignes:
 Liste des instances par évènement futur | type IEF · 2 champs | Instances | Validee | []
 Liste des parutions au JAL | type JAL · 2 champs | BODACC et JAL | Validee | []

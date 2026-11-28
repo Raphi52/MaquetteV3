@@ -338,8 +338,8 @@ public sealed class DomaineFacturer : IDomaineEcrans
         // (Serveur/Socle/EcransGeneres/LecteurJournalCaisse.cs, lot 13) : les lignes ci-dessous ne sont que l'exemple sans serveur.
         // « Éditer » : RIG v2 affiche son état Crystal sans passer par la file des éditions (OPE_METHODETRI.Editer, :100-108 ;
         // JournalCaisse.AfficherCrystal) ; RIG v3 ne génère pas cet état et pose le journal des encaissements affichés dans la file
-        // des éditions (EcrivainJournalCaisse.cs, EditionsEtatsV2.cs : lot 4 du plan-f4fb097f, 28/11/2026). L'écran envoie un geste
-        // par groupe affiché (FormeEtat.tsx) : un journal par mode de paiement, là où la V2 en édite un seul, trié par mode.
+        // des éditions (EcrivainJournalCaisse.cs, EditionsEtatsV2.cs : lot 4 du plan-f4fb097f, 28/11/2026). L'écran envoie un seul geste
+        // (FormeEtat.tsx, lot 16 du plan-f4fb097f) : un journal de toutes les lignes affichées, au titre de la période saisie, comme la V2.
         // fix-ok: pas un correctif à l'aveugle -- quatre commentaires de descripteur (PROC_FACTREEDIT, PROC_EDCHQEMIS, PROC_JCAISSE,
         // PROC_JVENTE) remis à jour : le banc du parcours (28/11/2026) les mesurait « aucun écrivain au serveur », le lot 4 les branche.
         new DescripteurEcran
@@ -386,7 +386,7 @@ public sealed class DomaineFacturer : IDomaineEcrans
         // Le corps de la fiche parlait de criées et d'adjudicataires (« ventes ») : le code n'en lit aucune (proc_jvente.md:182),
         // groupes et colonnes suivent le code. « Éditer » : l'état Crystal de la V2 s'affiche sans file des éditions ; RIG v3 pose le
         // journal des articles affichés dans la file des éditions (EcrivainJournalVente.cs, EditionsEtatsV2.cs : lot 4 du
-        // plan-f4fb097f, 28/11/2026), un par groupe affiché (FormeEtat.tsx).
+        // plan-f4fb097f, 28/11/2026), un seul pour toutes les lignes affichées (FormeEtat.tsx, lot 16).
         new DescripteurEcran
         {
             Code = "PROC_JVENTE", Titre = "Journal de vente", Sujet = "ventes du greffe",

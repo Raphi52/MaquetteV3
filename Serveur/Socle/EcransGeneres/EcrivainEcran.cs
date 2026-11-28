@@ -89,8 +89,12 @@ public abstract record IssueGeste
 {
     private IssueGeste() { }
 
-    /// <summary>Ecrit : le message de l'ecran et les lignes du journal (au moins une).</summary>
-    public sealed record Fait(string Message, TraceGeste[] Traces, string[] Ids) : IssueGeste;
+    /// <summary>Ecrit : le message de l'ecran et les lignes du journal (au moins une) ; <see cref="Fichier"/> : le fichier que RIG v2
+    /// ecrit sur le poste pour ce geste (un export), rendu a l'ecran (ResultatGeste.Fichier).</summary>
+    public sealed record Fait(string Message, TraceGeste[] Traces, string[] Ids) : IssueGeste
+    {
+        public FichierGeste? Fichier { get; init; }
+    }
 
     /// <summary>Refuse par un controle de RIG v2 : son message ; le socle annule la transaction.</summary>
     public sealed record Refus(string Motif) : IssueGeste;
@@ -325,7 +329,7 @@ public sealed class EcrivainsEcrans(IReadOnlyDictionary<string, IEcrivainEcran> 
         {
             case IssueGeste.Fait f:
                 await tx.CommitAsync(ct);
-                return new ResultatGeste(true, f.Message) { Ids = f.Ids };
+                return new ResultatGeste(true, f.Message) { Ids = f.Ids, Fichier = f.Fichier };
             case IssueGeste.Refus r:
                 await tx.RollbackAsync(CancellationToken.None);
                 return new ResultatGeste(false, r.Motif);
