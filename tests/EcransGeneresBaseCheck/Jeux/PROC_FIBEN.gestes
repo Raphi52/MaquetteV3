@@ -1,0 +1,59 @@
+# Gestes de « FIBEN » (EcrivainReleveFiben.cs), lot 3 du plan-f4fb097f, sur le jeu PROC_FIBEN.sql. Une ligne porte « FIBEN|BODACC
+# |premier jour|dernier jour » (EditionsV2.IdSurPeriode). « Générer » = le bouton de chaque etape de RIG v2 (OPE_CRITERES.cs:46-48,
+# OPE_CRITERES_BODACC.cs:78-80) : RIG v2 affiche l'etat Crystal de la periode choisie ; RIG v3 le pose dans la file des editions
+# (EditionsEtatsV2.cs, decision du chef du plan). RIG v2 n'ecrit rien sur les transmissions ni sur les annonces : les lignes de l'ecran
+# ne changent pas -- aucun « lignes: » ; ce qui se relit est la demande d'edition, ses volumes compares a un SELECT sur la base.
+#
+# Refus 1 : l'agent n'a pas la fonction FIBEN (FORM_ACCUEIL.cs:1624, au mot pres) -- jumeau accepte : le bloc 5, la meme ligne, l'agent
+# du banc (role BANC).
+agent: banc.l3.sansdroit
+geste: Agir Générer
+ids: FIBEN|20250301|20250331
+resultat: refuse
+message: Vous n'êtes pas autorisé à exécuter le processus 'FIBEN'.
+---
+# Refus 2 : deux mois a la fois. RIG v2 genere UN releve par clic, celui du mois de sa combo (OPE_CRITERES.cs:35-36) : rien ne part, pas
+# meme pour mars -- jumeau accepte : le bloc 5, mars seul.
+geste: Agir Générer
+ids: FIBEN|20250401|20250430,FIBEN|20250301|20250331
+resultat: refuse
+message: Choisissez la période à générer : RIG v2 génère un relevé à la fois, le mois de la transmission FIBEN ou le trimestre du relevé BODACC.
+---
+# Refus 3 : du 02 au 31/03 n'est pas un mois de l'ecran (la V2 edite du 1er au dernier jour du mois, OPE_CRITERES.cs:35-36) -- jumeau
+# accepte : le bloc 5, du 01 au 31/03.
+geste: Agir Générer
+ids: FIBEN|20250302|20250331
+resultat: refuse
+message: Une ligne n'est pas un relevé de l'écran FIBEN : relisez les relevés.
+---
+# Refus 4 : du 01/02 au 30/04 n'est pas un trimestre civil (OPE_CRITERES_BODACC.cs:68-70 : le 1er mois du trimestre, trois mois) --
+# jumeau accepte : le bloc 6, du 01/01 au 31/03.
+geste: Agir Générer
+ids: BODACC|20250201|20250430
+resultat: refuse
+message: Une ligne n'est pas un relevé de l'écran FIBEN : relisez les relevés.
+---
+# La transmission FIBEN de mars 2025 : titre « mars 2025 » (MMMM yyyy, ReleveFIBEN.cs:93), etat Expresso_EDI_FIBEN.rpt (:94), une ligne
+# pour le greffe. Les volumes de _CompterGreffe : 2 avis RCS (1600203 « REGUL » et 1600204 sans avis ne comptent pas), PC 2 crees
+# - 1 annule = 1 (1600214, action M, ne compte pas) : TOTAL 3, celui d'un SELECT sur EDI_BDF_RCS et EDI_BDF.
+geste: Agir Générer
+ids: FIBEN|20250301|20250331
+resultat: fait
+message: Relevé « mars 2025 » (2 avis RCS, 1 avis PC) : placé dans la file des éditions.
+controle: SELECT COUNT(*) FROM v2.DEMANDE_EDITION WHERE DMNED_LIBELLE_DOCUMENT = N'mars 2025' AND DMNED_CODE_PROCESSUS = 'FIBEN' AND DMNED_TYPE_GENERATION = 'FUSION_CRYSTAL' AND DMNED_PHASE_TRAITEMENT = 'C' AND DMNED_ID_DMND IS NULL => 1
+controle: SELECT CONCAT(x.value('(/PARAMETRES/@TitreEtat)[1]', 'nvarchar(60)'), '|', x.value('(/PARAMETRES/@NOMRPT)[1]', 'varchar(60)'), '|', x.value('(/PARAMETRES/@NB_LIGNES)[1]', 'int'), '|', x.value('(/PARAMETRES/@TOTAL)[1]', 'varchar(20)')) FROM (SELECT CAST(DMNED_PARAMETRE_GENERATION AS xml) AS x FROM v2.DEMANDE_EDITION WHERE DMNED_LIBELLE_DOCUMENT = N'mars 2025') AS d => mars 2025|Expresso_EDI_FIBEN.rpt|1|3.00
+controle: SELECT CASE WHEN x.value('(/PARAMETRES/@TOTAL)[1]', 'decimal(19,2)') = (SELECT COUNT(*) FROM v2.EDI_BDF_RCS WHERE DBDRC_DATE_ENVOI >= '20250301' AND DBDRC_DATE_ENVOI < '20250401' AND DBDRC_AVIS NOT LIKE '%  REGUL  %') + (SELECT SUM(CASE EDIBDF_CODE_ACTION WHEN 'C' THEN 1 WHEN 'A' THEN -1 ELSE 0 END) FROM v2.EDI_BDF WHERE EDIBDF_DATE_INSERTION_DANS_FICHIER >= '20250301' AND EDIBDF_DATE_INSERTION_DANS_FICHIER < '20250401') THEN 'TOTAL = SELECT' ELSE 'TOTAL <> SELECT' END FROM (SELECT CAST(DMNED_PARAMETRE_GENERATION AS xml) AS x FROM v2.DEMANDE_EDITION WHERE DMNED_LIBELLE_DOCUMENT = N'mars 2025') AS d => TOTAL = SELECT
+# REQUETE : la requete de comptage de la V2, aux bornes de la V2 (ToSQL00Heure / ToSQL24Heure, DBObject.cs:541-546).
+controle: SELECT CASE WHEN CHARINDEX('FROM EDI_BDF_RCS WHERE DBDRC_DATE_ENVOI >= convert(DateTime, ''2025-03-01 00:00:00.000'', 121) AND DBDRC_DATE_ENVOI < convert(DateTime, ''2025-03-31 23:59:59.998'', 121)', r) > 0 AND CHARINDEX('FROM EDI_BDF WHERE EDIBDF_DATE_INSERTION_DANS_FICHIER >= convert(DateTime, ''2025-03-01 00:00:00.000'', 121)', r) > 0 AND CHARINDEX('v2.', r) = 0 THEN 'requete de la V2' ELSE 'autre requete' END FROM (SELECT CAST(DMNED_PARAMETRE_GENERATION AS xml).value('(/PARAMETRES/@REQUETE)[1]', 'nvarchar(max)') AS r FROM v2.DEMANDE_EDITION WHERE DMNED_LIBELLE_DOCUMENT = N'mars 2025') AS d => requete de la V2
+controle: SELECT COUNT(*) FROM soc.Journal WHERE Ecran = 'FIBEN' AND Famille = 'demande' AND Objet = N'l''édition « mars 2025 »' AND Verbe = 'a cree' => 1
+---
+# Le releve BODACC du 1er trimestre 2025 : titre « 1er trimestre 2025 » (ReleveBODACC.cs:139, _GetLibelleTrimestre), etat
+# Expresso_ReleveBodacc2.rpt (:142), deux lignes pour le greffe (gratuites, payantes : :219-231). Les annonces comptees comme l'ecran :
+# A 2 (« a1 » du 31/03 a 22:00 compte en A, dans la borne « <= 23:59:59.998 »), B 1, C 0, P 1 -- TOTAL 4 ; 1600226-1600228 (type, cout
+# ou type d'annonce vides) ne comptent pas, 1600225 (02/04) est du 2e trimestre.
+geste: Agir Générer
+ids: BODACC|20250101|20250331
+resultat: fait
+message: Relevé « 1er trimestre 2025 » (A 2, B 1, C 0, P 1) : placé dans la file des éditions.
+controle: SELECT CONCAT(DMNED_CODE_PROCESSUS, '|', DMNED_TYPE_GENERATION, '|', x.value('(/PARAMETRES/@NOMRPT)[1]', 'varchar(60)'), '|', x.value('(/PARAMETRES/@NB_LIGNES)[1]', 'int'), '|', x.value('(/PARAMETRES/@TOTAL)[1]', 'varchar(20)')) FROM (SELECT DMNED_CODE_PROCESSUS, DMNED_TYPE_GENERATION, CAST(DMNED_PARAMETRE_GENERATION AS xml) AS x FROM v2.DEMANDE_EDITION WHERE DMNED_LIBELLE_DOCUMENT = N'1er trimestre 2025') AS d => FIBEN|FUSION_CRYSTAL|Expresso_ReleveBodacc2.rpt|2|4.00
+controle: SELECT CASE WHEN x.value('(/PARAMETRES/@TOTAL)[1]', 'decimal(19,2)') = (SELECT COUNT(*) FROM v2.BODACC WHERE BDCCR_DATE_PUBLICITE >= '20250101' AND BDCCR_DATE_PUBLICITE < '20250401' AND UPPER(LEFT(BDCCR_TYPE_BODACC, 1)) IN ('A', 'B', 'C', 'P') AND BDCCR_COUT_BODACC IS NOT NULL AND BDCCR_TYPE_ANNONCE IS NOT NULL) THEN 'TOTAL = SELECT' ELSE 'TOTAL <> SELECT' END FROM (SELECT CAST(DMNED_PARAMETRE_GENERATION AS xml) AS x FROM v2.DEMANDE_EDITION WHERE DMNED_LIBELLE_DOCUMENT = N'1er trimestre 2025') AS d => TOTAL = SELECT

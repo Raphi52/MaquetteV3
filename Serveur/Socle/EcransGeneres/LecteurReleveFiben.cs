@@ -19,8 +19,9 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// La V2 compte UNE periode choisie (un mois, un trimestre), pour chaque greffe exploite de la base commune
 /// (COMMUN_RIG.GREFFE, GRF_IS_EXPLOIT = 1, OPE_CRITERES.cs:55-56). La base commune est absente de la base V3 du greffe : la V3
 /// compte LE greffe de la base, pour chaque periode qui a une transmission (une ligne par mois, par trimestre), et l'Etat les
-/// filtre par sa periode. Non repris (nommes) : les tarifs unitaires saisis (4 et 6) et les montants qu'ils donnent, et
-/// l'edition Crystal (Expresso_EDI_FIBEN.rpt, Expresso_ReleveBodacc2.rpt).
+/// filtre par sa periode. Non repris (nommes) : les tarifs unitaires saisis (4 et 6) et les montants qu'ils donnent. L'edition
+/// Crystal (Expresso_EDI_FIBEN.rpt, Expresso_ReleveBodacc2.rpt) est posee dans la file des editions par « Générer »
+/// (EcrivainReleveFiben.cs) : l'Id d'une ligne porte son releve et sa periode (EditionsV2.IdSurPeriode, cle Fiben ou Bodacc).
 ///
 /// GROUPES : « Transmission FIBEN » (mensuelle) / « Relevé BODACC » (trimestriel).
 /// REGLE D'ETAT (la periode et aujourd'hui) : periode qui contient aujourd'hui -> EnCours « Période en cours » (ses volumes
@@ -32,6 +33,9 @@ internal sealed class LecteurReleveFiben : ILecteurEcran
     public string Procedure => "PROC_FIBEN";
 
     internal static readonly string[] Groupes = ["Transmission FIBEN", "Relevé BODACC"];
+
+    /// <summary>La cle de l'Id d'une ligne (EditionsV2.IdSurPeriode), par bloc : le releve que « Générer » edite.</summary>
+    internal const string Fiben = "FIBEN", Bodacc = "BODACC";
 
     private static readonly string[] Mois =
         ["janvier", "février", "mars", "avril", "mai", "juin", "juillet", "août", "septembre", "octobre", "novembre", "décembre"];
@@ -80,6 +84,10 @@ internal sealed class LecteurReleveFiben : ILecteurEcran
         var etat = aujourdhui.Date >= debut && aujourdhui.Date < fin ? "EnCours" : "Validee";
         return new LigneLue(releve, precisions, Groupes[bloc], etat, [])
         {
+            // Le releve et sa periode, premier et dernier jour (en tete du fichier).
+            // fix-ok: mesure le 28/11/2026 (banc ParcoursCompletCheck, PROC_FIBEN « aucun ecrivain (Générer) ») -- l'Etat n'envoie au
+            // geste que les Id des lignes affichees (FormeEtat.tsx, useGesteEnLot) ; sans Id, « Générer » ne savait pas quelle periode editer.
+            Id = EditionsV2.IdSurPeriode(bloc == 0 ? Fiben : Bodacc, debut, fin.AddDays(-1)),
             Valeurs = [FormeLigne.DateFiche(debut), releve, N("AvisRcs"), N("PcCrees"), N("PcAnnules"), N("A"), N("B"), N("C"), N("P")],
         };
     }

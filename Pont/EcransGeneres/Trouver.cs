@@ -28,6 +28,13 @@ namespace RigV3Desktop.Pont.EcransGeneres;
 // sections, leurs groupes et leurs etats sont ceux que ce lecteur lit et cherche, chacun cite sur sa ligne de fiche V2. Les
 // lignes ci-dessous restent la demonstration, montree sans serveur. « Interdits de gerer » n'a pas de lecteur : RIG v2
 // interroge le service web du FNIG, pas la base du greffe.
+//
+// LOT 3 DU PLAN « RIG v3 complet » (28/11/2026) : Voir un PDF et Voir une image ouvrent la fiche d'une piece de la GED ; « Envoyer
+// vers XDCA » des bilans en rejet ecrit l'affaire et la demande XDCA (EcrivainBilansRejetes.cs) ; « Générer » de FIBEN pose le
+// releve de la periode dans la file des editions (EcrivainReleveFiben.cs, decision du plan : une edition = une demande d'edition).
+// « Interdits de gerer » reste sans lecteur, donc rouge au banc du parcours : rien du FNIG national n'est dans la base du greffe.
+// fix-ok: mesure le 28/11/2026 (banc ParcoursCompletCheck, RIGV3_PARCOURS=Trouver.cs) -- PROC_PDF et PROC_IMAGE sans fiche ni recherche
+// prouvee, PROC_REJETS_BILANS et PROC_FIBEN sans ecrivain : les descripteurs citent desormais le lecteur ou l'ecrivain de chaque geste.
 
 // fix-ok: cause mesurée — 14 des 16 « Valider » de la version committée (HEAD d242adc) n'existaient pas dans leur fiche (gestes de maquette) ; chacun est cité sur sa ligne de fiche. PROC_IMAGE, lui, restait sans écran (banc EcransGeneres -Detail, liste « sans ecran ni descripteur ») : descripteur ajouté (contrôle : 16/16).
 public sealed class DomaineTrouver : IDomaineEcrans
@@ -221,7 +228,8 @@ public sealed class DomaineTrouver : IDomaineEcrans
             Code = "PROC_PDF", Titre = "Voir un PDF", Sujet = "pièces PDF", Rang = 4,
             Forme = FormeEcran.Document,
             // Lecteur : Serveur/Socle/EcransGeneres/LecteurPiecesGed.cs (lot 6) : les PDF de la GED du greffe (GED_RIG). RIG v2
-            // reçoit un chemin de fichier (proc_pdf.md:31-40) ; le document réel d'un greffe est dans sa GED, octets compris.
+            // reçoit un chemin de fichier (proc_pdf.md:31-40) ; le document réel d'un greffe est dans sa GED, octets compris. Ouvrir
+            // une pièce = lire sa fiche (le fichier ouvert, la pièce : plan « RIG v3 complet », lot 3) ; ses pages restent à montrer.
             Recherche = "Rechercher une pièce à lire…",
             Criteres = ["Fichier PDF unique, ou dossier de PDF", "Pièces non lues affichées en gras", "Alerte à la fermeture si une pièce n'est pas lue"],
             // Valider : proc_pdf.md:110 (« Imprimer tout », impression de masse du mode dossier, :203) ; VALIDER (ligne 106) n'est jamais visible.
@@ -254,7 +262,8 @@ public sealed class DomaineTrouver : IDomaineEcrans
             Code = "PROC_IMAGE", Titre = "Voir une image", Sujet = "fichiers à afficher", Rang = 4,
             Forme = FormeEcran.Document,
             // Lecteur : Serveur/Socle/EcransGeneres/LecteurPiecesGed.cs (lot 6) : les images de la GED du greffe (GED_RIG ; tif,
-            // tiff, png, jpg, jpeg, bmp, gif). RIG v2 reçoit un chemin de fichier (proc_image.md:24-28).
+            // tiff, png, jpg, jpeg, bmp, gif). RIG v2 reçoit un chemin de fichier (proc_image.md:24-28). Ouvrir une image = lire sa
+            // fiche (le fichier, le titre de la fenêtre, les pages : plan « RIG v3 complet », lot 3) ; ses pages restent à montrer.
             Recherche = "Rechercher un fichier à afficher…",
             Criteres = ["Fichier : chemin absolu d'une image ou d'un PDF (paramètre Filename)", "Titre de la fenêtre, facultatif (paramètre Titre)"],
             // Voir une image n'a pas de VALIDER (proc_image.md:85, :105) : son bouton final est l'action APERCU, à confirmer.
@@ -395,7 +404,8 @@ public sealed class DomaineTrouver : IDomaineEcrans
             // (proc_rejets_bilans.md:80-96) et ses codes de rejet par défaut (ChiffresSeuils.GetCodesMotifsRejet).
             Recherche = "Rechercher un bilan : SIREN, numéro de gestion ou numéro de dépôt…",
             Criteres = ["SIREN, numéro de gestion ou numéro de dépôt", "Codes motifs de rejet (plusieurs possibles)"],
-            // Valider : proc_rejets_bilans.md:208 (bouton « Envoyer vers XDCA », actif si la grille a des lignes, :398).
+            // Valider : proc_rejets_bilans.md:208 (bouton « Envoyer vers XDCA », actif si la grille a des lignes, :398). Écrit dans la
+            // base : l'affaire et la demande XDCA du bilan (EcrivainBilansRejetes.cs, plan « RIG v3 complet », lot 3).
             Valider = "Envoyer vers XDCA",
             // États : une correction XDCA en cours sur l'action du bilan -- règle en tête du lecteur.
             Etats = EtatsEcran.Trois("Rejeté", "En correction", "Corrigé"),
@@ -434,7 +444,12 @@ public sealed class DomaineTrouver : IDomaineEcrans
             Criteres = ["Nom", "Prénom", "Date de naissance", "Pays de naissance (France par défaut)", "Commune de naissance (si France)"],
             // Sans lecteur (lot 6, plan-676a4b19) : RIG v2 n'interroge pas la base du greffe mais le service web du FNIG
             // (FnigService.GetPersonneJugementsJud, adresse GRF_URL_FNIG du greffe : proc_vfnig.md:5-15), qu'aucun écran de la V3
-            // n'appelle. L'écran garde ses lignes d'exemple, étiquetées comme telles.
+            // n'appelle. L'écran garde ses lignes d'exemple, étiquetées comme telles. Revu au lot 3 du plan « RIG v3 complet »
+            // (28/11/2026) : la base du greffe n'a, du FNIG, que les demandes que CE greffe lui envoie (CASIER_JUDICIAIRE_FNIG, écran
+            // « Demandes FNIG ») -- les y chercher répondrait « inconnu » pour un interdit d'un autre tribunal. Le détail d'un interdit
+            // n'est pas lu de la base non plus : RIG v2 monte ses casiers EN MÉMOIRE depuis la réponse du service, sans les enregistrer
+            // (PROC_VFNIG\Detail\PROC_DETAIL_INTERDIT_VFNIG.cs:24-79 ; l'appel : Recherche\OPE_RECHERCHE_VFNIG.cs:21, :114). Pas de lecteur,
+            // donc, tant que la V3 n'appelle pas le service du FNIG (un échange extérieur, hors du plan).
             // Valider : proc_vfnig.md:32 et :449 (bouton « Editer les résultats », actif dès qu'une ligne est sélectionnée, :171).
             Valider = "Editer les résultats",
             Etats = EtatsEcran.Trois("À vérifier", "En cours", "Vérifiée"),
@@ -472,6 +487,8 @@ public sealed class DomaineTrouver : IDomaineEcrans
             Parametres = [Champ.Periode("Période")],
             Colonnes = [Champ.Date("Début de période"), "Relevé", Champ.Nombre("Avis RCS"), Champ.Nombre("Avis PC créés"), Champ.Nombre("Avis PC annulés"),
                         Champ.Nombre("Annonces A"), Champ.Nombre("Annonces B"), Champ.Nombre("Annonces C"), Champ.Nombre("Annonces P")],
+            // Générer : RIG v2 affiche l'état Crystal du mois ou du trimestre choisi (OPE_CRITERES.cs:34-52, OPE_CRITERES_BODACC.cs:61-77) ;
+            // RIG v3 le pose dans la file des éditions (Serveur/Socle/EcransGeneres/EcrivainReleveFiben.cs, plan « RIG v3 complet », lot 3).
             Gestes = ["Générer"],
             Recherche = "Rechercher un relevé : mois ou trimestre…",
             Criteres = ["Mois (transmission FIBEN, mensuelle)", "Trimestre et année (relevé BODACC, trimestriel)", "Tarifs unitaires"],
