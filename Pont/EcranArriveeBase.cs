@@ -1,3 +1,4 @@
+using RigV3.Contrats.EcransGeneres;
 using RigV3.Contrats.EcransMain;
 
 namespace RigV3Desktop.Pont;
@@ -6,12 +7,34 @@ namespace RigV3Desktop.Pont;
 /// L'entree de l'ecran « Arrivée du courrier » (web/src/ecrans/EcranArrivee.tsx) : la base du greffe de la session, lue par
 /// le serveur (Serveur/Socle/EcransMain/LectureArrivees.cs, colonnes de RIG v2 citees), et la demonstration
 /// (EcranArrivee.Exemple) seulement SANS serveur. Plan « RIG v3 100 % fonctionnel », lot 17 (26/11/2026).
+/// Le geste « Enregistrer une arrivée » (la saisie OPE_ARRIVEE de RIG v2) s'ecrit dans la base du greffe par le serveur
+/// (<see cref="EnregistrerAsync"/>, Serveur/Socle/EcransMain/EcritureArrivee.cs) ; sans serveur, rien n'est ecrit
+/// (plan « RIG v3 complet, mesuré par le banc du parcours complet », lot 7, 28/11/2026).
 /// </summary>
 public static partial class EcranArrivee
 {
     [JSInvokable("EcranArrivee.Trouver")]
     public static Task<VueArrivee> Trouver(CriteresArrivee criteres)
         => TrouverAsync(ClientServeur.Actif, SessionAgent.CodeGreffe, criteres);
+
+    /// <summary>« Enregistrer une arrivée » : le <paramref name="mode"/> (vide : PTT, comme RIG v2) et la <paramref name="date"/>
+    /// (aaaa-mm-jj, vide : aujourd'hui). Le resultat porte le numero donne (Ids).</summary>
+    [JSInvokable("EcranArrivee.Enregistrer")]
+    public static Task<ResultatGeste> Enregistrer(string mode, string date)
+        => EnregistrerAsync(ClientServeur.Actif, SessionAgent.CodeGreffe, mode, date);
+
+    /// <summary>Le geste sur <paramref name="serveur"/> et le greffe <paramref name="greffe"/> : sans eux, « Démonstration ».</summary>
+    public static async Task<ResultatGeste> EnregistrerAsync(ClientServeur? serveur, string? greffe, string? mode, string? date)
+    {
+        if (serveur is null || string.IsNullOrWhiteSpace(greffe))
+            return new ResultatGeste(false, $"{EcranGenere.Demonstration} : RIG n'est pas branché sur la base d'un greffe.") { SansEcrivain = true };
+        return await EcranGenere.EnvoyerGesteAsync(serveur, greffe, RoutesEcransMain.Pour(RoutesArrivee.Enregistrer, greffe),
+            new GesteEcran(TypeGeste.Creer, [], new Dictionary<string, string>
+            {
+                [RoutesArrivee.ChampMode] = mode?.Trim() ?? "",
+                [RoutesArrivee.ChampDate] = date?.Trim() ?? "",
+            }));
+    }
 
     /// <summary>Le courrier du greffe <paramref name="greffe"/> lu sur <paramref name="serveur"/> (null : la demonstration).</summary>
     public static async Task<VueArrivee> TrouverAsync(ClientServeur? serveur, string? greffe, CriteresArrivee c)

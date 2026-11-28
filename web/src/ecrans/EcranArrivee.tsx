@@ -19,6 +19,11 @@
 // tableau passe a UNE ligne par arrivee (Expediteur, Mode, N Demande, Numerisation, Date et heure) ; N Arrivee,
 // References, Case, Paiement, Type de demande, Utilisateur designe et Attestation sont dans la ligne depliee.
 // Le clic qui ouvre la demande, la ligne inerte sans demande et la ligne en alerte ne changent pas.
+//
+// ENREGISTRER UNE ARRIVEE (plan « RIG v3 complet, mesure par le banc du parcours complet », lot 7, 28/11/2026) : le bouton de la
+// barre ouvre la saisie d'OPE_ARRIVEE de RIG v2 (son mode, PTT propose, et sa date, vide = aujourd'hui) ; le pont la fait ecrire par
+// le serveur (Pont/EcranArriveeBase.cs, Serveur/Socle/EcransMain/EcritureArrivee.cs). Faite, la liste est RELUE sur le numero donne ;
+// refusee, le motif s'affiche en refus et la saisie reste ouverte.
 
 import { Fragment, useEffect, useState } from 'react'
 import { appeler } from '../pont'
@@ -28,6 +33,7 @@ import {
   PiedListe, PointEtat, VuesListe, exporterCsv, normaliser, useVuesDeSession, type ActionLigne, type Teinte, type VueEnregistree,
 } from '../composants/ListeModerne'
 import { ProvenanceEcran, type ModeLecture } from '../provenance'
+import { Annonce, type CompteRendu, type ResultatGesteVue } from './formes/commun'
 
 export interface OptionArrivee {
   code: string
@@ -77,6 +83,9 @@ export interface CriteresArrivee {
   critPaiement: boolean
   critNonNumerise: boolean
 }
+
+/** Le mode que RIG v2 propose a la saisie d'une arrivee (OPE_ARRIVEE.DoInitZoneSaisie) ; absent de la liste : le premier. */
+export const ModeSaisieParDefaut = 'PTT'
 
 const SansCritere: CriteresArrivee = {
   critNumArrivee: '', critNomArrivee: '', critReferences: '', critMode: '', critCase: '', critDu: '', critAu: '',
@@ -134,6 +143,11 @@ export function EcranArrivee({ ouvrirDossier }: ProprietesEcranArrivee) {
   const [vue, setVue] = useState<VueArrivee | null>(null)
   // La ligne depliee par son chevron (une a la fois).
   const [ouverte, setOuverte] = useState<string | null>(null)
+  // « Enregistrer une arrivee » : la saisie ouverte (mode, date aaaa-mm-jj), son compte rendu, l'envoi en cours, et la relecture.
+  const [saisie, setSaisie] = useState<{ mode: string; date: string } | null>(null)
+  const [annonce, setAnnonce] = useState<CompteRendu>(null)
+  const [envoi, setEnvoi] = useState(false)
+  const [relecture, setRelecture] = useState(0)
 
   const criteres: CriteresArrivee = {
     critNumArrivee, critNomArrivee, critReferences, critMode, critCase, critDu, critAu, critPaiement, critNonNumerise,
@@ -157,7 +171,7 @@ export function EcranArrivee({ ouvrirDossier }: ProprietesEcranArrivee) {
     }, topMax.valeur)).then((v) => { if (!perime) setVue(v) })
     return () => { perime = true }
   }, [critNumArrivee, critNomArrivee, critReferences, critMode, critCase, critDu, critAu,
-      critPaiement, critNonNumerise, topMax.valeur])
+      critPaiement, critNonNumerise, topMax.valeur, relecture])
 
   const trouvees = vue?.lignes ?? []
 
@@ -210,6 +224,30 @@ export function EcranArrivee({ ouvrirDossier }: ProprietesEcranArrivee) {
   const avecPaiement = affichees.filter((a) => a.paiementJoint).length
   const modes = vue?.modes ?? []
   const parMode = (libelle: string) => affichees.filter((a) => a.modeLisible === libelle).length
+
+  function ouvrirSaisie() {
+    setAnnonce(null)
+    setSaisie({ mode: modes.some((m) => m.code === ModeSaisieParDefaut) ? ModeSaisieParDefaut : (modes[0]?.code ?? ''), date: '' })
+  }
+
+  /** Le geste : ecrit par le serveur ; fait, la liste relit la base sur le numero donne (critere « Arrivee »). */
+  async function enregistrer() {
+    if (!saisie) return
+    setEnvoi(true)
+    try {
+      const r = await appeler<ResultatGesteVue>('EcranArrivee.Enregistrer', saisie.mode, saisie.date)
+      setAnnonce(r.fait || r.sansEcrivain ? r.message : { refus: r.message })
+      if (r.fait) {
+        setSaisie(null)
+        poserCriteres({ ...SansCritere, critNumArrivee: r.ids[0] ?? '' })
+        setRelecture((n) => n + 1)
+      }
+    } catch {
+      setAnnonce({ refus: "Le pont n'a pas répondu : rien n'est enregistré." })
+    } finally {
+      setEnvoi(false)
+    }
+  }
 
   function exporter() {
     exporterCsv('arrivees.csv',
@@ -336,8 +374,32 @@ export function EcranArrivee({ ouvrirDossier }: ProprietesEcranArrivee) {
         <VuesListe vues={vues.map((v, i) => ({ cle: v.cle, libelle: v.libelle, compte: comptes?.[i] }))} active={vueActive}
                    choisir={(cle) => { const v = vues.find((x) => x.cle === cle); if (v) poserCriteres(v.criteres) }}
                    enregistrer={enregistrerVue}>
+          <button type="button" className="rig-lm-outil rig-lm-outil--fort" disabled={saisie !== null} onClick={ouvrirSaisie}>
+            Enregistrer une arrivée
+          </button>
           <button type="button" className="rig-lm-outil" disabled={affichees.length === 0} onClick={exporter}>Exporter</button>
         </VuesListe>
+
+        {saisie && (
+          <div role="group" aria-label="Nouvelle arrivée"
+               style={{ display: 'flex', alignItems: 'flex-end', flexWrap: 'wrap', gap: 'var(--rig-esp-3)', padding: '4px 0 8px' }}>
+            <label className="rig-saisie-champ">
+              <span className="rig-saisie-champ__libelle">Mode d arrivee</span>
+              <select className="rig-saisie-champ__saisie" aria-label="Mode de la nouvelle arrivée" value={saisie.mode}
+                      onChange={(e) => setSaisie({ ...saisie, mode: e.target.value })}>
+                {modes.map((m) => <option key={m.code} value={m.code}>{m.libelle}</option>)}
+              </select>
+            </label>
+            <label className="rig-saisie-champ">
+              <span className="rig-saisie-champ__libelle">Date d arrivee (vide : aujourd hui)</span>
+              <input className="rig-saisie-champ__saisie" type="date" aria-label="Date de la nouvelle arrivée" value={saisie.date}
+                     onChange={(e) => setSaisie({ ...saisie, date: e.target.value })} />
+            </label>
+            <button type="button" className="rig-bouton rig-bouton--fort" disabled={envoi} onClick={() => { void enregistrer() }}>Enregistrer</button>
+            <button type="button" className="rig-bouton" disabled={envoi} onClick={() => setSaisie(null)}>Annuler</button>
+          </div>
+        )}
+        <Annonce texte={annonce} />
 
         <div className="rig-table-cadre">
           <table className="rig-table rig-lm-table">

@@ -21,6 +21,11 @@
 // Client, En cours et Date de validation sont dans la ligne depliee par le chevron. Les criteres, le clic qui
 // ouvre le dossier et la ligne en alerte ne changent pas. Les vues ajoutees vivent le temps de la SESSION
 // (decision du lot 1 : aucun reglage d'ecran ne les porte).
+//
+// SUPPRIMER L'ETAT EN COURS (plan « RIG v3 complet, mesure par le banc du parcours complet », lot 7, 28/11/2026) : le menu de la
+// ligne porte le menu de la grille de RIG v2 (OPE_RESULTATS.tsmiDeleteEtatEnCoursDemande_Click), offert pour une demande EN COURS ;
+// le pont le fait ecrire par le serveur (Pont/EcranDemandesBase.cs, Serveur/Socle/EcransMain/EcritureDemandes.cs). Fait, la liste est
+// RELUE ; refuse, le motif s'affiche en refus.
 
 import { Fragment, useEffect, useState } from 'react'
 import { appeler } from '../pont'
@@ -31,6 +36,7 @@ import {
   PiedListe, PointEtat, VuesListe, exporterCsv, normaliser, useVuesDeSession, type ActionLigne, type Teinte, type VueEnregistree,
 } from '../composants/ListeModerne'
 import { ProvenanceEcran, type ModeLecture } from '../provenance'
+import { Annonce, type CompteRendu, type ResultatGesteVue } from './formes/commun'
 
 export interface LigneDemande {
   numero: string
@@ -168,6 +174,9 @@ export function EcranDemandes({ valides, ouvrir, dossier = null }: ProprietesEcr
   const [vue, setVue] = useState<VueDemandes | null>(null)
   // La ligne depliee par son chevron (une a la fois).
   const [ouverte, setOuverte] = useState<string | null>(null)
+  // « Supprimer l'etat en cours » : son compte rendu, et la relecture de la liste apres un geste fait.
+  const [annonce, setAnnonce] = useState<CompteRendu>(null)
+  const [relecture, setRelecture] = useState(0)
 
   const criteres: CriteresDemandes = { critDemande, critClient, critProcessus, critDu, critAu, critEtats, critAlerte, critEnCours }
   function poserCriteres(c: CriteresDemandes) {
@@ -191,7 +200,18 @@ export function EcranDemandes({ valides, ouvrir, dossier = null }: ProprietesEcr
       critDemande, critClient, critProcessus, critDu, critAu, critEtats, critAlerte, critEnCours,
     }, topMax.valeur), clefValides === '' ? [] : clefValides.split('|')).then((v) => { if (!perime) setVue(v) })
     return () => { perime = true }
-  }, [critDemande, critClient, critProcessus, critDu, critAu, critEtats, critAlerte, critEnCours, topMax.valeur, clefValides])
+  }, [critDemande, critClient, critProcessus, critDu, critAu, critEtats, critAlerte, critEnCours, topMax.valeur, clefValides, relecture])
+
+  /** Le geste du menu : ecrit par le serveur ; fait, la liste relit la base. */
+  async function supprimerEtatEnCours(numero: string) {
+    try {
+      const r = await appeler<ResultatGesteVue>('EcranDemandes.SupprimerEtatEnCours', numero)
+      setAnnonce(r.fait || r.sansEcrivain ? r.message : { refus: r.message })
+      if (r.fait) setRelecture((n) => n + 1)
+    } catch {
+      setAnnonce({ refus: "Le pont n'a pas répondu : rien n'est modifié." })
+    }
+  }
 
   const trouvees = vue?.lignes ?? []
 
@@ -339,6 +359,7 @@ export function EcranDemandes({ valides, ouvrir, dossier = null }: ProprietesEcr
                                valider: () => { if (affichees.length === 1) ouvrir(affichees[0]!.dossier) } }} />
 
         {vue && <ProvenanceEcran mode={vue.mode} message={vue.message} quoi="Demandes" />}
+        <Annonce texte={annonce} />
 
         {vue && (
           <CartesChiffrees cartes={[
@@ -405,6 +426,7 @@ export function EcranDemandes({ valides, ouvrir, dossier = null }: ProprietesEcr
                       <MenuLigne libelle={`Actions de la demande ${dem.numero}`} actions={[
                         ouvrirDossier,
                         { libelle: estOuverte ? 'Replier la ligne' : 'Deplier la ligne', agir: () => setOuverte(estOuverte ? null : cle) },
+                        { libelle: 'Supprimer l’état en cours', desactive: !dem.enCours, agir: () => { void supprimerEtatEnCours(dem.numero) } },
                       ]} />
                     </td>
                   </tr>

@@ -144,7 +144,13 @@ public static partial class EcranCommandesWeb
     [JSInvokable("EcranCommandesWeb.Ouvrir")]
     public static Task<VueCommandesWeb> Ouvrir() => OuvrirAsync(ClientServeur.Actif, SessionAgent.CodeGreffe);
 
+    /// <summary>Un geste de l'ecran. Branche a la base, « Decider » Mettre en attente s'ecrit par le serveur
+    /// (EcranCommandesWebBase.cs, AgirAsync) ; tout autre geste, et la demonstration, se jouent sur la session.</summary>
     [JSInvokable("EcranCommandesWeb.Agir")]
+    public static Task<VueCommandesWeb> AgirAsync(string session, string geste, JsonElement valeur)
+        => AgirAsync(ClientServeur.Actif, SessionAgent.CodeGreffe, session, geste, valeur);
+
+    /// <summary>Le geste sur la session seule, sans serveur (tests/CommandesWebCheck le joue).</summary>
     public static VueCommandesWeb Agir(string session, string geste, JsonElement valeur)
     {
         var s = Sessions.Lire(session);

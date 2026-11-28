@@ -164,6 +164,40 @@ describe('EcranArrivee et la base du greffe', () => {
     await waitFor(() => expect(exemple(container)?.textContent).toBe('exemple'))
   })
 
+  // « Enregistrer une arrivee » (OPE_ARRIVEE de RIG v2, ecrite par le serveur : EcritureArrivee.cs). Faux si : le mode ou la date
+  // choisis ne vont pas au pont, la liste n'est pas RELUE sur le numero donne, ou un refus ferme la saisie sans le dire.
+  it('Enregistrer une arrivee : mode et date au pont, puis la liste est relue sur le numero donne', async () => {
+    const pont = installerFauxPont({
+      'EcranArrivee.Trouver': vue,
+      'EcranArrivee.Enregistrer': () => ({ fait: true, message: 'Arrivée n°A2633200009 enregistrée (Edi, 20/11/2026).', sansEcrivain: false,
+                                           ids: ['A2633200009'] }),
+    })
+    render(<EcranArrivee ouvrirDossier={vi.fn()} />)
+    await screen.findByText('A1')
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer une arrivée' }))
+    fireEvent.change(screen.getByLabelText('Mode de la nouvelle arrivée'), { target: { value: 'EDI' } })
+    fireEvent.change(screen.getByLabelText('Date de la nouvelle arrivée'), { target: { value: '2026-11-20' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
+    expect((await screen.findByRole('status')).textContent).toBe('Arrivée n°A2633200009 enregistrée (Edi, 20/11/2026).')
+    expect(pont.appels.mock.calls.find((a) => a[0] === 'EcranArrivee.Enregistrer')!.slice(1)).toEqual(['EDI', '2026-11-20'])
+    await waitFor(() => expect((pont.appels.mock.lastCall![1] as { critNumArrivee: string }).critNumArrivee).toBe('A2633200009'))
+    expect(screen.queryByLabelText('Mode de la nouvelle arrivée')).toBeNull()
+  })
+
+  it('Enregistrer une arrivee refusee : le motif en refus, la saisie reste ouverte ; sans PTT dans la liste, le mode propose est le premier', async () => {
+    const pont = installerFauxPont({
+      'EcranArrivee.Trouver': vue,
+      'EcranArrivee.Enregistrer': () => ({ fait: false, message: 'Le mode d’arrivée « POSTE » n’est pas utilisable en saisie.', sansEcrivain: false, ids: [] }),
+    })
+    render(<EcranArrivee ouvrirDossier={vi.fn()} />)
+    await screen.findByText('A1')
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer une arrivée' }))
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer' }))
+    expect((await screen.findByRole('alert')).textContent).toBe('Refus Le mode d’arrivée « POSTE » n’est pas utilisable en saisie.')
+    expect(pont.appels.mock.calls.find((a) => a[0] === 'EcranArrivee.Enregistrer')!.slice(1)).toEqual(['POSTE', ''])
+    expect(screen.getByLabelText('Mode de la nouvelle arrivée')).toBeTruthy()
+  })
+
   it('une base qui ne repond pas : son motif, et aucune arrivee', async () => {
     installerFauxPont({ 'EcranArrivee.Trouver': (): VueArrivee => ({
       modes: [], lignes: [], total: 0, aNumeriser: 0, mode: 'erreur',

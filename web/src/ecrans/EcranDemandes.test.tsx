@@ -273,6 +273,45 @@ describe('EcranDemandes et la base du greffe', () => {
     await waitFor(() => expect(criteresAppeles(pont.appels.mock.calls).some((c) => c.critEtats.join('|') === 'Validée')).toBe(true))
   })
 
+  // « Supprimer l'etat en cours » (menu de la grille de RIG v2, OPE_RESULTATS.cs:814-833 ; ecrit par le serveur : EcritureDemandes.cs).
+  // Faux si : le menu l'offre pour une demande qui n'est pas en cours, le numero n'arrive pas au pont, ou la liste n'est pas relue.
+  it('Supprimer l\'etat en cours : offert pour une demande en cours seulement, puis la liste est relue', async () => {
+    let enCours = true
+    const pont = installerFauxPont({
+      'EcranDemandes.Trouver': (_c: unknown, valides: unknown): VueDemandes => {
+        const v = vue(_c, valides)
+        return { ...v, lignes: v.lignes.map((l) => (l.numero === 'D2' ? { ...l, enCours } : l)) }
+      },
+      'EcranDemandes.SupprimerEtatEnCours': () => {
+        enCours = false
+        return { fait: true, message: 'La demande D2 n’est plus en cours (état inchangé).', sansEcrivain: false, ids: ['D2'] }
+      },
+    })
+    const { container } = render(<EcranDemandes valides={['004151']} ouvrir={vi.fn()} />)
+    await screen.findByText('Demande D2')
+    fireEvent.click(screen.getByRole('button', { name: 'Actions de la demande D1' }))
+    expect((screen.getByRole('menuitem', { name: 'Supprimer l’état en cours' }) as HTMLButtonElement).disabled).toBe(true)
+    fireEvent.click(screen.getByRole('button', { name: 'Actions de la demande D1' }))   // referme son menu
+    fireEvent.click(screen.getByRole('button', { name: 'Actions de la demande D2' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Supprimer l’état en cours' }))
+    expect((await screen.findByRole('status')).textContent).toBe('La demande D2 n’est plus en cours (état inchangé).')
+    expect(pont.appels.mock.calls.find((a) => a[0] === 'EcranDemandes.SupprimerEtatEnCours')!.slice(1)).toEqual(['D2'])
+    await waitFor(() => expect(synthese(container)).toBe('2 affichee(s) sur 12 · 0 en cours · 1 en alerte'))
+  })
+
+  it('Supprimer l\'etat en cours refuse : le motif en refus, la liste ne change pas', async () => {
+    installerFauxPont({
+      'EcranDemandes.Trouver': vue,
+      'EcranDemandes.SupprimerEtatEnCours': () => ({ fait: false, message: 'La demande D2 n’est pas en cours.', sansEcrivain: false, ids: [] }),
+    })
+    const { container } = render(<EcranDemandes valides={['004151']} ouvrir={vi.fn()} />)
+    await screen.findByText('Demande D2')
+    fireEvent.click(screen.getByRole('button', { name: 'Actions de la demande D2' }))
+    fireEvent.click(screen.getByRole('menuitem', { name: 'Supprimer l’état en cours' }))
+    expect((await screen.findByRole('alert')).textContent).toBe('Refus La demande D2 n’est pas en cours.')
+    expect(synthese(container)).toBe('2 affichee(s) sur 12 · 1 en cours · 1 en alerte')
+  })
+
   it('un acces refuse : son motif, et aucune demande', async () => {
     installerFauxPont({ 'EcranDemandes.Trouver': (): VueDemandes => ({
       traitements: [], etats: [], lignes: [], total: 0, libellesTraitements: [], mode: 'refuse',

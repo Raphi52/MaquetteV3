@@ -23,6 +23,8 @@
     <Compile Include="Lot14.cs" />
     <!-- Le banc du lot 15 (Edition des maquettes) : un fichier a lui, appele a la fin de Program.cs. -->
     <Compile Include="Lot15.cs" />
+    <!-- Le banc du lot 7 du plan « parcours complet » (gestes Arrivee, Demandes, Commandes web) : un fichier a lui, appele a la fin de Program.cs. -->
+    <Compile Include="ParcoursLot7.cs" />
     <ProjectReference Include="../../RigV3Desktop.csproj" />
     <ProjectReference Include="../../Serveur/RigV3.Serveur.csproj" />
     <ProjectReference Include="../../Base/RigV3.Migrations.csproj" />
