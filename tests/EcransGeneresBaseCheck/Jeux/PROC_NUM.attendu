@@ -2,6 +2,10 @@
 # ancien (date de creation ; sans date, en dernier). Groupe : TIF pour .tif / .tiff (toute casse), PDF sinon.
 # 2110305, « en cours de numerisation » (le nom que la V2 donne a un scan qui n'est pas fini), est un PDF sans pages.
 # Etat : tenu en cours par un processus (2110302) -> En cours ; sinon Disponible. Ecarte : 2110303, lie a l'OCR differe (jumeau 2110301).
+# Les trois premieres lignes viennent de PROC_PDF_WRITER.sql (« Pivoter des pages » relit cette liste, lot 5 de plan-f4fb097f).
+contrat du banc 5.pdf | PDF · 2 pages · 1 Ko · créé le 10/06/2001 · affaire 2001J00051 | PDF | AFaire | []
+vide du banc 5.pdf | PDF · créé le 09/06/2001 | PDF | AFaire | []
+tenu du banc 5.pdf | PDF · 5 pages · 9 Ko · créé le 06/06/2001 · en cours · processus NUM · depuis le 06/06/2001 | PDF | EnCours | []
 scan du banc 11.tif | TIF · 1 page · 1 Ko · créé le 03/05/2001 · en cours · processus NUM · depuis le 04/05/2001 | TIF | EnCours | []
 courrier du banc 11.pdf | PDF · 3 pages · 2 Ko · créé le 02/05/2001 · affaire 2001J00011 | PDF | AFaire | []
 en cours de numérisation | PDF · créé le 01/05/2001 | PDF | AFaire | []

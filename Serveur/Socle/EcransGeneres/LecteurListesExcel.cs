@@ -54,10 +54,10 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///       : debuts de code separes par « ; » -> AND (EVNPR_CODE_EVE_PRO LIKE '<code>%' OR ...) ;
 ///     « Sans sursis a statuer », « Sans ADD expertise », « Sans ADD » (IDJ seul, OPE_RECHERCHE.cs:93-97 ; ExcelInstance.cs:68-85).
 ///   ETAT : plus de 65 536 lignes -> EnAttente « Bloquee : trop de lignes » (TextNbOccurence_ChangementValeur, OPE_RECHERCHE.cs:466-472 :
-///   le bouton Excel est grise) ; sinon EnCours « Comptee ». Cellules : le type, son nombre de lignes.
-/// NON REPRIS (nomme) : l'EXPORT. La V2 lance EXECUTE_EXCEL avec la requete complete (OPE_RECHERCHE.cs:440-463 : les colonnes de la
-///   liste choisie, des expressions SQL stockees dans PARAMETRAGE_LISTE_XLS), qui ouvre un classeur NON enregistre dans Excel
-///   (AmiOffice2010\Excel.cs:551, aucun dossier choisi) ; « Lancer l'export Excel » reste en demonstration. « Exportee » n'est pas pose.
+///   le bouton Excel est grise) ; sinon EnCours « Comptee ». Cellules : le type, son nombre de lignes. Id : le type, sa periode et ses
+///   criteres (Comptage, plus bas), que « Lancer l'export Excel » relit -- une ligne de GIE non comptee n'en a pas.
+/// L'EXPORT : EcrivainListesExcel.cs (lot 5 du plan-f4fb097f) le pose dans la file des editions. « Exportee » n'est pas pose ici : la
+///   demande d'edition se relit dans la file des editions (PROC_POOLEDITION).
 /// </summary>
 internal sealed class LecteurListesExcel : IRechercheEcran
 {
@@ -199,35 +199,76 @@ internal sealed class LecteurListesExcel : IRechercheEcran
                                         Groupe(type), "AFaire", []) { Valeurs = [libelle, "non compté : filtre SQL du paramétrage"] });
                 continue;
             }
-            var sql = new System.Text.StringBuilder("SELECT COUNT(*) AS Nombre ").Append(Comptages[type]);
-            var parametres = new List<SqlParameter> { new("@du", du.Value.Date), new("@au", au.Date) };
-            if (type == "IDJ")
-            {
-                if (Coche(recherche.Critere(CritereSansSursis))) { sql.Append(" AND (R_TYPEDECISI_SURSIS_STATUER = 0)"); filtres.Add("sans sursis à statuer"); }
-                if (Coche(recherche.Critere(CritereSansAddExpertise))) { sql.Append(" AND (R_TYPEDECISI_ADD_EXPERTISE = 0)"); filtres.Add("sans ADD expertise"); }
-                if (Coche(recherche.Critere(CritereSansAdd))) { sql.Append(" AND (ISNULL(DJPrincip.DCJDC_AVANT_DIRE_DROIT, '') <> 1)"); filtres.Add("sans ADD"); }
-            }
-            if (types.Count > 0)
-            {
-                sql.Append(" AND (").AppendJoin(" OR ", types.Select((_, k) => $"(INSTN_NUM_ROLE LIKE @t{k})")).Append(')');
-                parametres.AddRange(types.Select((t, k) => new SqlParameter($"@t{k}", $"%[0-9]{t}[0-9]%")));
-            }
-            if (type is "IEF" or "IEP" && codes.Length > 0)
-            {
-                sql.Append(" AND (").AppendJoin(" OR ", codes.Select((_, k) => $"EVNPR_CODE_EVE_PRO LIKE @c{k}")).Append(')');
-                parametres.AddRange(codes.Select((c, k) => new SqlParameter($"@c{k}", c.Replace("[", "[[]", StringComparison.Ordinal) + "%")));
-                filtres.Add($"codes {string.Join(", ", codes)}");
-            }
+            var idj = type == "IDJ";
+            var comptage = new Comptage(type, du.Value.Date, au.Date, bornes.Length > 1 && CriteresConsultation.Date(bornes[1]) is not null,
+                [.. types], type is "IEF" or "IEP" ? codes : [], idj && Coche(recherche.Critere(CritereSansSursis)),
+                idj && Coche(recherche.Critere(CritereSansAddExpertise)), idj && Coche(recherche.Critere(CritereSansAdd)));
+            var (sql, parametres, enPlus) = comptage.Requete();
+            filtres.AddRange(enPlus);
             int nombre;
-            await using (var r = await LectureV2.LireAsync(baseGreffe, sql.ToString(), ct, [.. parametres]))
+            await using (var r = await LectureV2.LireAsync(baseGreffe, sql, ct, parametres))
                 nombre = await r.ReadAsync(ct) ? Convert.ToInt32(r["Nombre"], CultureInfo.InvariantCulture) : 0;
             var trop = nombre > PlafondExcel;
             lignes.Add(new LigneLue(libelle,
                 FormeLigne.Joindre(Nombre(nombre, "ligne", "lignes", "aucune ligne"), periode, FormeLigne.Joindre([.. filtres]),
                                    trop ? "au-delà de 65 536 lignes, Excel ne les affiche pas : changez vos critères" : null),
-                Groupe(type), trop ? "EnAttente" : "EnCours", []) { Valeurs = [libelle, nombre.ToString(CultureInfo.InvariantCulture)] });
+                Groupe(type), trop ? "EnAttente" : "EnCours", []) { Id = comptage.Id, Valeurs = [libelle, nombre.ToString(CultureInfo.InvariantCulture)] });
         }
         return new LignesLues(lignes, lignes.Count);
+    }
+
+    /// <summary>
+    /// Le COMPTAGE d'un type sur une periode (en tete du fichier) et l'Id de sa ligne : « type~types~codes~cases|du|au »
+    /// (EditionsV2.IdSurPeriode -- la forme Etat n'envoie au geste que les Id des lignes affichees, pas ses parametres). Types : les cases
+    /// de OPE_TYPE_INSTANCE ; codes : IEF et IEP seuls ; cases : S sans sursis, E sans ADD expertise, A sans ADD (IDJ seul), F la fin de
+    /// periode saisie (le titre de l'export de RIG v2 ne la porte que si elle l'est, OPE_RECHERCHE.cs:246). « Lancer l'export Excel »
+    /// (EcrivainListesExcel.cs) recompte par la meme requete, dans la transaction du geste.
+    /// </summary>
+    internal sealed record Comptage(string Type, DateTime Du, DateTime Au, bool FinSaisie, string[] Types, string[] Codes,
+                                    bool SansSursis, bool SansAddExpertise, bool SansAdd)
+    {
+        internal string Id => EditionsV2.IdSurPeriode(
+            string.Join('~', Type, string.Join(',', Types), string.Join(';', Codes),
+                        (SansSursis ? "S" : "") + (SansAddExpertise ? "E" : "") + (SansAdd ? "A" : "") + (FinSaisie ? "F" : "")), Du, Au);
+
+        /// <summary>Le comptage d'un Id de ligne ; null s'il n'en est pas un (une ligne sans periode, un type d'un autre ecran).</summary>
+        internal static Comptage? Lire(string? id)
+        {
+            if (EditionsV2.LirePeriode(id) is not { } p) return null;
+            var parts = p.Cle.Split('~');
+            if (parts.Length != 4 || !Comptages.ContainsKey(parts[0])) return null;
+            var types = parts[1].Split(',', StringSplitOptions.RemoveEmptyEntries);
+            if (types.Any(t => !TypesInstance.Contains(t))) return null;
+            var cases = parts[3];
+            return new Comptage(parts[0], p.Debut, p.Fin, cases.Contains('F'), types, parts[2].Split(';', StringSplitOptions.RemoveEmptyEntries),
+                                cases.Contains('S'), cases.Contains('E'), cases.Contains('A'));
+        }
+
+        /// <summary>La requete du compte (une colonne « Nombre ») et ses filtres en plus de la periode et des types, en mots.</summary>
+        internal (string Sql, SqlParameter[] Parametres, List<string> Filtres) Requete()
+        {
+            var filtres = new List<string>();
+            var sql = new System.Text.StringBuilder("SELECT COUNT(*) AS Nombre ").Append(Comptages[Type]);
+            var parametres = new List<SqlParameter> { new("@du", Du), new("@au", Au) };
+            if (Type == "IDJ")
+            {
+                if (SansSursis) { sql.Append(" AND (R_TYPEDECISI_SURSIS_STATUER = 0)"); filtres.Add("sans sursis à statuer"); }
+                if (SansAddExpertise) { sql.Append(" AND (R_TYPEDECISI_ADD_EXPERTISE = 0)"); filtres.Add("sans ADD expertise"); }
+                if (SansAdd) { sql.Append(" AND (ISNULL(DJPrincip.DCJDC_AVANT_DIRE_DROIT, '') <> 1)"); filtres.Add("sans ADD"); }
+            }
+            if (Types.Length > 0)
+            {
+                sql.Append(" AND (").AppendJoin(" OR ", Types.Select((_, k) => $"(INSTN_NUM_ROLE LIKE @t{k})")).Append(')');
+                parametres.AddRange(Types.Select((t, k) => new SqlParameter($"@t{k}", $"%[0-9]{t}[0-9]%")));
+            }
+            if (Type is "IEF" or "IEP" && Codes.Length > 0)
+            {
+                sql.Append(" AND (").AppendJoin(" OR ", Codes.Select((_, k) => $"EVNPR_CODE_EVE_PRO LIKE @c{k}")).Append(')');
+                parametres.AddRange(Codes.Select((c, k) => new SqlParameter($"@c{k}", c.Replace("[", "[[]", StringComparison.Ordinal) + "%")));
+                filtres.Add($"codes {string.Join(", ", Codes)}");
+            }
+            return (sql.ToString(), [.. parametres], filtres);
+        }
     }
 
     private static string Groupe(string type) => type switch { "GIE" => Groupements, "AFF" => Affaires, _ => Instances };

@@ -1,0 +1,82 @@
+# Gestes de « Pivoter des pages » (EcrivainPivoterPages.cs), lot 5 du plan-f4fb097f, sur les jeux PROC_PDF_WRITER.sql et PROC_NUM.sql
+# (la meme table). « Enregistrer le PDF » = PDF_WRITER de RIG v2 ouvert par « Documents océrisés » (PROC_NUM_PROC.cs:160-216), puis
+# la rotation d'Aspose et la recopie du fichier dans DOCUMENT_OCERISE (:255-268). 3500101 : un vrai PDF de deux pages, la 2e deja a 90°.
+# Les gestes de PROC_NUM.gestes passent avant ceux-ci sur la meme base (ordre alphabetique) et changent la liste (une suppression, une
+# copie de TIF) : un geste fait se relit par la fiche du document et un controle SQL, pas par toute la liste.
+#
+# Refus 1 : aucun document -- « Veuillez sélectionner un document. » (PROC_NUM_PROC.cs:215). Jumeau accepte : bloc 7, 3500101.
+geste: Agir Enregistrer le PDF
+ids:
+valeur: Sélection › Plage de pages = 1
+valeur: Rotation › Rotation = 90° horaire
+resultat: refuse
+message: Veuillez sélectionner un document.
+---
+# Refus 2 : un PDF au fichier VIDE (3500106) -- « Le fichier est corrompu. » (:203). Jumeau accepte : bloc 7, 3500101, son fichier.
+geste: Agir Enregistrer le PDF
+ids: 3500106
+valeur: Rotation › Rotation = 90° horaire
+resultat: refuse
+message: Le fichier est corrompu.
+---
+# Refus 3 : un TIF (2110302) s'ouvre dans l'editeur TIF de RIG v2, pas dans PDF_WRITER (:163-197). Jumeau accepte : bloc 7, un PDF.
+geste: Agir Enregistrer le PDF
+ids: 2110302
+valeur: Rotation › Rotation = 90° horaire
+resultat: refuse
+message: Ce TIF s'ouvre dans l'éditeur TIF de RIG v2 (paramètre PDF_WRITER_POUR_TIF de COMMUN_RIG, absent de la base du greffe).
+---
+# Refus 4 : 3500105, tenu en cours (RIG v2 l'ouvre quand meme : _Editer ne lit pas la reservation), son fichier n'est que l'en-tete
+# %PDF-1.4 -- le compte des pages echoue (OPE_PDF_WRITER.cs:347), le motif en mots. Jumeau accepte : bloc 7, 3500101, un PDF lisible.
+geste: Agir Enregistrer le PDF
+ids: 3500105
+valeur: Rotation › Rotation = 90° horaire
+resultat: refuse
+message: Problème durant la lecture du fichier PDF. (le nombre de pages n'a pas pu être récupéré) — startxref absent ou hors du fichier.
+---
+# Refus 5 : la plage « 5 » sur un document de deux pages (un numero hors du document est ignore, GetNumPagesFromEtendue :582-610),
+# aucune case cochee -- RIG v2 ne tourne rien (Rotate, :647). Jumeau accepte : bloc 7, la plage « 1 ».
+geste: Agir Enregistrer le PDF
+ids: 3500101
+valeur: Sélection › Plage de pages = 5
+valeur: Rotation › Rotation = 90° horaire
+resultat: refuse
+message: Aucune page à pivoter : cochez des pages ou saisissez une plage (ex. 1-3;5). Sans page choisie, RIG v2 ne tourne rien.
+---
+# Refus 6 : une page choisie, sans sens de rotation (les boutons « 90° », « -90° », « 180° », OPE_ROTATION.cs:49-56). Jumeau
+# accepte : bloc 7, « 90° horaire ».
+geste: Agir Enregistrer le PDF
+ids: 3500101
+valeur: Sélection › Plage de pages = 1
+resultat: refuse
+message: Choisissez la rotation : 90° horaire, 90° anti-horaire ou 180° (les boutons « 90° », « -90° » et « 180° » de RIG v2).
+---
+# Fait (le bloc que rejoue le banc du parcours) : la page 1 de 3500101 tournee de 90° horaire, au nom d'un agent qui a son utilisateur
+# RIG v2 (3500001). Le fichier est remplace (rotation ajoutee en fin de fichier, PagesPdf.cs), sa taille, ses pages et l'utilisateur
+# ecrits, son nom sans espaces (DocumentOcerise.Sauve, :404-415) ; la page 2 garde ses 90°.
+geste: Agir Enregistrer le PDF
+agent: banc.l5.pdf
+ids: 3500101
+valeur: Sélection › Plage de pages = 1
+valeur: Rotation › Rotation = 90° horaire
+resultat: fait
+message: « contrat_du_banc_5.pdf » enregistré : page 1 tournée de 90° horaire ; pages tournées : page 1 : 90° ; page 2 : 90°.
+fiche: 3500101
+Fichier source › Fichier source = contrat_du_banc_5.pdf
+Fichier source › Pages = 2
+Fichier source › Taille = 1 Ko
+Fichier source › Pages tournées = page 1 : 90° ; page 2 : 90°
+controle: SELECT CONCAT(DOCOC_ID_UTLST, '|', DOCOC_NB_PAGES, '|', CASE WHEN DOCOC_TAILLE = DATALENGTH(DOCOC_FICHIER) THEN 'taille du fichier' ELSE 'taille fausse' END, '|', CASE WHEN DATALENGTH(DOCOC_FICHIER) > 828 AND SUBSTRING(DOCOC_FICHIER, 1, 8) = 0x255044462D312E34 THEN 'PDF complete' ELSE 'PDF remplace' END) FROM v2.DOCUMENT_OCERISE WHERE DOCOC_ID_DOCOC = 3500101 => 3500001|2|taille du fichier|PDF complete
+---
+# Les pages cochees « 1;2 » tournees de 90° anti-horaire : les rotations s'accumulent sur le fichier deja enregistre (page 1 : 90 - 90,
+# page 2 : 90 - 90), RotationPage d'Aspose (AmiAsposePdf.cs:2284), au nom d'un compte sans utilisateur RIG v2 : DOCOC_ID_UTLST NULL.
+geste: Agir Enregistrer le PDF
+agent: banc.l5.sansv2
+ids: 3500101
+valeur: Sélection › Pages cochées = 1;2
+valeur: Rotation › Rotation = 90° anti-horaire
+resultat: fait
+message: « contrat_du_banc_5.pdf » enregistré : pages 1, 2 tournées de 90° anti-horaire ; pages tournées : aucune.
+fiche: 3500101
+Fichier source › Pages tournées = aucune
+controle: SELECT CONCAT(CASE WHEN DOCOC_ID_UTLST IS NULL THEN 'sans utilisateur' ELSE CONVERT(varchar(10), DOCOC_ID_UTLST) END, '|', CASE WHEN DOCOC_TAILLE = DATALENGTH(DOCOC_FICHIER) THEN 'taille du fichier' ELSE 'taille fausse' END) FROM v2.DOCUMENT_OCERISE WHERE DOCOC_ID_DOCOC = 3500101 => sans utilisateur|taille du fichier
