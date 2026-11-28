@@ -16,7 +16,8 @@ using RigV3Desktop.Pont;
 // trois ecrans faits main, joues a la fin de Program.cs sur la meme base jetable et le meme serveur en memoire, un fichier a lui.
 //   A. « Arrivee du courrier » : Enregistrer une arrivee (EcritureArrivee.cs, OPE_ARRIVEE de RIG v2) ;
 //   B. « Demandes » : Supprimer l'etat en cours (EcritureDemandes.cs, OPE_RESULTATS.tsmiDeleteEtatEnCoursDemande_Click) ;
-//   C. « Commandes web » : Mettre en attente (EcritureCommandesWeb.cs, regles de NeoRIG).
+//   C. « Commandes web » : Mettre en attente, et Valider sur le debiteur cherche en base (EcritureCommandesWeb.cs, regles de NeoRIG) ;
+//   D. « Requisitions » : Terminer la commande de documents (EcritureRequisitions.cs), et pas de zone des commandes web en base.
 // Chaque refus a son JUMEAU accepte (meme borne, autre cote), rien d'ecrit ni de journal sur un refus, une ligne au journal sur un
 // geste fait, et la relecture par le pont. Identifiants : a partir de 3 700 000 ((30 + 7) x 100 000, regle du plan), codes « L7… ».
 // Les tables deja creees par Program.cs et Lot20.cs (MODE_ARRIVEE, ARRIVEE, DEMANDE, AFFAIRE, COMMANDE_WEB) recoivent les colonnes que
@@ -26,6 +27,13 @@ using RigV3Desktop.Pont;
 //   A. le mode « L7N » (R_MODEARRIVE_UTILISABLE_SAISIE = 0) : sans le filtre de ULT_COMBO_MODE_ARRIVEE, il serait enregistre ;
 //   B. la demande L7 3700012, PAS en cours : sans la garde de OPE_RESULTATS.cs:818, elle serait « supprimee » et journalisee ;
 //   C. la commande 3700402, DEJA en attente (T) : sans la regle de TraitementCommandeWeb.Verifier, elle serait remise en attente.
+//      Valider : la meme 3700402 SANS dossier retenu -- sans TransitionsCommandeWeb.VerifierCible, elle serait validee sur rien ; et
+//      3000401 par l'ecran, debiteur non retenu -- sans la marche « Debiteur », le pont enverrait Valider au serveur.
+//   D. sans « Guichet » (Terminer) ; et la session ouverte AVEC un serveur -- sans la garde, la zone des commandes web de
+//      demonstration (marquee « exemple ») s'afficherait au-dessus des dossiers de la base.
+// fix-ok: pas un correctif a l'aveugle -- tests ajoutes sur le refus du chef (plan-f4fb097f, lot 7, main bad949c) : « Valider » des
+// commandes web n'etait pas ecrit (capture commandes-web-3 : recherche du debiteur non reprise) et Requisitions montrait en base les
+// commandes web d'exemple (capture requisitions-2). Vus rouges avant la correction (compte rendu du lot 7).
 
 /// <summary>Ce que Program.cs prete au banc du lot 7.</summary>
 internal sealed record BancParcoursLot7(Func<string, (string Nom, object? Valeur)[], Task> ExecuterSql, Action<bool, string> Verifier,
@@ -136,7 +144,17 @@ internal sealed record BancParcoursLot7(Func<string, (string Nom, object? Valeur
             $"Relecture de la commande {numero} : REQUI validee, nommee de sa LPLURI, sur le dossier ({(int)reponse.StatusCode} {(lue is null ? corps[..Math.Min(400, corps.Length)] : "")})");
 
         static JsonElement V(object? v) => JsonSerializer.SerializeToElement(v);
-        var vue = EcranRequisitions.Ouvrir();
+        // La zone haute des commandes web n'est pas dans le REQUI de RIG v2 (aucune commande web dans RCS\Exe\PROC_REQUI ni sur la
+        // branche Feature/RCS/275_Refonte_Requi) : ouverte AVEC un serveur, la session ne la montre pas (refus du chef, capture
+        // requisitions-2 : « Commandes web à traiter » marquées « exemple » au-dessus des dossiers de la base). Jumeau : sans serveur,
+        // la demonstration la garde.
+        var enBase = EcranRequisitions.Ouvrir(Client, Greffe);
+        var demo = EcranRequisitions.Ouvrir(null, null);
+        EcranRequisitions.Fermer(enBase.Session);
+        EcranRequisitions.Fermer(demo.Session);
+        Exiger(enBase is { ZoneCommandesWeb: false, CommandesWeb.Length: 0, NbATraiter: 0 } && demo is { ZoneCommandesWeb: true, CommandesWeb.Length: > 0 },
+            $"pont Requisitions : branche a la base, pas de zone des commandes web ({enBase.CommandesWeb.Length} ligne(s)) ; sans serveur, la demonstration la garde ({demo.CommandesWeb.Length})");
+        var vue = EcranRequisitions.Ouvrir(Client, Greffe);
         try
         {
             await EcranRequisitions.AgirAsync(Client, Greffe, vue.Session, "Critere", V(new { champ = "CritRaisonSociale", valeur = "ALPHA BASE" }));
@@ -287,15 +305,21 @@ internal sealed record BancParcoursLot7(Func<string, (string Nom, object? Valeur
             "pont Demandes : sans demande choisie, rien n'est envoye ; sans serveur, « Démonstration »");
     }
 
-    // ============================================================ C. METTRE EN ATTENTE UNE COMMANDE WEB (EcritureCommandesWeb.cs)
+    // ============================================================ C. METTRE EN ATTENTE ET VALIDER UNE COMMANDE WEB (EcritureCommandesWeb.cs)
     // Apres Lot20.cs (qui cree COMMANDE_WEB sans les colonnes du traitement) : 3700401 et 3700404 a traiter (A), 3700402 deja en attente
-    // (T), 3700403 validee (V).
+    // (T), 3700403 validee (V) ; 3700407, un certificat de non-faillite (famille 5) d'ALPHA BASE SARL (dossier 2700001 de Program.cs), a
+    // valider par l'ecran. Ce que Valider ecrit (CMDWB_ID_DMND, DEMANDE et AFFAIRE, compteur DMD), aux types de RIG_DEV.
     private async Task CommandesWebAsync()
     {
         await Sql("""
             IF COL_LENGTH('v2.COMMANDE_WEB', 'CMDWB_ID_UTLST') IS NULL ALTER TABLE v2.COMMANDE_WEB ADD CMDWB_ID_UTLST int NULL;
             IF COL_LENGTH('v2.COMMANDE_WEB', 'CMDWB_DATE_MODIFICATION') IS NULL
                 ALTER TABLE v2.COMMANDE_WEB ADD CMDWB_DATE_MODIFICATION datetime NOT NULL DEFAULT (getdate());
+            IF COL_LENGTH('v2.COMMANDE_WEB', 'CMDWB_ID_DMND') IS NULL ALTER TABLE v2.COMMANDE_WEB ADD CMDWB_ID_DMND int NULL;
+            IF COL_LENGTH('v2.DEMANDE', 'DMND_ID_AFFRE') IS NULL ALTER TABLE v2.DEMANDE ADD DMND_ID_AFFRE int NULL;
+            IF COL_LENGTH('v2.DEMANDE', 'DMND_NOM_UTILISATEUR') IS NULL ALTER TABLE v2.DEMANDE ADD DMND_NOM_UTILISATEUR varchar(255) NULL;
+            IF NOT EXISTS (SELECT 1 FROM num.Compteur WHERE Type = 'DMD')
+                INSERT INTO num.Compteur (Type, Annee, Structure, CodageAnnee, Lettre, TailleChrono, Debut) VALUES ('DMD', YEAR(@aujourdhui), 'LAQC', 2, 'D', 5, 1);
             """);
         await Sql("""
             INSERT INTO v2.COMMANDE_WEB (CMDWB_ID_CMDWB, CMDWB_REFERENCE_COMMANDE, CMDWB_NUMERO_SUIVI, CMDWB_DATE_COMMANDE, CMDWB_FAMILLE, CMDWB_TYPE_PRODUIT,
@@ -303,7 +327,8 @@ internal sealed record BancParcoursLot7(Func<string, (string Nom, object? Valeur
             VALUES (3700401, 'L7-CW-1', 'L7-CW-1-1', DATEADD(hour, 8, @aujourdhui), 2, 'ET-CP', 'IG', '437000001', 'L7 ALPHA WEB', NULL, 'A', NULL, NULL),
                    (3700402, 'L7-CW-2', 'L7-CW-2-1', DATEADD(hour, 7, @aujourdhui), 2, 'ET-CP', 'IG', '437000002', 'L7 BETA WEB', NULL, 'T', 'Deja', NULL),
                    (3700403, 'L7-CW-3', 'L7-CW-3-1', DATEADD(hour, 6, @aujourdhui), 2, 'ET-CP', 'IG', '437000003', 'L7 GAMMA WEB', NULL, 'V', NULL, @aujourdhui),
-                   (3700404, 'L7-CW-4', 'L7-CW-4-1', DATEADD(hour, 5, @aujourdhui), 2, 'ET-CP', 'IG', '437000004', 'L7 DELTA WEB', NULL, 'A', NULL, NULL);
+                   (3700404, 'L7-CW-4', 'L7-CW-4-1', DATEADD(hour, 5, @aujourdhui), 2, 'ET-CP', 'IG', '437000004', 'L7 DELTA WEB', NULL, 'A', NULL, NULL),
+                   (3700407, 'IG-L7CW7', 'L7-CW-7-1', DATEADD(hour, 9, @aujourdhui), 5, 'FA-CF', 'IG', '412700001', 'ALPHA BASE SARL', NULL, 'A', NULL, NULL);
             """);
         Task<string> Commande(int id) => Valeur($"SELECT CONCAT(CMDWB_ETAT, '|', ISNULL(CMDWB_MOTIF, '(null)'), '|', ISNULL(CAST(CMDWB_ID_UTLST AS varchar(10)), '(null)')) FROM v2.COMMANDE_WEB WHERE CMDWB_ID_CMDWB = {id}");
         GesteEcran Attente(int id, string? motif) => new(TypeGeste.Decider, [id.ToString()],
@@ -342,13 +367,85 @@ internal sealed record BancParcoursLot7(Func<string, (string Nom, object? Valeur
             Exiger(apres.Message is { Severite: "succes", Texte: var texte } && texte.StartsWith("Commande L7-CW-1 mise en attente.", StringComparison.Ordinal)
                    && await Commande(3700401) == "T|Piece manquante L7|2700001" && apres.Lignes.All(l => l.Id != 3700401),
                 $"pont Commandes web, Mettre en attente : ecrit par le serveur, motif sans ses blancs, la liste relue n'a plus la commande a traiter (« {apres.Message?.Texte} »)");
-            // Valider reste refuse (editions et facture absentes), rien d'ecrit.
-            await EcranCommandesWeb.AgirAsync(Client, Greffe, vue.Session, "Choisir", V(3000401));
-            var valider = await EcranCommandesWeb.AgirAsync(Client, Greffe, vue.Session, "Decider", V("Valider"));
-            Exiger(valider.Message is { Texte: SessionCommandesWeb.SansEcriture } && await Valeur("SELECT CMDWB_ETAT FROM v2.COMMANDE_WEB WHERE CMDWB_ID_CMDWB = 3000401") == "A",
-                "pont Commandes web : « Valider » reste refuse, la commande reste a traiter");
+            // VALIDER par l'ecran. 3000401 (Lot20.cs, etat d'endettement, SIREN 412700001 « ALPHA BASE SARL ») cherche son DEBITEUR
+            // DANS LA BASE (la recherche de « Requisitions », REQUI de RIG v2) : le dossier 2700001 de Program.cs, par son SIREN. Sans
+            // debiteur retenu, Valider reste ferme et n'envoie rien ; retenu, il reste ferme par ses types d'inscription commandes, qui
+            // viennent du flux XML que la V3 ne lit pas -- rien d'ecrit.
+            var choisie = await EcranCommandesWeb.AgirAsync(Client, Greffe, vue.Session, "Choisir", V(3000401));
+            var rapprochement = choisie.Panneau?.Rapprochement;
+            Exiger(rapprochement is { Debiteur: true, Message: null, Entites: [{ Gestion: "2019B27001", Designation: "ALPHA BASE SARL", SirenConcorde: true } trouve] }
+                   && trouve.Cle == SessionCommandesWeb.CleDossier(2700001),
+                $"pont Commandes web : le debiteur de 3000401 est cherche DANS LA BASE par son SIREN, le dossier 2700001 seul ({rapprochement?.Message ?? string.Join(", ", rapprochement?.Entites.Select(e => e.Designation) ?? [])})");
+            var journalSans = await Journal();
+            var sansDebiteur = await EcranCommandesWeb.AgirAsync(Client, Greffe, vue.Session, "Decider", V("Valider"));
+            Exiger(sansDebiteur.Message is { Severite: "avertissement", Texte: "Retenez le débiteur dans le rapprochement pour rattacher la commande." }
+                   && await Valeur("SELECT CMDWB_ETAT FROM v2.COMMANDE_WEB WHERE CMDWB_ID_CMDWB = 3000401") == "A" && await Journal() == journalSans,
+                $"pont Commandes web, Valider sans debiteur retenu : ferme, rien d'envoye ni d'ecrit (« {sansDebiteur.Message?.Texte} »)");
+            await EcranCommandesWeb.AgirAsync(Client, Greffe, vue.Session, "Retenir", V(SessionCommandesWeb.CleDossier(2700001)));
+            var sansTypes = await EcranCommandesWeb.AgirAsync(Client, Greffe, vue.Session, "Decider", V("Valider"));
+            Exiger(sansTypes.Message is { Texte: SessionCommandesWeb.SansTypesRecus } && sansTypes.Panneau?.Etapes is [{ Nom: "Débiteur", Faite: true }, { Faite: false }, ..]
+                   && await Valeur("SELECT CMDWB_ETAT FROM v2.COMMANDE_WEB WHERE CMDWB_ID_CMDWB = 3000401") == "A" && await Journal() == journalSans,
+                $"pont Commandes web, etat d'endettement au debiteur retenu : la marche « Débiteur » est faite, Valider reste ferme par les types (flux XML non lu), rien d'ecrit (« {sansTypes.Message?.Texte} »)");
+
+            // 3700407, un certificat de non-faillite : son dossier concerne (2700001, par le SIREN), le certificat pre-coche, l'edition ;
+            // Valider part au serveur, la liste relue n'a plus la commande a traiter.
+            var faillite = await EcranCommandesWeb.AgirAsync(Client, Greffe, vue.Session, "Choisir", V(3700407));
+            Exiger(faillite.Panneau?.Rapprochement is { Debiteur: false, Entites: [{ Gestion: "2019B27001" }] },
+                $"pont Commandes web : le dossier concerne de 3700407 est lu en base ({faillite.Panneau?.Rapprochement?.Message})");
+            await EcranCommandesWeb.AgirAsync(Client, Greffe, vue.Session, "Retenir", V(SessionCommandesWeb.CleDossier(2700001)));
+            var validee = await EcranCommandesWeb.AgirAsync(Client, Greffe, vue.Session, "Decider", V("Valider"));
+            Exiger(validee.Message is { Severite: "succes", Texte: var texteValide } && texteValide.StartsWith("Commande IG-L7CW7 validée et rattachée au dossier 2019B27001", StringComparison.Ordinal)
+                   && await Valeur("""
+                       SELECT CONCAT(c.CMDWB_ETAT, '|', d.DMND_CODE_PROSS, '|', d.DMND_ETAT_DEMANDE, '|', CAST(d.DMND_EN_COURS AS int), '|', d.DMND_ID_DSRCS, '|',
+                                     d.DMND_NUM_INDICATIF, '|', d.DMND_NOM)
+                       FROM v2.COMMANDE_WEB AS c JOIN v2.DEMANDE AS d ON d.DMND_ID_DMND = c.CMDWB_ID_DMND WHERE c.CMDWB_ID_CMDWB = 3700407
+                       """) == $"V|CMD_WEB|V|0|2700001|2019B27001|Infogreffe - N° L7CW7 du {Jour:dd/MM/yyyy}"
+                   && validee.Lignes.All(l => l.Id != 3700407),
+                $"pont Commandes web, Valider : ecrit par le serveur sur le dossier retenu (demande CMD_WEB validee, dossier 2700001, nom sans le prefixe IG-), la liste relue n'a plus la commande a traiter (« {validee.Message?.Texte} »)");
         }
         finally { EcranCommandesWeb.Fermer(vue.Session); }
+
+        // VALIDER, la route : chaque refus de NeoRIG a son jumeau accepte. 3700402 est EN ATTENTE (T) : la mise en attente la refuse
+        // (plus haut), Valider l'accepte (TransitionsCommandeWeb.EstAutorisee). L'ENTREE QUI REND CETTE PARTIE ROUGE si Valider etait
+        // faux : la commande 3700402 sans dossier (CibleNonRetenue) -- sans la regle VerifierCible, elle serait validee sur rien.
+        await Sql("""
+            INSERT INTO v2.DEMANDE (DMND_ID_DMND, DMND_NUM_DEMANDE, DMND_ETAT_DEMANDE, DMND_EN_COURS, DMND_CODE_PROSS) VALUES (3700402, 'L7RECEP', 'Q', 1, 'CMD_WEB');
+            UPDATE v2.COMMANDE_WEB SET CMDWB_ID_DMND = 3700402 WHERE CMDWB_ID_CMDWB = 3700402;
+            INSERT INTO v2.COMMANDE_WEB (CMDWB_ID_CMDWB, CMDWB_REFERENCE_COMMANDE, CMDWB_NUMERO_SUIVI, CMDWB_DATE_COMMANDE, CMDWB_FAMILLE, CMDWB_TYPE_PRODUIT,
+                CMDWB_ORIGINE, CMDWB_SIREN, CMDWB_DENOMINATION, CMDWB_NOM_REQUERANT, CMDWB_ETAT, CMDWB_MOTIF, CMDWB_DATE_TRAITEMENT)
+            VALUES (3700405, 'L7-CW-5', 'L7-CW-5-1', DATEADD(hour, 4, @aujourdhui), 2, 'ET-CP', 'MAN', '412700001', 'ALPHA BASE SARL', NULL, 'A', NULL, NULL),
+                   (3700406, 'L7-CW-6', 'L7-CW-6-1', DATEADD(hour, 3, @aujourdhui), 13, 'CNO', 'IG', '412700001', 'ALPHA BASE SARL', NULL, 'A', NULL, NULL);
+            """);
+        GesteEcran Validation(int id, string? dossier) => new(TypeGeste.Decider, [id.ToString()],
+            dossier is null ? new Dictionary<string, string>() : new Dictionary<string, string> { [RoutesTraitementCommandesWeb.ChampDossier] = dossier }) { Nom = "Valider" };
+        Task<string> Validation3700402() => Valeur("""
+            SELECT CONCAT(c.CMDWB_ETAT, '|', ISNULL(CAST(c.CMDWB_ID_UTLST AS varchar(10)), '(null)'), '|', CASE WHEN c.CMDWB_DATE_TRAITEMENT IS NULL THEN 'sans date' ELSE 'date' END,
+                          '|', ISNULL(c.CMDWB_MOTIF, '(null)'), '|', (SELECT CONCAT(r.DMND_ETAT_DEMANDE, CAST(r.DMND_EN_COURS AS int)) FROM v2.DEMANDE AS r WHERE r.DMND_ID_DMND = 3700402),
+                          '|', d.DMND_CODE_PROSS, '|', d.DMND_ETAT_DEMANDE, '|', CAST(d.DMND_EN_COURS AS int), '|', d.DMND_ID_DSRCS, '|', d.DMND_NUM_INDICATIF, '|', d.DMND_NOM)
+            FROM v2.COMMANDE_WEB AS c LEFT JOIN v2.DEMANDE AS d ON d.DMND_ID_DMND = c.CMDWB_ID_DMND WHERE c.CMDWB_ID_CMDWB = 3700402
+            """);
+        async Task RefusValider(string quoi, int id, string? dossier, string message)
+        {
+            var (avant, journal, demandes) = (await Commande(id), await Journal(), await Valeur("SELECT COUNT(*) FROM v2.DEMANDE"));
+            var (s, r) = await Route(RoutesTraitementCommandesWeb.Valider, Validation(id, dossier));
+            Exiger(s == HttpStatusCode.UnprocessableEntity && r is { Fait: false } && r.Message == message && await Commande(id) == avant
+                   && await Journal() == journal && await Valeur("SELECT COUNT(*) FROM v2.DEMANDE") == demandes,
+                $"Valider, {quoi} : refuse (422) au message de NeoRIG, rien d'ecrit ({(int)s} « {r?.Message} »)");
+        }
+        await RefusValider("commande 3700402 sans dossier retenu", 3700402, null, EcritureCommandesWeb.CibleNonRetenue);
+        await RefusValider("dossier 3799999 absent de la base", 3700402, "3799999", EcritureCommandesWeb.CibleDisparue);
+        await RefusValider("commande 3700403 deja validee", 3700403, "2700001", EcritureCommandesWeb.DejaTraitee);
+        await RefusValider("commande introuvable", 3799999, "2700001", EcritureCommandesWeb.Introuvable);
+        await RefusValider("saisie au guichet 3700405 sans client", 3700405, "2700001", EcritureCommandesWeb.SansClients);
+        await RefusValider("certificat de non-opposition 3700406", 3700406, "2700001", EcritureCommandesWeb.SansControleDelivrance);
+        var jValider = await Journal();
+        var (sValide, rValide) = await Route(RoutesTraitementCommandesWeb.Valider, Validation(3700402, "2700001"));
+        var lue = await Validation3700402();
+        Exiger(sValide == HttpStatusCode.OK && rValide is { Fait: true, Ids: ["3700402", { Length: > 0 }] }
+               && lue == $"V|2700001|date|(null)|X0|CMD_WEB|V|0|2700001|2019B27001|Infogreffe - N° L7-CW-2 du {Jour:dd/MM/yyyy}"
+               && await Journal() == (int.Parse(jValider) + 1).ToString(),
+            $"Valider, commande EN ATTENTE 3700402 sur le dossier 2700001 : etat V, operateur, date de traitement ; la demande de reception (Q) est abandonnee (X), "
+            + $"une demande CMD_WEB validee porte le dossier et son n° de gestion ; une ligne au journal ({lue} « {rValide?.Message} »)");
 
         var relue = await EcranCommandesWeb.OuvrirAsync(Client, Greffe);
         try
@@ -357,6 +454,11 @@ internal sealed record BancParcoursLot7(Func<string, (string Nom, object? Valeur
             var panneau = (await EcranCommandesWeb.AgirAsync(Client, Greffe, relue.Session, "Choisir", V(3700401))).Panneau;
             Exiger(panneau is { MotifAttente: "Piece manquante L7" },
                 $"pont Commandes web : relue dans une session neuve, la commande 3700401 est sous « En attente » avec son motif ({panneau?.MotifAttente ?? "absente"})");
+            await EcranCommandesWeb.AgirAsync(Client, Greffe, relue.Session, "ChoisirOnglet", V("Validee"));
+            var validee = (await EcranCommandesWeb.AgirAsync(Client, Greffe, relue.Session, "Choisir", V(3700407))).Panneau;
+            Exiger(validee is { Etat.Libelle: "Validée", Traitee: { Rejetee: false, Rattachement: { } rattachement } }
+                   && rattachement.StartsWith("Rattachée au dossier 2019B27001 · demande n° ", StringComparison.Ordinal) && rattachement.Length > "Rattachée au dossier 2019B27001 · demande n° ".Length,
+                $"pont Commandes web : relue dans une session neuve, 3700407 est « Validée », rattachee au dossier par la demande de sa validation ({validee?.Traitee?.Rattachement ?? "absente"})");
         }
         finally { EcranCommandesWeb.Fermer(relue.Session); }
     }

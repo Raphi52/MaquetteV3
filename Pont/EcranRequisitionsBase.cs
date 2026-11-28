@@ -14,11 +14,20 @@ namespace RigV3Desktop.Pont;
 /// V2 (LectureEntreprisesRequi.cs). Ce que la base ne cherche pas est dit dans la note des resultats : le dirigeant et l'activite
 /// (moteur RechercheDossier de RIG v2), la phonetique, les etablissements secondaires et les non-inscrits. Les controles de la V2
 /// (raison sociale en chiffres, aucun critere) passent avant : rien n'est lu.
-/// SANS serveur : la demonstration (JeuDemo.EntreprisesRequi). En panne : le motif et aucune ligne. Les commandes web de la zone
-/// haute restent la demonstration (elles se lisent avec l'ecran « Commandes web », hors de ce lot) : l'ecran les marque.
+/// SANS serveur : la demonstration (JeuDemo.EntreprisesRequi). En panne : le motif et aucune ligne.
+///
+/// LA ZONE HAUTE DES COMMANDES WEB n'est montree que sur la demonstration (<see cref="ZoneCommandesWeb"/>, lot 7 du plan « RIG v3
+/// complet », 28/11/2026) : le REQUI de RIG v2 n'en a pas -- aucune commande web dans D:\RigApplication\Source\RCS\Exe\PROC_REQUI ni
+/// sous PROC_REQUI de la branche Feature/RCS/275_Refonte_Requi (git grep « CommandeWeb », « commande web » : rien) -- et les
+/// commandes web de la base se traitent dans l'ecran « Commandes web » (LectureCommandesWeb.cs, EcritureCommandesWeb.cs).
 /// </summary>
+// fix-ok: cause mesuree -- refus du chef (capture requisitions-2, main bad949c) : branchee a la base, l'ecran montrait au-dessus des
+// dossiers lus les commandes web de JeuDemo, marquees « exemple » ; la session ne savait pas a l'ouverture qu'un serveur etait branche.
 public sealed partial class SessionRequisitions
 {
+    /// <summary>La zone haute des commandes web : vraie sur la demonstration seule (ouverte sans serveur).</summary>
+    internal bool ZoneCommandesWeb { get; init; } = true;
+
     /// <summary>La note des resultats lus en base : ce que la recherche ne reprend pas de RIG v2.</summary>
     public const string NoteBase = "Base du greffe : les dossiers RCS dont la dénomination contient la raison sociale, au SIREN "
                                  + "et à l'adresse du siège saisis. Phonétique, établissements secondaires et non-inscrits "

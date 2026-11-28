@@ -103,7 +103,7 @@ public sealed class SondeRequisitions : ISondeEcran
             WHERE LEN(e.Denomination) >= 4 AND e.Denomination NOT LIKE '%[0-9]%' ORDER BY s.Id
             """);
         if (nom.Length == 0) return new(false, false, "aucun dossier RCS avec une dénomination dans la base du banc : rien à chercher");
-        var vue = EcranRequisitions.Ouvrir();
+        var vue = EcranRequisitions.Ouvrir(c.Client, c.Greffe);
         try
         {
             await EcranRequisitions.AgirAsync(c.Client, c.Greffe, vue.Session, "Critere", V(new { champ = "CritRaisonSociale", valeur = nom }));
@@ -139,7 +139,7 @@ public sealed class SondeRequisitions : ISondeEcran
             WHERE LEN(e.Denomination) >= 4 AND e.Denomination NOT LIKE '%[0-9]%' ORDER BY s.Id
             """);
         if (nom.Length == 0) return new(false, false, "aucun dossier RCS avec une dénomination dans la base du banc : rien à commander");
-        var vue = EcranRequisitions.Ouvrir();
+        var vue = EcranRequisitions.Ouvrir(c.Client, c.Greffe);
         try
         {
             await EcranRequisitions.AgirAsync(c.Client, c.Greffe, vue.Session, "Critere", V(new { champ = "CritRaisonSociale", valeur = nom }));

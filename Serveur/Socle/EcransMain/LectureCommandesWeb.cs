@@ -21,7 +21,10 @@ namespace RigV3.Serveur.Socle.EcransMain;
 ///   - l'état (CMDWB_ETAT : A, T, V, R, S -- EtatCommandeWeb.cs:25-40) et l'origine (CMDWB_ORIGINE : SL, IG, MAN --
 ///     OrigineCommandeWeb.cs:16-28) sont rendus tels quels, le pont les traduit.
 /// NON LU : l'adresse de livraison, l'e-mail, les types d'inscription et le sous-type commandés, que NéoRIG tire du flux XML de
-/// la commande (CMDWB_FLUX, CommandeWebRepository.cs:121-177, :300-330) ; le rapprochement et les lots d'envoi.
+/// la commande (CMDWB_FLUX, CommandeWebRepository.cs:121-177, :300-330) ; les lots d'envoi. LA DEMANDE de la commande
+/// (CMDWB_ID_DMND, 1824-creer-commande-web.sql:27) : son numéro et le numéro de gestion qu'elle porte, posé par « Valider »
+/// (EcritureCommandesWeb.cs, lot 7 du plan « RIG v3 complet ») -- le dossier auquel la commande validée est rattachée. Le
+/// rapprochement (chercher le débiteur) est la recherche de « Réquisitions » (LectureEntreprisesRequi.cs), appelée par le pont.
 /// </summary>
 public static class LectureCommandesWeb
 {
@@ -31,8 +34,10 @@ public static class LectureCommandesWeb
     private const string Requete = """
         SELECT TOP (@plafond) c.CMDWB_ID_CMDWB, c.CMDWB_REFERENCE_COMMANDE, c.CMDWB_NUMERO_SUIVI, c.CMDWB_DATE_COMMANDE, c.CMDWB_FAMILLE,
                c.CMDWB_TYPE_PRODUIT, c.CMDWB_ORIGINE, c.CMDWB_SIREN, c.CMDWB_DENOMINATION, c.CMDWB_NOM_REQUERANT, c.CMDWB_ETAT,
-               c.CMDWB_MOTIF, c.CMDWB_DATE_TRAITEMENT, COUNT(*) OVER () AS Total
+               c.CMDWB_MOTIF, c.CMDWB_DATE_TRAITEMENT, d.DMND_NUM_DEMANDE AS NumeroDemande, d.DMND_NUM_INDICATIF AS DossierDemande,
+               COUNT(*) OVER () AS Total
         FROM v2.COMMANDE_WEB AS c
+        LEFT JOIN v2.DEMANDE AS d ON d.DMND_ID_DMND = c.CMDWB_ID_DMND
         WHERE c.CMDWB_FAMILLE IN (2, 5, 11, 12, 13)
         ORDER BY c.CMDWB_DATE_COMMANDE, c.CMDWB_ID_CMDWB
         """;
@@ -50,7 +55,7 @@ public static class LectureCommandesWeb
             lignes.Add(new CommandeWebLue(Convert.ToInt32(r["CMDWB_ID_CMDWB"], CultureInfo.InvariantCulture), T("CMDWB_REFERENCE_COMMANDE"),
                 T("CMDWB_NUMERO_SUIVI"), FormeLigne.DateDe(r, "CMDWB_DATE_COMMANDE"), Convert.ToInt32(r["CMDWB_FAMILLE"], CultureInfo.InvariantCulture),
                 T("CMDWB_TYPE_PRODUIT"), T("CMDWB_ORIGINE"), T("CMDWB_SIREN"), T("CMDWB_DENOMINATION"), T("CMDWB_NOM_REQUERANT"),
-                T("CMDWB_ETAT"), T("CMDWB_MOTIF"), FormeLigne.DateDe(r, "CMDWB_DATE_TRAITEMENT")));
+                T("CMDWB_ETAT"), T("CMDWB_MOTIF"), FormeLigne.DateDe(r, "CMDWB_DATE_TRAITEMENT"), T("NumeroDemande"), T("DossierDemande")));
         }
         return new CommandesWebLues([.. lignes], total);
     }

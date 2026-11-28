@@ -33,8 +33,12 @@
 //
 // LA BASE DU GREFFE (plan « RIG v3 100 % fonctionnel », lot 6, 26/11/2026, marche du lot 17) : « Rechercher » lit les dossiers
 // de la base (Pont/EcranRequisitionsBase.cs → Serveur/Socle/EcransMain/LectureEntreprisesRequi.cs, la requete de « Dossier RCS »)
-// par raison sociale, SIREN et adresse du siege ; une note dit ce que la recherche ne reprend pas encore du moteur de RIG v2. Les
-// commandes web restent la demonstration, marquee « exemple ». Sans serveur, toute la demonstration ; en panne, le motif.
+// par raison sociale, SIREN et adresse du siege ; une note dit ce que la recherche ne reprend pas encore du moteur de RIG v2. La
+// zone des commandes web n'est PAS montree en base (lot 7 du plan « RIG v3 complet », 28/11/2026) : le REQUI de RIG v2 n'en a pas
+// (RCS\Exe\PROC_REQUI, branche Feature/RCS/275_Refonte_Requi) et les commandes web se traitent dans l'ecran « Commandes web ». Sans
+// serveur, toute la demonstration, zone comprise, marquee « exemple » ; en panne, le motif.
+// fix-ok: cause mesuree -- refus du chef (capture requisitions-2, main bad949c) : branchee a la base, la bande « Commandes web a
+// traiter » marquee « exemple » restait au-dessus des dossiers lus ; vitest rouge (zoneCommandesWeb: false ignore) avant ce rendu.
 
 import { Fragment, useEffect, useRef, useState, type KeyboardEvent } from 'react'
 import { EnteteTriable } from '../composants/EnteteTriable'
@@ -171,6 +175,9 @@ export interface VueRequisitions {
   modeResultats?: ModeLecture
   /** En base : ce que la recherche reprend ou non de RIG v2 ; en panne : le motif. */
   messageResultats?: string | null
+  /** La zone haute des commandes web : false quand la session est branchee a la base (le REQUI de RIG v2 n'en a pas) ;
+   *  absent : la demonstration d'avant le lot 7, qui la montre. */
+  zoneCommandesWeb?: boolean
 }
 
 const pont: PontDeSession<VueRequisitions> = {
@@ -266,13 +273,15 @@ export function EcranRequisitions({ dossier = null }: ProprietesEcranRequisition
     `${soc.designation} ${soc.siren} ${soc.siren.replace(/\s/g, '')} ${soc.gestion} ${soc.id} ${soc.adresse}`).includes(cherche))
   const radiees = trouvees.filter((soc) => soc.radie).length
 
+  // La zone haute n'est montree que sur la demonstration : le REQUI de RIG v2 n'en a pas (Pont/EcranRequisitionsBase.cs).
+  const zoneWeb = vue.zoneCommandesWeb !== false
   return (
-    <div className="rig-proc__corps rig-proc__corps--cmdweb">
+    <div className={zoneWeb ? 'rig-proc__corps rig-proc__corps--cmdweb' : 'rig-proc__corps'}>
 
       {/* Zone HAUTE : les commandes passees sur le web et arrivees par EDI.
           C est le raccordement demande par la fiche 275 : choisir une commande
           remplit les criteres et lance la recherche pour rapprocher un dossier. */}
-      <section className="rig-cmdweb">
+      {zoneWeb && <section className="rig-cmdweb">
         <EnteteListe titre="Commandes web a traiter"
                      synthese={<><b>{vue.nbATraiter}</b>{' a traiter · '}{vue.commandesWeb.length}{' affichee(s)'}</>} />
         {/* Lot 6 du plan « RIG v3 100 % fonctionnel » : les commandes web restent la demonstration (elles se lisent avec
@@ -342,7 +351,7 @@ export function EcranRequisitions({ dossier = null }: ProprietesEcranRequisition
             </tbody>
           </table>
         </div>
-      </section>
+      </section>}
 
 
       <aside className="rig-criteres" onKeyDown={surToucheCritere}>

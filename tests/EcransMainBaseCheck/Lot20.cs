@@ -312,11 +312,11 @@ internal sealed record BancLot20(Func<string, (string Nom, object? Valeur)[], Ta
             CREATE TABLE v2.COMMANDE_WEB (CMDWB_ID_CMDWB int NOT NULL PRIMARY KEY, CMDWB_REFERENCE_COMMANDE varchar(50) NULL, CMDWB_NUMERO_SUIVI varchar(50) NULL,
                 CMDWB_DATE_COMMANDE datetime NULL, CMDWB_FAMILLE tinyint NULL, CMDWB_TYPE_PRODUIT varchar(10) NULL, CMDWB_ORIGINE varchar(5) NULL,
                 CMDWB_SIREN varchar(9) NULL, CMDWB_DENOMINATION varchar(250) NULL, CMDWB_NOM_REQUERANT varchar(250) NULL, CMDWB_ETAT char(1) NULL,
-                CMDWB_MOTIF varchar(500) NULL, CMDWB_DATE_TRAITEMENT datetime NULL);
+                CMDWB_MOTIF varchar(500) NULL, CMDWB_DATE_TRAITEMENT datetime NULL, CMDWB_ID_DMND int NULL);
             INSERT INTO v2.COMMANDE_WEB VALUES
-                (3000401, '60324-BANC1', '60324-BANC1-1', '20261001 08:30', 2, 'ET-CP', 'IG', '412700001', 'ALPHA BASE SARL', 'REQUERANT UN', 'A', NULL, NULL),
-                (3000402, 'SL-BANC-2', '2-1', '20260930 08:00', 5, 'FA-CF', 'SL', '412700002', 'BETA BASE SAS', NULL, 'R', 'Siren inconnu', '20261002'),
-                (3000403, 'X-BANC-3', '3-1', '20260929 08:00', 7, 'XX', 'IG', NULL, 'HORS FAMILLE', NULL, 'A', NULL, NULL);
+                (3000401, '60324-BANC1', '60324-BANC1-1', '20261001 08:30', 2, 'ET-CP', 'IG', '412700001', 'ALPHA BASE SARL', 'REQUERANT UN', 'A', NULL, NULL, NULL),
+                (3000402, 'SL-BANC-2', '2-1', '20260930 08:00', 5, 'FA-CF', 'SL', '412700002', 'BETA BASE SAS', NULL, 'R', 'Siren inconnu', '20261002', NULL),
+                (3000403, 'X-BANC-3', '3-1', '20260929 08:00', 7, 'XX', 'IG', NULL, 'HORS FAMILLE', NULL, 'A', NULL, NULL, NULL);
             """, []);
         var lues = await SurLaBase(cn => LectureCommandesWeb.LireAsync(cn, CancellationToken.None));
         Exiger(lues.Lignes.Select(c => c.Id).SequenceEqual([3000402, 3000401]) && lues.Total == 2,
@@ -332,11 +332,13 @@ internal sealed record BancLot20(Func<string, (string Nom, object? Valeur)[], Ta
                && vue.Tuiles.Single(t => t.Etat == "Rejetee").Nombre == 1,
             "pont Commandes web branche : la tuile « A traiter » montre la commande A de la base, la rejetee compte sous sa tuile ; aucune de JeuDemo");
         EcranCommandesWeb.Agir(vue.Session, "Choisir", Valeur(3000401));
+        // Sur la session seule (sans le serveur, qui cherche le debiteur et ecrit : tests/EcransMainBaseCheck/ParcoursLot7.cs), Valider
+        // reste ferme par sa premiere marche, aucun debiteur n'etant retenu, et rien n'est ecrit (lot 7 du plan « RIG v3 complet »).
         var apres = EcranCommandesWeb.Agir(vue.Session, "Decider", Valeur("Valider"));
-        Exiger(apres.Message is { Severite: "avertissement", Texte: SessionCommandesWeb.SansEcriture }
+        Exiger(apres.Message is { Severite: "avertissement", Texte: "Retenez le débiteur dans le rapprochement pour rattacher la commande." }
                && apres.Lignes.Select(l => l.Id).SequenceEqual([3000401])
                && await Compter("SELECT COUNT(*) FROM v2.COMMANDE_WEB WHERE CMDWB_ETAT = 'A' AND CMDWB_ID_CMDWB = 3000401") == 1,
-            "pont Commandes web branche : « Valider » REFUSE et dit pourquoi ; la commande reste « A traiter », rien n'est ecrit");
+            "pont Commandes web branche, sans debiteur retenu : « Valider » FERME par sa marche et dit pourquoi ; la commande reste « A traiter », rien n'est ecrit");
         var saisie = EcranCommandesWeb.Agir(vue.Session, "NouvelleCommande", Valeur(null));
         Exiger(saisie is { Message.Texte: SessionCommandesWeb.SansEcriture } && saisie.Tuiles.Sum(t => t.Nombre) == 2,
             "pont Commandes web branche : la saisie au guichet refuse aussi, aucune commande neuve en memoire");
@@ -347,7 +349,7 @@ internal sealed record BancLot20(Func<string, (string Nom, object? Valeur)[], Ta
         // entreprise ne correspond au SIREN » tire des entites de demonstration (TraitementCommandes.Entites).
         await Sql("""
             INSERT INTO v2.COMMANDE_WEB VALUES
-                (3000404, '60324-BANC4', '60324-BANC4-1', '20261002 08:30', 13, 'CNO', 'IG', '412700004', 'DELTA BASE SA', NULL, 'A', NULL, NULL);
+                (3000404, '60324-BANC4', '60324-BANC4-1', '20261002 08:30', 13, 'CNO', 'IG', '412700004', 'DELTA BASE SA', NULL, 'A', NULL, NULL, NULL);
             """, []);
         var cno = await EcranCommandesWeb.OuvrirAsync(Client, Greffe);
         EcranCommandesWeb.Agir(cno.Session, "Choisir", Valeur(3000404));

@@ -51,7 +51,7 @@ public sealed record VueRequisitions(string Session,
                                      string Volet, int NbPanier, string Compteur, string Message,
                                      LigneEntrepriseRequi[] Trouvees, bool ARecherche, bool Interrompue,
                                      int LimiteRetenue, LignePanierRequi[] Panier, ArticlesRequi? Articles,
-                                     string ModeResultats = "demo", string? MessageResultats = null);
+                                     string ModeResultats = "demo", string? MessageResultats = null, bool ZoneCommandesWeb = true);
 
 /// <summary>
 /// Pont de l'ecran PROC_REQUI (web/src/ecrans/EcranRequisitions.tsx) : requisitions
@@ -69,9 +69,13 @@ public static class EcranRequisitions
     internal static readonly SessionsEcran<SessionRequisitions> Sessions = new();
 
     [JSInvokable("EcranRequisitions.Ouvrir")]
-    public static VueRequisitions Ouvrir()
+    public static VueRequisitions Ouvrir() => Ouvrir(ClientServeur.Actif, SessionAgent.CodeGreffe);
+
+    /// <summary>Ouvre l'ecran avec le serveur et le greffe donnes : branchee a la base, sans la zone des commandes web de la
+    /// demonstration (EcranRequisitionsBase.cs) ; sans serveur, toute la demonstration (tests/RequiCheck).</summary>
+    public static VueRequisitions Ouvrir(ClientServeur? serveur, string? greffe)
     {
-        var session = new SessionRequisitions();
+        var session = new SessionRequisitions { ZoneCommandesWeb = serveur is null || string.IsNullOrWhiteSpace(greffe) };
         return session.Vue(Sessions.Ouvrir(session));
     }
 
@@ -678,7 +682,7 @@ public sealed partial class SessionRequisitions
     /// <summary>Ce que le balisage du .razor lisait, mis a plat pour React.</summary>
     internal VueRequisitions Vue(string session)
     {
-        var commandesWeb = CommandesWebVisibles.Select(web => new LigneCommandeWebRequi(
+        var commandesWeb = !ZoneCommandesWeb ? [] : CommandesWebVisibles.Select(web => new LigneCommandeWebRequi(
             Array.IndexOf(CommandesWeb, web),
             web == CommandeWebEnCours ? "rig-table__ligne--alerte" : (web.Etat == "Traitee" ? "rig-table__ligne--inerte" : ""),
             web.Origine, web.Numero, web.Recue.ToString("dd/MM/yyyy HH:mm"), web.Demandeur, web.Famille,
@@ -711,12 +715,12 @@ public sealed partial class SessionRequisitions
         }
 
         return new VueRequisitions(session,
-            NbATraiter, MasquerTraitees, CleTri, TriAscendant, commandesWeb, CommandeWebEnCours is not null,
+            ZoneCommandesWeb ? NbATraiter : 0, MasquerTraitees, CleTri, TriAscendant, commandesWeb, CommandeWebEnCours is not null,
             new CriteresRequi(CritRaisonSociale, CritSiren, CritDirigeant, CritActivite, CritNumVoie, CritAdresse,
                               CritCodePostal, CritVille, CritPhonetique, CritEtendre, CritTousEtb, CritSupprCompris,
                               CritGuichet, CritLimiteDossiers),
             RaisonSocialeInvalide, Volet, Panier.Count, Compteur, Message,
-            trouvees, ARecherche, Interrompue, LimiteRetenue, panier, articles, ModeResultats, MessageResultats);
+            trouvees, ARecherche, Interrompue, LimiteRetenue, panier, articles, ModeResultats, MessageResultats, ZoneCommandesWeb);
     }
 }
 

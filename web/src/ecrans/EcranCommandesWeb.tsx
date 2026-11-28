@@ -94,7 +94,8 @@ export interface EnveloppeCw { reference: string; membres: MembreCw[]; etat: str
 export interface ChampCw { libelle: string; valeur: string }
 export interface DocumentCw { document: string; bac: string; exemplaires: string; origine: string }
 export interface SaisieCw { famille: string; familles: OptionCw[]; denomination: string; siren: string; requerant: string }
-export interface TraiteeCw { rejetee: boolean; motif: string; reference: string; envoyes: DocumentCw[] }
+/** Une commande traitee ; rattachement : le dossier et la demande de sa validation lus en base (lot 7 du plan « RIG v3 complet »). */
+export interface TraiteeCw { rejetee: boolean; motif: string; reference: string; envoyes: DocumentCw[]; rattachement?: string | null }
 /** distingue : cette adresse departage le dossier des autres dossiers trouves (voir EntiteCw.distinctions). */
 export interface LigneEntiteCw { nature: string; adresse: string; nbInscriptions: number; distingue: boolean }
 export interface EntiteCw {
@@ -648,6 +649,7 @@ function Panneau({ p, geste, sortant = false }: { p: PanneauCw; geste: Geste; so
         {p.traitee ? (
           <section className="rig-tcw__zone">
             <div className="rig-tcw__zone-tete"><span className="rig-tcw__section">Ce qui a été envoyé</span></div>
+            {p.traitee.rattachement && <div className="rig-tcw__ligne-statut">{p.traitee.rattachement}</div>}
             {p.traitee.rejetee ? (
               <>
                 <div className="rig-tcw__ligne-statut rig-tcw__ligne-statut--rejet">Motif du rejet : {p.traitee.motif}</div>

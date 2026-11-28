@@ -286,6 +286,24 @@ describe('EcranCommandesWeb', () => {
     expect(document.activeElement).not.toBe(champ)
   })
 
+  it('commande validee lue en base : « Ce qui a été envoyé » dit le dossier et la demande de sa validation (lot 7)', async () => {
+    // Le pont rend « rattachement » pour une commande validee en base (Pont/EcranCommandesWebBase.cs, RattachementDe) ; sans lui, la
+    // commande validee ne dirait pas a quel dossier elle a ete rattachee. Jumeau : une commande traitee sans rattachement, aucune ligne.
+    const rattachement = 'Rattachée au dossier 2019B27001 · demande n° D2633200001'
+    const validee = (r?: string) => ({ ...vueDeBase(), panneau: { ...panneau(), etat: { icone: 'check', libelle: 'Validée' }, certificats: null,
+      pied: null, etapes: [], traitee: { rejetee: false, motif: '', reference: 'IG-12399', envoyes: [], rattachement: r ?? null } } })
+    session(validee(rattachement))
+    const { unmount } = render(<EcranCommandesWeb />)
+    expect((await screen.findByText(rattachement)).className).toBe('rig-tcw__ligne-statut')
+    expect(screen.getByText('Aucun document n\'a été édité pour cette demande.')).toBeTruthy()
+    unmount()
+    retirerFauxPont()
+    session(validee())
+    render(<EcranCommandesWeb />)
+    expect(await screen.findByText('Aucun document n\'a été édité pour cette demande.')).toBeTruthy()
+    expect(screen.queryByText(/Rattachée au dossier/)).toBeNull()
+  })
+
   it('non-opposition : sans controle, le cadre « Controle de delivrance » dit la raison du pont (en base, type pourtant coche)', async () => {
     // Lot 20 : il disait toujours « Cochez un type de certificat », meme un type coche, quand le pont (en base) ne joue pas le controle.
     const raison = 'Contrôle de délivrance non joué : il cherche l\'entreprise du SIREN de la commande.'

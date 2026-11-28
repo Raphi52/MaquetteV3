@@ -43,7 +43,8 @@ public sealed record EnveloppeCw(string Reference, MembreCw[] Membres, string Et
 public sealed record ChampCw(string Libelle, string Valeur);
 public sealed record DocumentCw(string Document, string Bac, string Exemplaires, string Origine);
 public sealed record SaisieCw(string Famille, OptionCw[] Familles, string Denomination, string Siren, string Requerant);
-public sealed record TraiteeCw(bool Rejetee, string Motif, string Reference, DocumentCw[] Envoyes);
+/// <summary>Une commande traitee ; <c>Rattachement</c> : le dossier et la demande de sa validation, lus en base (nul sinon).</summary>
+public sealed record TraiteeCw(bool Rejetee, string Motif, string Reference, DocumentCw[] Envoyes, string? Rattachement = null);
 
 /// <summary>Distingue : cette adresse departage le dossier des autres (voir EntiteCw.Distinctions).</summary>
 public sealed record LigneEntiteCw(string Nature, string Adresse, int NbInscriptions, bool Distingue);
@@ -144,7 +145,8 @@ public static partial class EcranCommandesWeb
     [JSInvokable("EcranCommandesWeb.Ouvrir")]
     public static Task<VueCommandesWeb> Ouvrir() => OuvrirAsync(ClientServeur.Actif, SessionAgent.CodeGreffe);
 
-    /// <summary>Un geste de l'ecran. Branche a la base, « Decider » Mettre en attente s'ecrit par le serveur
+    /// <summary>Un geste de l'ecran. Branche a la base, « Decider » Mettre en attente et Valider s'ecrivent par le serveur, le
+    /// rapprochement est cherche dans la base
     /// (EcranCommandesWebBase.cs, AgirAsync) ; tout autre geste, et la demonstration, se jouent sur la session.</summary>
     [JSInvokable("EcranCommandesWeb.Agir")]
     public static Task<VueCommandesWeb> AgirAsync(string session, string geste, JsonElement valeur)
@@ -172,8 +174,12 @@ public sealed partial class SessionCommandesWeb
 {
     private readonly List<CommandeRecue> Toutes;
 
-    /// <summary>« serveur » : les commandes viennent de la base du greffe et AUCUN geste ne les modifie ; « demo » sinon
-    /// (Pont/LectureEcranMain.cs). <see cref="Provenance"/> : le motif d'une panne, rien en base ni en demonstration.</summary>
+    /// <summary>« serveur » : les commandes viennent de la base du greffe, seuls Mettre en attente et Valider les modifient (par le
+    /// serveur), le rapprochement y est cherche (EcranCommandesWebBase.cs) ; « demo » sinon (Pont/LectureEcranMain.cs).
+    /// <see cref="Provenance"/> : le motif d'une panne, rien en base ni en demonstration.</summary>
+    // fix-ok: cause mesuree -- refus du chef (main bad949c, capture commandes-web-3) : en base, le rapprochement rendait
+    // SansRapprochement (aucun dossier) et l'escalier cherchait la cible dans TraitementCommandes.Entites (la demonstration) : Valider
+    // restait a 0/3. Les cles d'entites passent maintenant par Entite(cle) de la session, la recherche par la base.
     private readonly string Mode = LectureEcransMain.Demo;
     private readonly string? Provenance;
     private bool EnBase => Mode == "serveur";
@@ -397,7 +403,9 @@ public sealed partial class SessionCommandesWeb
         TousDebiteurs = false;
         TousEtablissements = false;
         RechercheRapprochementOuverte = false;
-        Resultat = EnBase ? SansRapprochement : TraitementCommandes.RechercherPour(c);
+        Resultat = new([], null);
+        if (EnBase) RechercheDemandee = (c.Siren, c.Denomination);
+        else Resultat = TraitementCommandes.RechercherPour(c);
 
         var choix = ChoixCommande.ParDefaut(c);
         TypesCoches.Clear();
@@ -471,12 +479,17 @@ public sealed partial class SessionCommandesWeb
     }
 
     private void RelancerRapprochement()
-        => Resultat = EnBase ? SansRapprochement : TraitementCommandes.Rechercher(RechSiren, RechRaison);
+    {
+        if (EnBase) RechercheDemandee = (RechSiren, RechRaison);
+        else Resultat = TraitementCommandes.Rechercher(RechSiren, RechRaison);
+    }
 
     private void Retenir(EntiteRapprochee e)
     {
         if (Selection is null) return;
         Selection.CibleRetenue = e.Cle;
+        // En base, le dossier retenu reste connu quand une autre recherche le quitte (EcranCommandesWebBase.cs).
+        if (EnBase) Retenues[e.Cle] = e;
         // Le dossier retenu se resume en une ligne ; « Changer de dossier » rouvre la recherche.
         RapprochementDeplie = false;
         RechercheRapprochementOuverte = false;
@@ -488,9 +501,9 @@ public sealed partial class SessionCommandesWeb
 
     private List<DocumentEdite> DocumentsEnCours(CommandeRecue c) => DocumentsEnCours(c, ChoixEnCours);
 
-    private static List<DocumentEdite> DocumentsEnCours(CommandeRecue c, ChoixCommande choix)
+    private List<DocumentEdite> DocumentsEnCours(CommandeRecue c, ChoixCommande choix)
     {
-        var cible = TraitementCommandes.Entite(c.CibleRetenue);
+        var cible = Entite(c.CibleRetenue);
         // Un certificat bloque ne se commande pas : son compteur compte pour zero.
         var certificats = choix.Certificats.ToDictionary(kv => kv.Key,
             kv => cible is not null && TraitementCommandes.MotifBlocage(kv.Key, cible) is not null ? 0 : kv.Value);
@@ -528,7 +541,7 @@ public sealed partial class SessionCommandesWeb
     private Marche[] Marches(CommandeRecue c, ChoixCommande choix, IReadOnlyList<DocumentEdite> docs)
     {
         var groupe = TraitementCommandes.Groupe(c.Famille);
-        var retenue = TraitementCommandes.Entite(c.CibleRetenue);
+        var retenue = Entite(c.CibleRetenue);
         var dossier = groupe == FamilleCommande.EtatEndettement
             ? new Marche("Débiteur", retenue is null ? "Retenez le débiteur dans le rapprochement pour rattacher la commande." : null,
                          retenue?.Designation ?? "")
@@ -553,8 +566,10 @@ public sealed partial class SessionCommandesWeb
             FamilleCommande.Faillite => new Marche("Certificats",
                 choix.CertificatDeFaillite || choix.Certificats.Values.Any(q => q > 0) ? null : rienADelivrer,
                 ResumeCertificats(choix)),
+            // En base, une commande sans type recu (le flux XML n'est pas lu) ne peut rien cocher : l'etape dit pourquoi.
             _ => new Marche("Types d'inscription commandés",
-                TypesCochesCommandes(c, choix) > 0 ? null : rienADelivrer, ResumeTypes(c, choix)),
+                TypesCochesCommandes(c, choix) > 0 ? null : EnBase && c.TypesRecus.Length == 0 ? SansTypesRecus : rienADelivrer,
+                ResumeTypes(c, choix)),
         };
         return [dossier, choisi, new Marche("Édition", rienADelivrer, TraitementCommandes.BarreEdition(docs))];
     }
@@ -646,7 +661,7 @@ public sealed partial class SessionCommandesWeb
     private void Consulter(DocumentConsulte document)
     {
         if (Selection is not { } c) return;
-        var cible = TraitementCommandes.Entite(c.CibleRetenue);
+        var cible = Entite(c.CibleRetenue);
         var siren = TraitementCommandes.FormaterSiren(c.Siren);
         Message = document switch
         {
@@ -778,7 +793,11 @@ public sealed partial class SessionCommandesWeb
     {
         if (EnBase && GestesQuiEcrivent.Contains(geste))
         {
-            Message = (SansEcriture, "avertissement");
+            // Valider s'ecrit par le serveur une fois l'escalier fait (EcranCommandesWebBase.cs, ValidationEnBase) : arrive ici, il
+            // lui manque une marche, que le message nomme ; rien n'est envoye.
+            Message = Action(geste, valeur) == ActionCommande.Valider && Selection is { } aValider
+                      && BlocageValider(aValider, DocumentsEnCours(aValider)) is { } blocage
+                ? (blocage, "avertissement") : (SansEcriture, "avertissement");
             return;
         }
         switch (geste)
@@ -810,7 +829,7 @@ public sealed partial class SessionCommandesWeb
 
             // ---- zones
             case "RelancerRapprochement": RelancerRapprochement(); break;
-            case "Retenir": Retenir(TraitementCommandes.Entite(Texte(valeur))
+            case "Retenir": Retenir(Entite(Texte(valeur))
                                     ?? throw new ArgumentException($"Entite inconnue : « {Texte(valeur)} ».")); break;
             case "CocherTous":
                 if (Selection is { } s) CocherTous(TraitementCommandes.CasesCommandees(s), valeur.GetBoolean());
@@ -952,7 +971,7 @@ public sealed partial class SessionCommandesWeb
         return new LigneCw(cmd.Id, Rang(cmd), cmd.Id == Selection?.Id, Tiret(cmd.Denomination),
                            TraitementCommandes.Precisions(cmd),
                            TraitementCommandes.Libelle(cmd.Famille),
-                           TraitementCommandes.EstRapprochementDirect(cmd),
+                           !EnBase && TraitementCommandes.EstRapprochementDirect(cmd),
                            marches.Length > 0 ? $"{faites}/{marches.Length}" : null,
                            marches.Length > 0 && faites == marches.Length);
     }
@@ -976,7 +995,7 @@ public sealed partial class SessionCommandesWeb
             ? []
             : DonneesRecues(c).Select(d => new ChampCw(d.Libelle, Tiret(d.Valeur))).ToArray();
         var traitee = c.EstTraitee
-            ? new TraiteeCw(c.Etat == EtatCommande.Rejetee, c.Motif, c.Reference, Documents(c.Envoyes))
+            ? new TraiteeCw(c.Etat == EtatCommande.Rejetee, c.Motif, c.Reference, Documents(c.Envoyes), RattachementDe(c))
             : null;
 
         // Les zones du detail, selon le groupe du type (le @switch du .razor).
@@ -1033,7 +1052,7 @@ public sealed partial class SessionCommandesWeb
     /// <summary>Ce que lisait le RenderFragment ZoneRapprochement du .razor.</summary>
     private RapprochementCw VueRapprochement(CommandeRecue c, bool debiteur)
     {
-        var retenue = TraitementCommandes.Entite(c.CibleRetenue);
+        var retenue = Entite(c.CibleRetenue);
         var entites = Resultat.Entites;
         var affichees = entites.Select(e => (Entite: e, Lignes: debiteur
                 ? TraitementCommandes.LignesVisibles(e, TousDebiteurs, TousEtablissements)
@@ -1153,7 +1172,7 @@ public sealed partial class SessionCommandesWeb
     /// <summary>Ce que lisait le RenderFragment ZoneCertificats du .razor.</summary>
     private CertificatsCw VueCertificats(CommandeRecue c)
     {
-        var cible = TraitementCommandes.Entite(c.CibleRetenue);
+        var cible = Entite(c.CibleRetenue);
         var motifNonFaillite = cible is null ? null : TraitementCommandes.MotifBlocage(CertificatFaillite.NonFaillite, cible);
         var lignes = Enum.GetValues<CertificatFaillite>().Select(cert =>
         {

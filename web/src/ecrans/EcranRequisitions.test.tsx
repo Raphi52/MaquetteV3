@@ -66,6 +66,20 @@ describe('EcranRequisitions', () => {
       .toEqual(['Ordre d\'arrivee', 'Origine', 'N commande', 'Recue le', 'Demandeur', 'Famille', 'EDI', 'Societe visee', 'Siren', 'Etat'])
   })
 
+  // Le REQUI de RIG v2 n'a pas de zone des commandes web (RCS\Exe\PROC_REQUI, branche 275) : branchee a la base, la session ne la
+  // montre pas (zoneCommandesWeb: false), ni la note « exemple » de ses commandes de demonstration. L'ENTREE qui rend ce test rouge si
+  // l'ecran etait faux : zoneCommandesWeb: false -- un ecran qui l'ignore afficherait la bande et sa note. Jumeau : le test d'avant.
+  it('branchee a la base, pas de zone des commandes web ni de note « exemple » : les criteres et les resultats seuls', async () => {
+    installerFauxPont({ 'EcranRequisitions.Ouvrir': () => ({ ...vueDeBase(), commandesWeb: [], nbATraiter: 0, zoneCommandesWeb: false }) })
+    const { container } = render(<EcranRequisitions />)
+    expect(await screen.findByText('Saisissez un critere puis lancez la recherche.')).toBeTruthy()
+    expect(screen.queryByText('Commandes web a traiter')).toBeNull()
+    expect(screen.queryByText(/Commandes web de démonstration/)).toBeNull()
+    expect(container.querySelector('.rig-cmdweb')).toBeNull()
+    expect(container.querySelector('.rig-proc__corps--cmdweb')).toBeNull()
+    expect(container.querySelector('.rig-proc__corps .rig-criteres')).not.toBeNull()
+  })
+
   it('un clic sur l\'en-tete « Recue le » remonte le tri sur la cle Recue, la session rend le nouvel ordre', async () => {
     const { gestes } = session((v, geste, cle) => {
       if (geste !== 'BasculerTri') return v
