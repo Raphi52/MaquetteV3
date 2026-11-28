@@ -1,6 +1,7 @@
 -- Jeu de LecteurDocumentsOcerises (« Documents océrisés », PROC_NUM), lot 11 du plan « RIG v3 100 % fonctionnel » (plan-676a4b19).
 -- Documents 2110301-2110304. Ce qui est retenu ou ecarte, et pourquoi : PROC_NUM.attendu. La table aux types de RIG_DEV
--- (INFORMATION_SCHEMA.COLUMNS de SQL-DEV\DEV, lu le 27/11/2026), colonnes lues ; aucun autre ecran ne la lit.
+-- (INFORMATION_SCHEMA.COLUMNS de SQL-DEV\DEV, lu le 27/11/2026), colonnes lues. « Pivoter des pages » (PROC_PDF_WRITER) relit la meme
+-- liste : ses documents 35001xx (PROC_PDF_WRITER.sql) sont aussi dans PROC_NUM.attendu et PROC_NUM.gestes.
 IF OBJECT_ID(N'v2.DOCUMENT_OCERISE') IS NULL
     CREATE TABLE v2.DOCUMENT_OCERISE (DOCOC_ID_DOCOC int NOT NULL PRIMARY KEY, DOCOC_NOM_FICHIER varchar(255) NULL,
         DOCOC_DATE_CREATION datetime NULL, DOCOC_ID_UTLST int NULL, DOCOC_NB_PAGES int NULL, DOCOC_TAILLE int NULL,

@@ -1,0 +1,48 @@
+# Gestes de « Export Excel » (EcrivainListesExcel.cs), lot 5 du plan-f4fb097f, sur le jeu PROC_LISTEEXCEL.sql (instances de 1968).
+# Une ligne comptee porte « type~types~codes~cases|debut|fin » (LecteurListesExcel.Comptage ; F = fin de periode saisie). « Lancer
+# l'export Excel » = le bouton Excel de RIG v2 (OPE_RECHERCHE.cs:440-463, :465-499) : la liste comptee posee dans la file des editions
+# (une demande d'edition REPORT_SQL, decision du plan), au titre du classeur de RIG v2 (:224-257). Les lignes de l'ecran ne changent
+# pas (RIG v2 n'ecrit rien en base) : chaque geste fait se relit par un controle SQL de la file des editions.
+#
+# Refus 1 : deux types (INS et IDJ, le groupe « Instances » sans type choisi) -- l'ecran de RIG v2 s'ouvre sur UN type de liste.
+# Jumeau accepte : bloc 4, INS seul.
+geste: Agir Lancer l'export Excel
+ids: INS~~~F|19680301|19680331,IDJ~~~F|19680301|19680331
+resultat: refuse
+message: RIG v2 exporte une liste à la fois (son écran s'ouvre sur un type de liste) : choisissez le type de liste à exporter.
+---
+# Refus 2 : IDJ le 02/04/1968 (fin vide) ne compte aucune decision -- RIG v2 laisse le bouton grise a 0 (:485). Jumeau accepte :
+# bloc 5, INS le meme jour (2110603, 1 ligne).
+geste: Agir Lancer l'export Excel
+ids: IDJ~~~|19680402|19680402
+resultat: refuse
+message: « Liste des instances par date DJ du 02/04/1968 » : aucune ligne à exporter, RIG v2 laisse « Excel » grisé.
+---
+# Refus 3 : une ligne sans periode (la liste des types, avant le comptage) -- le bouton de RIG v2 est grise tant que rien n'est compte
+# (:30, SetNbOccurence(0)). Jumeau accepte : bloc 4, la meme liste comptee sur mars 1968.
+geste: Agir Lancer l'export Excel
+ids: INS
+resultat: refuse
+message: « Lancer l'export Excel » n'est actif qu'après le comptage d'une période : RIG v2 le grise tant qu'aucune ligne n'est comptée.
+---
+# INS sur mars 1968 (2110601, 2110602) : une demande d'edition REPORT_SQL, processus LISTEEXCEL, source « Export Excel », phase C,
+# sans demande V2 ; titre « <libelle> du <debut> au <fin> » (:246). Le libelle : celui du type (pas de PARAMETRAGE_LISTE INS dans les jeux).
+geste: Agir Lancer l'export Excel
+ids: INS~~~F|19680301|19680331
+resultat: fait
+message: « Liste des instances du 01/03/1968 au 31/03/1968 » (2 lignes) : placé dans la file des éditions.
+controle: SELECT CONCAT(DMNED_TYPE_GENERATION, '|', DMNED_CODE_PROCESSUS, '|', DMNED_LIBELLE_SOURCE, '|', DMNED_PHASE_TRAITEMENT, '|', CASE WHEN DMNED_ID_DMND IS NULL THEN 'sans demande' ELSE 'avec demande' END) FROM v2.DEMANDE_EDITION WHERE DMNED_LIBELLE_DOCUMENT = N'Liste des instances du 01/03/1968 au 31/03/1968' => REPORT_SQL|LISTEEXCEL|Export Excel|C|sans demande
+---
+# Fin vide (le titre de RIG v2 n'a alors pas de « au », :246) : INS le 02/04/1968, 2110603.
+geste: Agir Lancer l'export Excel
+ids: INS~~~|19680402|19680402
+resultat: fait
+message: « Liste des instances du 02/04/1968 » (1 ligne) : placé dans la file des éditions.
+controle: SELECT COUNT(*) FROM v2.DEMANDE_EDITION WHERE DMNED_LIBELLE_DOCUMENT = N'Liste des instances du 02/04/1968' AND DMNED_LIBELLE_SOURCE = 'Export Excel' => 1
+---
+# AFF : « jusqu'au <debut> » (:257) ; les affaires enrolees avant le 01/03/1968 sans decision definitive, 2110604.
+geste: Agir Lancer l'export Excel
+ids: AFF~~~F|19680301|19680331
+resultat: fait
+message: « Liste affaires en cours jusqu'au 01/03/1968 » (1 ligne) : placé dans la file des éditions.
+controle: SELECT COUNT(*) FROM v2.DEMANDE_EDITION WHERE DMNED_LIBELLE_DOCUMENT = N'Liste affaires en cours jusqu''au 01/03/1968' AND DMNED_TYPE_GENERATION = 'REPORT_SQL' => 1

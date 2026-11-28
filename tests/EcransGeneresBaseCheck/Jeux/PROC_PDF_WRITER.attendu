@@ -1,0 +1,16 @@
+# « Pivoter des pages » (LecteurPivoterPages) sur les jeux PROC_PDF_WRITER.sql et PROC_NUM.sql (la meme table, la meme liste) : les
+# documents hors OCR differe, du plus recent au plus ancien (sans date, en dernier). Groupe : TIF pour .tif / .tiff (toute casse),
+# PDF sinon. Etat, dans l'ordre de _Editer (PROC_NUM_PROC.cs:162-215) :
+#   - un TIF -> EnAttente, l'editeur TIF de RIG v2 (parametre PDF_WRITER_POUR_TIF absent) : 2110302 (meme tenu en cours), 2110304
+#     -- jumeau 3500101, un PDF ;
+#   - un PDF sans fichier -> Rejetee « Le fichier est corrompu. » : NULL (2110301, 2110305) ou vide (3500106) -- jumeau 3500101 ;
+#   - un PDF tenu en cours par un processus -> EnCours (3500105) -- jumeau 3500101, libre ;
+#   - sinon AFaire (3500101).
+# Ecarte : 2110303, lie a l'OCR differe (jumeau 3500101).
+contrat du banc 5.pdf | PDF · 2 pages · 1 Ko · créé le 10/06/2001 · affaire 2001J00051 | PDF | AFaire | []
+vide du banc 5.pdf | PDF · créé le 09/06/2001 · fichier absent de la base : « Le fichier est corrompu. » | PDF | Rejetee | []
+tenu du banc 5.pdf | PDF · 5 pages · 9 Ko · créé le 06/06/2001 · en cours · processus NUM · depuis le 06/06/2001 | PDF | EnCours | []
+scan du banc 11.tif | TIF · 1 page · 1 Ko · créé le 03/05/2001 · s'ouvre dans l'éditeur TIF de RIG v2 (paramètre PDF_WRITER_POUR_TIF de COMMUN_RIG, absent de la base du greffe) | TIF | EnAttente | []
+courrier du banc 11.pdf | PDF · 3 pages · 2 Ko · créé le 02/05/2001 · affaire 2001J00011 · fichier absent de la base : « Le fichier est corrompu. » | PDF | Rejetee | []
+en cours de numérisation | PDF · créé le 01/05/2001 · fichier absent de la base : « Le fichier est corrompu. » | PDF | Rejetee | []
+ancien du banc 11.TIFF | TIF · s'ouvre dans l'éditeur TIF de RIG v2 (paramètre PDF_WRITER_POUR_TIF de COMMUN_RIG, absent de la base du greffe) | TIF | EnAttente | []

@@ -362,35 +362,45 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
 
         new DescripteurEcran
         {
-            Code = "PROC_PDF_WRITER", Titre = "Pivoter des pages", Sujet = "pages",
+            Code = "PROC_PDF_WRITER", Titre = "Pivoter des pages", Sujet = "documents",
+            // Lecteur : LecteurPivoterPages.cs (lot 5, plan « RIG v3 complet ») -- les documents de la base que RIG v2 ouvre dans
+            // PDF_WRITER, depuis « Documents océrisés » (PROC_NUM_PROC.cs:160-215), et la fiche du document ouvert. Groupes et états :
+            // l'aiguillage de RIG v2 (un TIF va à son éditeur TIF, un PDF sans fichier est « corrompu »).
+            // Écrivain : EcrivainPivoterPages.cs (lot 5, 28/11/2026) -- « Enregistrer le PDF » tourne les pages choisies dans le fichier
+            // (PagesPdf.cs, la rotation d'Aspose de RIG v2, PROC_PDF_WRITER.cs:89) et le recopie dans DOCUMENT_OCERISE comme PROC_NUM
+            // (DOCOC_FICHIER, DOCOC_TAILLE, DOCOC_NB_PAGES, DOCOC_ID_UTLST, doc.Sauve() : PROC_NUM_PROC.cs:249-268).
             Forme = FormeEcran.Document,
-            Recherche = "Rechercher une page, une plage (ex. 1-3, 5)…",
+            Recherche = "Rechercher un document, une affaire…",
             Criteres = ["Pages cochées", "Plage de pages", "Sens de rotation"],
             Valider = "Enregistrer le PDF",
+            Gestes = ["Enregistrer le PDF"],
             Rang = 2,
-            Etats = EtatsEcran.Trois("À pivoter", "Pivotée", "Enregistrée"),
-            Groupes = ["Pages 1 à 4", "Pages 5 à 8"],
+            Etats =
+            [
+                new EtatEcran("AFaire", "À pivoter", "a-traiter"), new EtatEcran("EnCours", "En cours ailleurs", "saisie-manuelle"),
+                new EtatEcran("Validee", "Enregistré", "validee"), new EtatEcran("EnAttente", "Éditeur TIF", "en-attente"),
+                new EtatEcran("Rejetee", "Fichier absent", "rejetee"),
+            ],
+            Groupes = ["PDF", "TIF"],
             Sections =
             [
-                Marche("Fichier source", "Le fichier PDF source doit exister. Absent, l'écran reste ouvert mais inutilisable.", true,
-                    "Fichier source"),
-                Marche("Sélection", "Cocher des pages ou saisir une plage (ex. 1-3,5). La plage prime sur les cases cochées.", true,
+                Marche("Fichier source", "Le document ouvert : son fichier doit être dans la base. Absent, RIG v2 refuse : « Le fichier est corrompu. » Un TIF s'ouvre dans l'éditeur TIF de RIG v2, sauf paramètre PDF_WRITER_POUR_TIF.", true,
+                    "Fichier source", "Format", Champ.Nombre("Pages"), "Taille", "Pages tournées"),
+                Marche("Sélection", "Cocher des pages ou saisir une plage (ex. 1-3;5). La plage prime sur les cases cochées ; un document d'une page n'a pas à être coché.", true,
                     "Pages cochées", "Plage de pages"),
                 Marche("Rotation", "90° horaire, 90° anti-horaire ou 180°. Les rotations s'accumulent page par page ; le PDF n'est pas touché avant l'enregistrement.", true,
-                    "Rotation"),
+                    Champ.Liste("Rotation", "90° horaire", "90° anti-horaire", "180°")),
                 Marche("Enregistrement", "Applique les rotations en une passe vers le fichier de sortie. Quitter sans enregistrer demande confirmation.", true,
                     "Fichier de sortie"),
             ],
             Lignes =
             [
-                Ligne("Page 1", "Aucune rotation", "Pages 1 à 4", "AFaire"),
-                Ligne("Page 2", "Rotation de 90° horaire, non enregistrée", "Pages 1 à 4", "EnCours", 0, 1, 2),
-                Ligne("Page 3", "Rotation de 180°, non enregistrée", "Pages 1 à 4", "EnCours", 0, 1, 2),
-                Ligne("Page 4", "Rotation de 90° anti-horaire, non enregistrée", "Pages 1 à 4", "EnCours", 0, 1, 2),
-                Ligne("Page 5", "Aucune rotation", "Pages 5 à 8", "AFaire"),
-                Ligne("Page 6", "Rotation de 90° horaire, enregistrée", "Pages 5 à 8", "Validee", 0, 1, 2, 3),
-                Ligne("Page 7", "Aucune rotation, enregistrée", "Pages 5 à 8", "Validee", 0, 1, 2, 3),
-                Ligne("Page 8", "Rotation de 180°, enregistrée", "Pages 5 à 8", "Validee", 0, 1, 2, 3),
+                Ligne("Courrier Alpha Services.pdf", "PDF · 3 pages · 120 Ko · créé le 02/03/2026 · affaire 2026J00101", "PDF", "AFaire"),
+                Ligne("Requête Bêta Industrie.pdf", "PDF · 2 pages · 64 Ko · créé le 03/03/2026", "PDF", "AFaire"),
+                Ligne("Jugement Gamma Conseil.pdf", "PDF · 4 pages · 210 Ko · en cours · processus NUM", "PDF", "EnCours"),
+                Ligne("Annexe Delta Transports.pdf", "PDF · 1 page · fichier absent de la base : « Le fichier est corrompu. »", "PDF", "Rejetee"),
+                Ligne("Scan Epsilon Habitat.tif", "TIF · 2 pages · s'ouvre dans l'éditeur TIF de RIG v2", "TIF", "EnAttente"),
+                Ligne("Scan Zêta Commerce.tif", "TIF · 1 page · s'ouvre dans l'éditeur TIF de RIG v2", "TIF", "EnAttente"),
             ],
         },
 
@@ -639,6 +649,12 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
             // (et de RIG_DEV : aucune table PAPERCUT, lu le 27/11/2026) ; « Imprimer » appelle le service WCF d'impression PaperCut.
             // L'écran le DIT : chaque ligne d'exemple nomme la table absente (le descripteur n'a pas d'autre texte affiché au-dessus
             // de la liste, et la mention « exemple » seule ne disait pas pourquoi).
+            // Remesuré le 28/11/2026 (lot 5, plan « RIG v3 complet ») : le COMMUN_RIG de SQL-DEV\DEV a 17 tables, ni PAPERCUT ni
+            // RIG_PARAMETRE. RIG v2 n'ouvre l'écran qu'avec PAPERCUT_ACTIF = 1 (« Papercut n'est pas actif pour le moment. »,
+            // FORM_PAPERCUT.cs:29-33), lu dans GRF_PARAM_TEST de la table des greffes (RigGreffe.cs:470-476), colonne qu'aucune base de
+            // SQL-DEV ne porte (RIG_DEV, COMMUN_RIG). Aucun lecteur ni écrivain honnête : la ligne du banc du parcours reste rouge.
+            // fix-ok: mesure le 28/11/2026 -- la 1re rédaction de cette note cherchait PAPERCUT_ACTIF dans PARAMETRAGE ; RigGreffe.ParamTest
+            // le lit dans GRF_PARAM_TEST (RigGreffe.cs:470-476), absente des deux bases de SQL-DEV (INFORMATION_SCHEMA.COLUMNS lu).
             Forme = FormeEcran.File,
             Recherche = "Rechercher une imprimante…",
             Criteres = ["Imprimante", "Utilisateur", "Nombre de feuilles"],
@@ -673,8 +689,10 @@ public sealed class DomaineModifierEnvois : IDomaineEcrans
             // Lecteur : LecteurListesExcel.cs (lot 11) -- les types de liste d'instances du greffe, leurs colonnes et leurs listes
             // paramétrées (PARAMETRAGE_LISTE_XLS*) ; avec une date de début, le COMPTAGE de RIG v2 par type (ExcelInstance.cs:9-104,
             // la requête de PARAMETRAGE_LISTE réécrite sous v2) et le blocage au-delà de 65 536 lignes (OPE_RECHERCHE.cs:466-472).
-            // L'export reste en démonstration : EXECUTE_EXCEL ouvre un classeur non enregistré, sans dossier choisi (Excel.cs:551),
-            // avec des colonnes qui sont des expressions SQL stockées dans la base.
+            // Écrivain : EcrivainListesExcel.cs (lot 5, plan « RIG v3 complet », 28/11/2026) -- RIG v2 ouvre le classeur dans Excel
+            // (EXECUTE_EXCEL, OPE_RECHERCHE.cs:440-463) sans rien écrire en base ; « Lancer l'export Excel » pose la liste comptée dans la
+            // file des éditions (décisions des lots 1 et 3 : une édition V2 faite sur le poste = une demande dans la file), une liste à
+            // la fois, refusée à 0 ligne et au-delà de 65 536 comme le bouton de RIG v2 (:465-499).
             Forme = FormeEcran.Etat,
             // Les critères des listes d'instances (OPE_INSTANCE, OPE_TYPE_INSTANCE, OPE_CODE_EVE_PRO ; OPE_RECHERCHE.cs:78-99).
             // Code d'acte et nature d'affaire du groupement ne se saisissent pas : ce sont deux réglages du greffe (OPE_INSTANCE.cs:78-79).
