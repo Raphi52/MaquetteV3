@@ -8,6 +8,9 @@
 // referentiel, version couverte, delivre le, valide jusqu'au (SOC-019 CA04). La regle de validite vit dans
 // Contrats/Socle/Certification.cs (la meme que le demarrage de la beta) et le serveur la joue
 // (Serveur/Socle/Certification, prouve par tests/SocleBetaCheck) ; tout passe par Pont/EcranCertificat.cs.
+// Un compte d'Amitel y ENREGISTRE le certificat recu (formulaire EnregistrerCertificat, SOC-019 T03 ; plan « RIG v3 complet »,
+// lot 13). fix-ok: PUT RoutesCertification.Enregistrer n'etait joue que par tests/SocleBetaCheck (grep du 28/11) : aucun ecran
+// ne l'offrait, le geste etait injouable depuis la V3.
 
 import { useEffect, useState } from 'react'
 import { appeler } from '../pont'
@@ -39,6 +42,8 @@ export interface VueEcranCertificat {
   mode: 'serveur' | 'demo' | 'sans-greffe' | 'refuse' | 'erreur'
   message: string | null
   etat: EtatCertificat | null
+  /** Compte d'Amitel : l'ecran offre d'enregistrer le certificat recu de l'organisme (le serveur le verifie : 403 sinon). */
+  peutEnregistrer?: boolean
 }
 
 const Message = { margin: 0, padding: 'var(--rig-esp-2) var(--rig-esp-3)' } as const
@@ -68,6 +73,57 @@ export function pastilleCertificat(etat: EtatCertificat['etat']): { classe: stri
 /** « 2026-11-21 » (DateOnly du serveur) en « 21/11/2026 ». */
 function jour(d: string): string {
   return dateCourte(d.slice(0, 10))
+}
+
+/** Les champs du certificat que l'organisme delivre (certificat-v3.json du dossier de la beta), saisis par Amitel. */
+const ChampsCertificat: [keyof Certificat, string, string][] = [
+  ['organisme', 'Organisme', 'text'], ['accreditation', 'Accréditation', 'text'], ['numero', 'Numéro du certificat', 'text'],
+  ['referentiel', 'Référentiel', 'text'], ['versionCouverte', 'Version couverte', 'text'],
+  ['delivreLe', 'Délivré le', 'date'], ['valideJusquau', 'Valide jusqu\'au', 'date'],
+]
+
+/**
+ * « Enregistrer le certificat » (SOC-019 T03), offert aux seuls comptes d'Amitel : le certificat recu de l'organisme accredite,
+ * enregistre une fois dans la base commune pour les 40 greffes (Pont/EcranCertificat.cs, EnregistrerAsync). Un refus du serveur
+ * (certificat incomplet, compte hors Amitel) est dit sous le formulaire ; rien n'est enregistre.
+ */
+function EnregistrerCertificat({ version, surFait }: { version: string; surFait: (v: VueEcranCertificat) => void }) {
+  const [saisie, setSaisie] = useState<Certificat>({
+    logiciel: 'V3', organisme: '', accreditation: '', numero: '', referentiel: 'NF525',
+    versionCouverte: version.split('.').slice(0, 2).join('.'), delivreLe: '', valideJusquau: '',
+  })
+  const [refus, setRefus] = useState<string | null>(null)
+  const [envoi, setEnvoi] = useState(false)
+  const complet = ChampsCertificat.every(([cle]) => saisie[cle].trim() !== '')
+
+  async function enregistrer() {
+    setEnvoi(true)
+    try {
+      const v = await appeler<VueEcranCertificat>('EcranCertificat.Enregistrer', saisie)
+      if (v.mode === 'serveur') { setRefus(null); surFait(v) } else setRefus(v.message)
+    } catch {
+      setRefus("Le pont n'a pas répondu : le certificat n'est pas enregistré.")
+    } finally {
+      setEnvoi(false)
+    }
+  }
+
+  return (
+    <div className="rig-criteres__bloc">
+      <div className="rig-kicker">Enregistrer le certificat reçu (Amitel)</div>
+      {ChampsCertificat.map(([cle, libelle, type]) => (
+        <label key={cle} className="rig-saisie-champ">
+          <span className="rig-saisie-champ__libelle">{libelle}</span>
+          <input className="rig-saisie-champ__saisie" type={type} value={saisie[cle]}
+                 onChange={(e) => setSaisie({ ...saisie, [cle]: e.target.value })} />
+        </label>
+      ))}
+      <button className="rig-bouton rig-bouton--fort" disabled={!complet || envoi} onClick={() => void enregistrer()}>
+        Enregistrer le certificat
+      </button>
+      {refus && <p style={Aide} role="alert"><span className="rig-etat rig-etat--alerte">Refusé</span> {refus}</p>}
+    </div>
+  )
 }
 
 export function EcranCertificat() {
@@ -129,6 +185,7 @@ export function EcranCertificat() {
         <p style={Aide}>
           La V3 et l'ancien RIG ont chacun leur certificat : celui de l'ancien RIG reste sur sa fiche habituelle.
         </p>
+        {vue.mode === 'serveur' && vue.peutEnregistrer && <EnregistrerCertificat version={etat.versionEnService} surFait={setVue} />}
       </aside>
 
       <section className="rig-resultats-proc">
