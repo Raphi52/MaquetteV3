@@ -1,0 +1,49 @@
+# Gestes de « Cheques emis » (EcrivainChequesEmis.cs), lot 4 du plan-f4fb097f, sur le jeu PROC_EDCHQEMIS.sql.
+# « Voir » = VOIR de RIG v2 (OPE_EDCHQEMIS.cs:54-58, :83-92) : RIG v2 affiche l'état Crystal ; RIG v3 le pose dans la file des éditions
+# (EditionsEtatsV2.cs, décision du chef du plan). Les remboursements ne changent pas : aucun « lignes: » ; ce qui se relit est la demande
+# d'édition, et son total comparé à un SELECT sur les remboursements.
+#
+# Refus 1 : l'agent n'a pas la fonction EDCHQEMIS (FORM_ACCUEIL.cs:1624) -- jumeau accepte : le bloc 4, l'agent du banc (rôle BANC).
+agent: banc.l4.sansdroit
+geste: Agir Voir
+ids: 2200703,2200705
+resultat: refuse
+message: Vous n'êtes pas autorisé à exécuter le processus 'EDCHQEMIS'.
+---
+# Refus 2 : aucun remboursement, VOIR inactif (OPE_EDCHQEMIS.cs:65-68) -- jumeau accepte : le bloc 4, deux remboursements.
+geste: Agir Voir
+ids:
+resultat: refuse
+message: Il y a 0 élément à visualiser
+---
+# Refus 3 : 2200704 n'est pas un remboursement (mode de type autre que RBT, EmisTropPercus.cs:101) -- jumeau accepte : 2200703 (bloc 4).
+geste: Agir Voir
+ids: 2200703,2200704
+resultat: refuse
+message: Un remboursement n'est plus à l'état des chèques émis (supprimé, mode de paiement autre qu'un remboursement, ou sans ventilation sur un client, une affaire et sa demande) : relisez la liste.
+---
+# Les remboursements de juin 2025 (PROC_EDCHQEMIS.recherches, bloc 1) : un trop-perçu (2200703, 20,00, le 10/06) et une notification
+# (2200705, 25,00, le 12/06) -- les deux origines, le titre « Chèques émis entre le ... » (EmisTropPercus.cs:166). Total 45,00, celui d'un
+# SELECT SUM(ENCMT_MONTANT) sur ces remboursements.
+geste: Agir Voir
+ids: 2200703,2200705
+resultat: fait
+message: Chèques émis entre le 10/06/2025 et le 12/06/2025 : 2 remboursements, 45,00 €, placé dans la file des éditions.
+controle: SELECT COUNT(*) FROM v2.DEMANDE_EDITION WHERE DMNED_LIBELLE_DOCUMENT = N'Chèques émis entre le 10/06/2025 et le 12/06/2025' AND DMNED_CODE_PROCESSUS = 'EDCHQEMIS' AND DMNED_TYPE_GENERATION = 'FUSION_CRYSTAL' AND DMNED_PHASE_TRAITEMENT = 'C' AND DMNED_ID_DMND IS NULL => 1
+controle: SELECT CONCAT(x.value('(/PARAMETRES/@NOMRPT)[1]', 'varchar(60)'), '|', x.value('(/PARAMETRES/@NB_LIGNES)[1]', 'int'), '|', x.value('(/PARAMETRES/@TOTAL)[1]', 'varchar(20)')) FROM (SELECT CAST(DMNED_PARAMETRE_GENERATION AS xml) AS x FROM v2.DEMANDE_EDITION WHERE DMNED_LIBELLE_DOCUMENT = N'Chèques émis entre le 10/06/2025 et le 12/06/2025') AS d => Expresso_EMIS_TROPPERCU.rpt|2|45.00
+controle: SELECT CASE WHEN x.value('(/PARAMETRES/@TOTAL)[1]', 'decimal(19,2)') = (SELECT SUM(ENCMT_MONTANT) FROM v2.ENCAISSEMENT WHERE ENCMT_ID_ENCMT IN (2200703, 2200705)) THEN 'TOTAL = SELECT' ELSE 'TOTAL <> SELECT' END FROM (SELECT CAST(DMNED_PARAMETRE_GENERATION AS xml) AS x FROM v2.DEMANDE_EDITION WHERE DMNED_LIBELLE_DOCUMENT = N'Chèques émis entre le 10/06/2025 et le 12/06/2025') AS d => TOTAL = SELECT
+controle: SELECT COUNT(*) FROM soc.Journal WHERE Ecran = 'Chèques émis' AND Famille = 'demande' AND Objet = N'l''édition « Chèques émis entre le 10/06/2025 et le 12/06/2025 »' AND Verbe = 'a cree' => 1
+---
+# Une notification seule : le titre « pour notifications » (EmisTropPercus.cs:164).
+geste: Agir Voir
+ids: 2200705
+resultat: fait
+message: Chèques émis pour notifications entre le 12/06/2025 et le 12/06/2025 : 1 remboursement, 25,00 €, placé dans la file des éditions.
+controle: SELECT COUNT(*) FROM v2.DEMANDE_EDITION WHERE DMNED_LIBELLE_DOCUMENT = N'Chèques émis pour notifications entre le 12/06/2025 et le 12/06/2025' => 1
+---
+# Un trop-perçu seul : le titre « pour trop perçus » (EmisTropPercus.cs:169, la date sans l'heure : en tête de l'écrivain).
+geste: Agir Voir
+ids: 2200703
+resultat: fait
+message: Chèques émis pour trop perçus entre le 10/06/2025 et le 10/06/2025 : 1 remboursement, 20,00 €, placé dans la file des éditions.
+controle: SELECT COUNT(*) FROM v2.DEMANDE_EDITION WHERE DMNED_LIBELLE_DOCUMENT = N'Chèques émis pour trop perçus entre le 10/06/2025 et le 10/06/2025' => 1

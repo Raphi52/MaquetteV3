@@ -5,7 +5,7 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 
 /// <summary>
 /// « Refacturation » (PROC_FACTREEDIT) : les factures deja emises dont l'edition peut etre relancee. Mode d'emploi : LecteurEcran.cs.
-/// Plan « RIG v3 100 % fonctionnel », lot 12, 27/11/2026. Lecture seule : la reedition n'est pas branchee (NON REPRIS, plus bas).
+/// Plan « RIG v3 100 % fonctionnel », lot 12, 27/11/2026. La reedition (« Valider ») : EcrivainRefacturation.cs (plan-f4fb097f, lot 4).
 ///
 /// SOURCE (ancien RIG) : OPE_REVIEW.OnProcessusEventBeforeChild (D:\RigApplication\Source\RIG\DLL\Processus\PROC_FACTREEDIT ; le Detail
 /// OPE de proc_factreedit.md fait foi, OPE_REVIEW.cs:72-88) : FACTURE jointe a sa DEMANDE (FACTU_NUM_DEMANDE = DMND_NUM_DEMANDE) et a
@@ -17,16 +17,14 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// Dans la base V3, CLIENT est la fiche rec.Client. ORDRE : les plus recentes d'abord. ETAT : AFaire « À rééditer » (la V2 coche toutes
 /// les factures par defaut, :19 ; aucune trace de reedition n'est lue ici).
 /// CELLULES : les colonnes de la grille V2 (OPE_REVIEW.cs:43-57) -- numero, date (jj/mm/aaaa), montant TTC (decimal exact) -- et le client.
-/// NON REPRIS (nomme) : la REEDITION (DoGenererLesDemandesEditions, OPE_REVIEW.cs:236-252). Elle ne cree rien : elle redonne la
-/// derniere DEMANDE_EDITION facture de chaque demande cochee (maquette FACT_n_IMP, :244-252) au tableau d'edition, et TOUT ce qu'elle
-/// ecrit est la validation de ce tableau (TableauEditionLot2Parametre._sauveDiffereLot2, :347-425) : le groupe d'impression choisi par
-/// lot et imprimante (_creerNumGroupe, :447-505 -- le groupe en cours d'un lot differe, ou un groupe neuf du lot direct clos en phase P),
-/// le drapeau d'envoi par courriel, les numeros LR/LRAR (DemandeEdition.SauveValidation, DemandeEdition.cs:1392-1405) et la ligne
-/// DEMANDE_EDITION_HISTO (:1406-1407). Cette validation du tableau n'est reprise par AUCUN lot du plan (EditionsEvenementV2.cs, en tete :
-/// « le groupe d'impression que la validation du tableau attribue [...] : la demande reste sans groupe ») ; sans elle, la reedition se
-/// reduirait a une ligne d'historique, sans groupe ni impression : un faux succes. Elle attend un socle « tableau d'edition » commun
-/// (choix de l'imprimante et du lot a l'ecran, groupes, LRAR), a decider par le chef du plan. « Valider » repond donc « rien n'est
-/// enregistré » (aucun ecrivain, ModuleEcransGeneres.cs).
+/// LA REEDITION (« Valider ») : EcrivainRefacturation.cs, lot 4 du plan-f4fb097f (28/11/2026). RIG v2 (DoGenererLesDemandesEditions,
+/// OPE_REVIEW.cs:236-254) donne la derniere edition de facture (maquette FACT_n_IMP) de chaque facture cochee au tableau d'edition, qui en
+/// cree une COPIE, nouvelle demande d'edition (TreeViewDestinataire.cs:2682 -> DemandeEdition.CreateNouvelleDemandeEdition), puis valide
+/// le tableau (TableauEditionLot2Parametre._sauveDiffereLot2, :347-425). Le lot 12 l'avait laissee non branchee, faute d'un socle
+/// « tableau d'edition » ; la decision du chef du plan (« une edition = une demande dans la file des editions ») l'a tranchee : la V3
+/// ecrit la copie. Ce que la validation du tableau ajoute -- le groupe d'impression (_creerNumGroupe, :447-505), les numeros LR/LRAR
+/// (DemandeEdition.SauveValidation, DemandeEdition.cs:1392-1405), la ligne DEMANDE_EDITION_HISTO (:1406-1407) -- reste non repris, nomme
+/// dans l'ecrivain.
 /// </summary>
 internal sealed class LecteurRefacturation : ILecteurEcran
 {

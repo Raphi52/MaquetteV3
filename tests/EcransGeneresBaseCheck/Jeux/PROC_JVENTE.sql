@@ -57,3 +57,26 @@ INSERT INTO v2.ARTICLE_UTILISE (ARTUT_ID_ARTUT, ARTUT_ID_CLIEN, ARTUT_CODE_ARTIC
     (2300411, 2300472, ''L13RAD'', ''Radiation banc'', 1, 14.30, 14.30, 0, ''20250311'', ''L13F011'', NULL),
     -- un article tarife (sans facture) du 10/03/2025 : ecarte sans « Type d''article = Tarifés » -- jumeau retenu 2300410
     (2300412, 2300471, ''L13COPIE'', ''Copie banc tarif'', 2, 0.78, 1.87, 20, ''20250310 15:00'', NULL, 2300491);', N'@aujourdhui datetime', @aujourdhui;
+-- Lot 4 du plan-f4fb097f (28/11/2026), les gestes de PROC_JVENTE : le droit d'executer le processus JVENTE (FORM_ACCUEIL.cs:1614-1624,
+-- soc.Droit), fonction du domaine Comptabilite (soc.Fonction de RIG_DEV : « Journal de vente », DLL, Comptabilite = 1), sur le role BANC
+-- de l'agent du banc ; et un agent SANS ce droit (banc.l4.sansdroit, role BANC_L4 sans fonction, admis comme lui), pour le refus. Les
+-- colonnes de la file des editions que l'etat ecrit (EditionsEtatsV2.cs) et que les controles du .gestes relisent.
+IF NOT EXISTS (SELECT 1 FROM soc.Fonction WHERE Code = 'JVENTE')
+    INSERT INTO soc.Fonction (Code, Libelle, TypeV2, Comptabilite) VALUES ('JVENTE', N'Journal de vente', 'DLL', 1);
+IF NOT EXISTS (SELECT 1 FROM soc.RoleFonction WHERE Role = 'BANC' AND Fonction = 'JVENTE') INSERT INTO soc.RoleFonction (Role, Fonction) VALUES ('BANC', 'JVENTE');
+IF NOT EXISTS (SELECT 1 FROM soc.Role WHERE Nom = 'BANC_L4') INSERT INTO soc.Role (Nom, Libelle) VALUES ('BANC_L4', 'Banc lot 4, sans droit');
+IF NOT EXISTS (SELECT 1 FROM soc.Compte WHERE CompteWindows = 'banc.l4.sansdroit')
+BEGIN
+    INSERT INTO soc.Compte (CompteWindows, Nom, Prenom, Abrege, Civilite, CodeGreffe, IdService, Desactive)
+    SELECT 'banc.l4.sansdroit', 'SANSDROIT', 'Banc', 'BANCL4', 'M.', CodeGreffe, IdService, 0 FROM soc.Compte WHERE CompteWindows = 'banc.ecrans';
+    INSERT INTO soc.CompteRole (IdCompte, Role) SELECT Id, 'BANC_L4' FROM soc.Compte WHERE CompteWindows = 'banc.l4.sansdroit';
+END
+IF OBJECT_ID(N'v2.DEMANDE_EDITION') IS NULL
+    CREATE TABLE v2.DEMANDE_EDITION (DMNED_ID_DMNED int NOT NULL PRIMARY KEY, DMNED_ID_DMND int NULL, DMNED_ID_DSRCS int NULL,
+        DMNED_LOT varchar(255) NULL, DMNED_PHASE_TRAITEMENT varchar(10) NOT NULL, DMNED_DATE_PRE_EMISSION datetime NULL,
+        DMNED_DESIGNATION_DESTINATAIRE varchar(255) NULL, DMNED_LIBELLE_DOCUMENT varchar(255) NOT NULL,
+        DMNED_LIBELLE_ERREUR varchar(255) NULL, DMNED_DATE_CREATION datetime NULL, DMNED_ID_EMAIL_ENVOYE int NULL,
+        DMNED_MODE_ENVOI int NULL);
+IF COL_LENGTH('v2.DEMANDE_EDITION', 'DMNED_CODE_PROCESSUS') IS NULL ALTER TABLE v2.DEMANDE_EDITION ADD DMNED_CODE_PROCESSUS varchar(40) NULL;
+IF COL_LENGTH('v2.DEMANDE_EDITION', 'DMNED_TYPE_GENERATION') IS NULL ALTER TABLE v2.DEMANDE_EDITION ADD DMNED_TYPE_GENERATION varchar(40) NULL;
+IF COL_LENGTH('v2.DEMANDE_EDITION', 'DMNED_PARAMETRE_GENERATION') IS NULL ALTER TABLE v2.DEMANDE_EDITION ADD DMNED_PARAMETRE_GENERATION varchar(max) NULL;

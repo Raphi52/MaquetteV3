@@ -19,8 +19,10 @@ public sealed class DomaineFacturer : IDomaineEcrans
             Code = "PROC_FACTREEDIT", Titre = "Refacturation", Sujet = "factures émises",
             Forme = FormeEcran.File,
             // Lot 12 (27/11/2026) : la liste de la base, LecteurRefacturation.cs ; les colonnes de la grille V2 (OPE_REVIEW.cs:43-57)
-            // et le client (la V3 liste tous les clients). La réédition n'écrit que la validation du tableau d'édition (groupe d'impression, LRAR,
-            // historique), qu'aucun lot ne reprend : non branchée, raison dans LecteurRefacturation.cs ; « Valider » n'enregistre rien.
+            // et le client (la V3 liste tous les clients). Lot 4 du plan-f4fb097f (28/11/2026) : « Valider » relance l'édition des factures
+            // cochées, une nouvelle demande d'édition copiée de leur dernière édition de facture, dans la file des éditions
+            // (EcrivainRefacturation.cs ; OPE_REVIEW.cs:236-254, DemandeEdition.CreateNouvelleDemandeEdition). Le groupe d'impression, les
+            // numéros LRAR et l'historique que valide le tableau d'édition de la V2 restent non repris, nommés dans l'écrivain.
             Colonnes = ["Numéro de facture", "Date de facturation", Champ.Montant("Montant TTC"), "Client"],
             Recherche = "Rechercher une facture, un numéro, un montant…",
             Criteres = ["Client", "Période de facturation (du, au)"],
@@ -295,7 +297,9 @@ public sealed class DomaineFacturer : IDomaineEcrans
         },
 
         // Le Détail OPE fait foi : un état Crystal de contrôle des remboursements (trop-perçus et
-        // notifications), pas une liste de chèques. Une seule étape de critères, un bouton VOIR.
+        // notifications), pas une liste de chèques. Une seule étape de critères, un bouton VOIR. Lot 4 du plan-f4fb097f (28/11/2026) :
+        // « Voir » pose l'état des remboursements affichés dans la file des éditions (EcrivainChequesEmis.cs, EditionsEtatsV2.cs) ;
+        // RIG v2 l'affiche à l'écran, RIG v3 ne génère pas d'état Crystal.
         new DescripteurEcran
         {
             Code = "PROC_EDCHQEMIS", Titre = "Cheques emis", Sujet = "remboursements émis",
@@ -332,9 +336,12 @@ public sealed class DomaineFacturer : IDomaineEcrans
 
         // Le code n'a pas de grille : c'est un rapport Crystal édité sur critères. La V3 calcule le journal dans la base
         // (Serveur/Socle/EcransGeneres/LecteurJournalCaisse.cs, lot 13) : les lignes ci-dessous ne sont que l'exemple sans serveur.
-        // « Éditer » n'a pas d'écrivain : RIG v2 affiche son état Crystal sans passer par la file des éditions
-        // (OPE_METHODETRI.Editer, :100-108 ; JournalCaisse.AfficherCrystal) ; RIG v3 ne génère pas cet état, le tableau et ses
-        // totaux sont le journal.
+        // « Éditer » : RIG v2 affiche son état Crystal sans passer par la file des éditions (OPE_METHODETRI.Editer, :100-108 ;
+        // JournalCaisse.AfficherCrystal) ; RIG v3 ne génère pas cet état et pose le journal des encaissements affichés dans la file
+        // des éditions (EcrivainJournalCaisse.cs, EditionsEtatsV2.cs : lot 4 du plan-f4fb097f, 28/11/2026). L'écran envoie un geste
+        // par groupe affiché (FormeEtat.tsx) : un journal par mode de paiement, là où la V2 en édite un seul, trié par mode.
+        // fix-ok: pas un correctif à l'aveugle -- quatre commentaires de descripteur (PROC_FACTREEDIT, PROC_EDCHQEMIS, PROC_JCAISSE,
+        // PROC_JVENTE) remis à jour : le banc du parcours (28/11/2026) les mesurait « aucun écrivain au serveur », le lot 4 les branche.
         new DescripteurEcran
         {
             Code = "PROC_JCAISSE", Titre = "Journal de caisse", Sujet = "encaissements",
@@ -377,7 +384,9 @@ public sealed class DomaineFacturer : IDomaineEcrans
         // RigCrystalFactu). La V3 calcule le journal dans la base (LecteurJournalVente.cs, lot 13) : les articles vendus de la
         // période, édition « Détaillée » triée par date, celle que RIG v2 ouvre par défaut (OPE_EDITION.cs:34-37, OPE_TRI.cs:50-51).
         // Le corps de la fiche parlait de criées et d'adjudicataires (« ventes ») : le code n'en lit aucune (proc_jvente.md:182),
-        // groupes et colonnes suivent le code. « Éditer » n'a pas d'écrivain : l'état Crystal s'affiche sans file des éditions.
+        // groupes et colonnes suivent le code. « Éditer » : l'état Crystal de la V2 s'affiche sans file des éditions ; RIG v3 pose le
+        // journal des articles affichés dans la file des éditions (EcrivainJournalVente.cs, EditionsEtatsV2.cs : lot 4 du
+        // plan-f4fb097f, 28/11/2026), un par groupe affiché (FormeEtat.tsx).
         new DescripteurEcran
         {
             Code = "PROC_JVENTE", Titre = "Journal de vente", Sujet = "ventes du greffe",

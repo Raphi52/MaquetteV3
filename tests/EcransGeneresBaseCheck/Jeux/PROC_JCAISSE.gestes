@@ -1,0 +1,47 @@
+# Gestes de « Journal de caisse » (EcrivainJournalCaisse.cs), lot 4 du plan-f4fb097f, sur le jeu PROC_JCAISSE.sql.
+# « Éditer » = EDITER de RIG v2 (FORM_JCAISSE.cs:42-48) : RIG v2 affiche l'état Crystal ; RIG v3 le pose dans la file des éditions
+# (EditionsEtatsV2.cs, décision du chef du plan). Les encaissements ne changent pas (la V2 n'écrit rien sur eux) : aucun « lignes: » ;
+# ce qui se relit est la demande d'édition, et son total comparé à un SELECT sur les encaissements.
+#
+# Refus 1 : l'agent n'a pas la fonction JCAISSE (FORM_ACCUEIL.cs:1624) -- jumeau accepte : le bloc 4, l'agent du banc (rôle BANC).
+agent: banc.l4.sansdroit
+geste: Agir Éditer
+ids: 2300211,2300202,2300203,2300210
+resultat: refuse
+message: Vous n'êtes pas autorisé à exécuter le processus 'JCAISSE'.
+---
+# Refus 2 : aucun encaissement à éditer (JournalCaisse.cs:216-218) -- jumeau accepte : le bloc 4, quatre encaissements.
+geste: Agir Éditer
+ids:
+resultat: refuse
+message: Aucun élément trouvé
+---
+# Refus 3 : 2300204 n'est pas au journal (sa ventilation n'a pas d'affaire : INNER JOIN AFFAIRE de GetData, OPE_CRITERESGENERAUX.cs:168-175)
+# -- jumeau accepte : 2300210, au journal (bloc 4). Rien n'est écrit pour 2300210 non plus.
+geste: Agir Éditer
+ids: 2300210,2300204
+resultat: refuse
+message: Un encaissement n'est plus au journal de caisse (supprimé, sans ventilation sur une affaire et un client, ou mode de paiement inconnu) : relisez le journal.
+---
+# Les quatre encaissements de février 2024 (PROC_JCAISSE.recherches, bloc 1), un par mode : la période est la leur (05 au 07/02/2024),
+# le tri celui de la V2 par défaut (« Par mode de paiement » -> Expresso_JCaisseMode.rpt). Le total : 12,34 + 50,05 - 20,00 + 1 234,56
+# = 1 276,95 (2300202, ventilé deux fois, compte une fois), celui d'un SELECT SUM(ENCMT_MONTANT) sur ces encaissements.
+geste: Agir Éditer
+ids: 2300211,2300202,2300203,2300210
+resultat: fait
+message: Journal de caisse de la période du 05/02/2024 au 07/02/2024 : 4 encaissements, 1 276,95 €, placé dans la file des éditions.
+controle: SELECT COUNT(*) FROM v2.DEMANDE_EDITION WHERE DMNED_LIBELLE_DOCUMENT = N'Journal de caisse de la période du 05/02/2024 au 07/02/2024' AND DMNED_CODE_PROCESSUS = 'JCAISSE' AND DMNED_TYPE_GENERATION = 'FUSION_CRYSTAL' AND DMNED_PHASE_TRAITEMENT = 'C' AND DMNED_ID_DMND IS NULL => 1
+controle: SELECT CONCAT(x.value('(/PARAMETRES/@NOMRPT)[1]', 'varchar(60)'), '|', x.value('(/PARAMETRES/@NB_LIGNES)[1]', 'int'), '|', x.value('(/PARAMETRES/@TOTAL)[1]', 'varchar(20)')) FROM (SELECT CAST(DMNED_PARAMETRE_GENERATION AS xml) AS x FROM v2.DEMANDE_EDITION WHERE DMNED_LIBELLE_DOCUMENT = N'Journal de caisse de la période du 05/02/2024 au 07/02/2024') AS d => Expresso_JCaisseMode.rpt|4|1276.95
+controle: SELECT CASE WHEN x.value('(/PARAMETRES/@TOTAL)[1]', 'decimal(19,2)') = (SELECT SUM(ENCMT_MONTANT) FROM v2.ENCAISSEMENT WHERE ENCMT_ID_ENCMT IN (2300202, 2300203, 2300210, 2300211)) THEN 'TOTAL = SELECT' ELSE 'TOTAL <> SELECT' END FROM (SELECT CAST(DMNED_PARAMETRE_GENERATION AS xml) AS x FROM v2.DEMANDE_EDITION WHERE DMNED_LIBELLE_DOCUMENT = N'Journal de caisse de la période du 05/02/2024 au 07/02/2024') AS d => TOTAL = SELECT
+controle: SELECT CAST(SUM(ENCMT_MONTANT) AS varchar(20)) FROM v2.ENCAISSEMENT WHERE ENCMT_ID_ENCMT IN (2300202, 2300203, 2300210, 2300211) => 1276.95
+controle: SELECT COUNT(*) FROM soc.Journal WHERE Ecran = 'Journal de caisse' AND Famille = 'demande' AND Objet = N'l''édition « Journal de caisse de la période du 05/02/2024 au 07/02/2024 »' AND Verbe = 'a cree' => 1
+---
+# Le tri saisi « Par date » : l'état Crystal du libellé, Expresso_JCaisseParDate.rpt (la V2 l'envoie au mode 3, ParMontant : écart de la
+# fiche, proc_jcaisse.md:291, que la V3 ne reprend pas, comme son lecteur) ; la période saisie fait le titre (un encaissement, 1 234,56).
+geste: Agir Éditer
+ids: 2300210
+valeur: Tri = Par date
+valeur: Période = 2024-02-01|2024-02-29
+resultat: fait
+message: Journal de caisse de la période du 01/02/2024 au 29/02/2024 : 1 encaissement, 1 234,56 €, placé dans la file des éditions.
+controle: SELECT CONCAT(x.value('(/PARAMETRES/@NOMRPT)[1]', 'varchar(60)'), '|', x.value('(/PARAMETRES/@NB_LIGNES)[1]', 'int'), '|', x.value('(/PARAMETRES/@TOTAL)[1]', 'varchar(20)')) FROM (SELECT CAST(DMNED_PARAMETRE_GENERATION AS xml) AS x FROM v2.DEMANDE_EDITION WHERE DMNED_LIBELLE_DOCUMENT = N'Journal de caisse de la période du 01/02/2024 au 29/02/2024') AS d => Expresso_JCaisseParDate.rpt|1|1234.56

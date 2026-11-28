@@ -1,0 +1,42 @@
+# Gestes de « Journal de vente » (EcrivainJournalVente.cs), lot 4 du plan-f4fb097f, sur le jeu PROC_JVENTE.sql.
+# « Éditer » = EDITER de RIG v2 (proc_jvente.md, Détail OPE) : RIG v2 affiche l'état Crystal ; RIG v3 le pose dans la file des éditions
+# (EditionsEtatsV2.cs, décision du chef du plan). Les articles ne changent pas : aucun « lignes: » ; ce qui se relit est la demande
+# d'édition, et ses totaux HT et TTC comparés à un SELECT sur les articles.
+#
+# Refus 1 : l'agent n'a pas la fonction JVENTE (FORM_ACCUEIL.cs:1624) -- jumeau accepte : le bloc 4, l'agent du banc (rôle BANC).
+agent: banc.l4.sansdroit
+geste: Agir Éditer
+ids: 2300410,2300411,2300412
+resultat: refuse
+message: Vous n'êtes pas autorisé à exécuter le processus 'JVENTE'.
+---
+# Refus 2 : aucun article à éditer (JournalVente.cs:578-579) -- jumeau accepte : le bloc 4, trois articles.
+geste: Agir Éditer
+ids:
+resultat: refuse
+message: Aucun élément trouvé
+---
+# Refus 3 : le client de 2300405 n'est pas dans la base (INNER JOIN CLIENT, JournalVente.cs:284) -- jumeau accepte : 2300410 (bloc 4).
+geste: Agir Éditer
+ids: 2300410,2300405
+resultat: refuse
+message: Un article n'est plus au journal de vente (supprimé, ou son client n'est pas dans la base) : relisez le journal.
+---
+# Les articles de mars 2025 (PROC_JVENTE.recherches) : 2300410 facturé le 10/03 (1 x 32,50 HT, 39,00 TTC), 2300411 facturé le 11/03
+# (1 x 14,30, 14,30 TTC), 2300412 tarifé le 10/03 (2 x 0,78 = 1,56 HT, 1,87 TTC) : la période est la leur, à la date de la facture ou à
+# celle de l'article tarifé (10 au 11/03/2025). Totaux : 48,36 HT et 55,17 TTC, ceux d'un SELECT sur ces articles.
+geste: Agir Éditer
+ids: 2300410,2300411,2300412
+resultat: fait
+message: Journal de vente de la période du 10/03/2025 au 11/03/2025 - Détaillé : 3 articles, 48,36 € HT, 55,17 € TTC, placé dans la file des éditions.
+controle: SELECT COUNT(*) FROM v2.DEMANDE_EDITION WHERE DMNED_LIBELLE_DOCUMENT = N'Journal de vente de la période du 10/03/2025 au 11/03/2025 - Détaillé' AND DMNED_CODE_PROCESSUS = 'JVENTE' AND DMNED_TYPE_GENERATION = 'FUSION_CRYSTAL' AND DMNED_PHASE_TRAITEMENT = 'C' AND DMNED_ID_DMND IS NULL => 1
+controle: SELECT CONCAT(x.value('(/PARAMETRES/@NOMRPT)[1]', 'varchar(60)'), '|', x.value('(/PARAMETRES/@NB_LIGNES)[1]', 'int'), '|', x.value('(/PARAMETRES/@TOTAL_HT)[1]', 'varchar(20)'), '|', x.value('(/PARAMETRES/@TOTAL)[1]', 'varchar(20)')) FROM (SELECT CAST(DMNED_PARAMETRE_GENERATION AS xml) AS x FROM v2.DEMANDE_EDITION WHERE DMNED_LIBELLE_DOCUMENT = N'Journal de vente de la période du 10/03/2025 au 11/03/2025 - Détaillé') AS d => Expresso_JVente.rpt|3|48.36|55.17
+controle: SELECT CASE WHEN x.value('(/PARAMETRES/@TOTAL)[1]', 'decimal(19,2)') = s.Ttc AND x.value('(/PARAMETRES/@TOTAL_HT)[1]', 'decimal(19,2)') = s.Ht THEN 'TOTAUX = SELECT' ELSE 'TOTAUX <> SELECT' END FROM (SELECT CAST(DMNED_PARAMETRE_GENERATION AS xml) AS x FROM v2.DEMANDE_EDITION WHERE DMNED_LIBELLE_DOCUMENT = N'Journal de vente de la période du 10/03/2025 au 11/03/2025 - Détaillé') AS d CROSS JOIN (SELECT SUM(ARTUT_MONTANT_TTC) AS Ttc, SUM(ARTUT_PRIX_UHT * ARTUT_QUANTITE) AS Ht FROM v2.ARTICLE_UTILISE WHERE ARTUT_ID_ARTUT IN (2300410, 2300411, 2300412)) AS s => TOTAUX = SELECT
+controle: SELECT COUNT(*) FROM soc.Journal WHERE Ecran = 'Journal de vente' AND Famille = 'demande' AND Objet = N'l''édition « Journal de vente de la période du 10/03/2025 au 11/03/2025 - Détaillé »' AND Verbe = 'a cree' => 1
+---
+# Un seul jour : le titre n'a pas de « au » (JournalVente.cs:513, la fin n'est écrite que si elle diffère du début).
+geste: Agir Éditer
+ids: 2300411
+resultat: fait
+message: Journal de vente de la période du 11/03/2025 - Détaillé : 1 article, 14,30 € HT, 14,30 € TTC, placé dans la file des éditions.
+controle: SELECT COUNT(*) FROM v2.DEMANDE_EDITION WHERE DMNED_LIBELLE_DOCUMENT = N'Journal de vente de la période du 11/03/2025 - Détaillé' AND DMNED_CODE_PROCESSUS = 'JVENTE' => 1
