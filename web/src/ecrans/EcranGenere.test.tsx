@@ -311,6 +311,47 @@ describe('Forme Consultation : une fiche en lecture seule', () => {
     fireEvent.click(bouton('Exporter'))
     expect(annonce()).toBe('Démonstration : rien n’est enregistré — « Exporter » : « Bêta SAS ».')
   })
+
+  // Ecart releve a la reception du lot 2 (plan-f4fb097f) : « Exporter » des Listes Excel posait une demande jamais executee, aucun
+  // fichier. RIG v2 ECRIT le fichier sur le poste (OPE_LISTE.Exporter, OPE_LISTE.cs:125-136 : « exportListeExcel_<type>.sql ») : le
+  // geste rend ce fichier (ResultatGeste.Fichier), que l'ecran enregistre sur le poste, au nom et au texte exacts.
+  // Entree qui le fait echouer si la correction est fausse : un resultat fait AVEC un fichier (sans telechargement, aucun clic).
+  // fix-ok: pas un correctif a l'aveugle -- trois tests NEUFS ou recrits pour le lot 16 (deux ecarts mesures a la reception des lots 2 et
+  // 4), chacun vu rouge sur le code d'avant (vitest : « Chèque : Journal… Espèces : Journal… », puis « expected [] » sans telechargement).
+  it('un geste fait qui rend un fichier l’enregistre sur le poste (nom et texte exacts) ; sans fichier, rien n’est telecharge', async () => {
+    const d = descripteur({ forme: 'Consultation', gestes: ['Exporter'] })
+    const lue: LigneEcranVue = { nom: 'Liste des instances par évènement futur', precisions: '', groupe: 'Instances', etat: 'Validee', faites: [], id: '3200101' }
+    const script = "IF NOT EXISTS(SELECT PRMLS_VALEUR FROM PARAMETRAGE_LISTE WHERE PRMLS_VALEUR = 'IEF') \r\nINSERT INTO PARAMETRAGE_LISTE (PRMLS_VALEUR) VALUES ('IEF')\r\n"
+    let avecFichier = true
+    const pont = installerFauxPont({
+      'EcranGenere.Lignes': () => ({ mode: 'base', message: null, greffe: '3801', lignes: [lue], exemples: [] }),
+      'EcranGenere.Geste': () => ({ fait: true, message: avecFichier ? 'Fichier exporté : exportListeExcel_IEF.sql.' : 'Fait, sans fichier.',
+                                    sansEcrivain: false, ids: ['9'], fichier: avecFichier ? { nom: 'exportListeExcel_IEF.sql', contenu: script } : null }),
+    })
+    const recu: { blob?: Blob } = {}
+    const creer = vi.fn((b: Blob) => { recu.blob = b; return 'blob:export' })
+    Object.assign(URL, { createObjectURL: creer, revokeObjectURL: vi.fn() })
+    const noms: string[] = []
+    const clic = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(function (this: HTMLAnchorElement) { noms.push(this.download) })
+    try {
+      const { container } = render(<EcranGenere descripteur={d} />)
+      const o = outils(container)
+      await waitFor(() => expect(o.noms()).toEqual(['Liste des instances par évènement futur']))
+      fireEvent.click(o.ligne('Liste des instances par évènement futur'))
+      fireEvent.click(o.bouton('Exporter'))
+      await waitFor(() => expect(o.annonce()).toBe('Fichier exporté : exportListeExcel_IEF.sql.'))
+      expect(noms).toEqual(['exportListeExcel_IEF.sql'])
+      expect(await recu.blob!.text()).toBe(script)
+      avecFichier = false
+      fireEvent.click(o.bouton('Exporter'))
+      await waitFor(() => expect(o.annonce()).toBe('Fait, sans fichier.'))
+      expect(pont.appels.mock.calls.filter((c) => c[0] === 'EcranGenere.Geste')).toHaveLength(2)
+      expect(creer).toHaveBeenCalledTimes(1)
+      expect(noms).toEqual(['exportListeExcel_IEF.sql'])
+    } finally {
+      clic.mockRestore()
+    }
+  })
 })
 
 describe('Forme Saisie : creer en etapes, aux vrais champs', () => {
@@ -920,25 +961,57 @@ describe('socle fonctionnel : recherche et fiche sur Referentiel, Audience et Op
   const filtreTexte = (container: HTMLElement) => container.querySelector('input.rig-lm-cherche__saisie') as HTMLInputElement
 
   // Lot 6 du plan « RIG v3 100 % fonctionnel » : le geste d'un Etat part a l'ecrivain (l'impression des registres judiciaires),
-  // un envoi par groupe, avec les lignes affichees du groupe.
+  // avec les lignes affichees. Lot 16 du plan-f4fb097f (28/11/2026) : UN envoi pour toute la procedure, pas un par groupe -- RIG v2
+  // edite le resultat en un clic (VALIDER des registres : une demande par registre dans la meme validation, OPE_REGISTRE_ABSTRACT.cs:
+  // 113-126 ; EDITER du journal de caisse : un seul etat trie par mode, OPE_METHODETRI.Editer, OPE_METHODETRI.cs:83-109).
   describe('Etat', () => {
     const registres = descripteur({
       forme: 'Etat', titre: 'Registres', gestes: ['Impression'], groupes: ['Répertoire général', 'Injonctions de payer'],
       colonnes: [champ('Rôle'), champ("Date d'acte", 'Date')],
     })
     const ligne = (id: string, groupe: string): LigneEcranVue => ({ nom: `Rôle ${id}`, precisions: '', groupe, etat: 'Validee', faites: [], id })
-    it("lu en base, « Impression » envoie les lignes affichees a l'ecrivain, un envoi par registre, et dit ce qui est ecrit", async () => {
+    it("lu en base, « Impression » envoie toutes les lignes affichees a l'ecrivain en un geste, et dit ce qui est ecrit", async () => {
       const pont = installerFauxPont({
         'EcranGenere.Lignes': () => base([ligne('G-1', 'Répertoire général'), ligne('G-2', 'Répertoire général'), ligne('I-7', 'Injonctions de payer')]),
-        'EcranGenere.Geste': (_c: unknown, groupe: unknown) => ({ fait: true, message: `${String(groupe)} : placé dans la file des éditions.`, sansEcrivain: false, ids: ['9'] }),
+        'EcranGenere.Geste': () => ({ fait: true, message: '2 registres placés dans la file des éditions.', sansEcrivain: false, ids: ['9', '10'] }),
       })
       const { container } = render(<EcranGenere descripteur={registres} />)
       const o = outils(container)
       await waitFor(() => expect(container.querySelectorAll('tbody tr')).toHaveLength(3))
       fireEvent.click(o.bouton('Impression'))
-      await waitFor(() => expect(o.annonce()).toBe('Répertoire général : Répertoire général : placé dans la file des éditions. Injonctions de payer : Injonctions de payer : placé dans la file des éditions.'))
-      expect(pont.appels).toHaveBeenCalledWith('EcranGenere.Geste', 'ECRAN_TEST', 'Répertoire général', 'Agir', 'Impression', ['G-1', 'G-2'], {})
-      expect(pont.appels).toHaveBeenCalledWith('EcranGenere.Geste', 'ECRAN_TEST', 'Injonctions de payer', 'Agir', 'Impression', ['I-7'], {})
+      await waitFor(() => expect(o.annonce()).toBe('2 registres placés dans la file des éditions.'))
+      expect(pont.appels.mock.calls.filter((c) => c[0] === 'EcranGenere.Geste')).toEqual(
+        [['EcranGenere.Geste', 'ECRAN_TEST', 'Répertoire général', 'Agir', 'Impression', ['G-1', 'G-2', 'I-7'], {}]])
+    })
+
+    // Ecart releve a la reception du lot 4 (plan-f4fb097f) : en « Tout », le journal de caisse posait DEUX editions au meme titre
+    // (« Chèque : Journal de caisse de la période… » puis « Espèces : … »), une par mode de paiement. RIG v2 n'en pose qu'une, au
+    // titre de la periode SAISIE (JournalCaisse.cs:186, dateDebut/dateFin d'OPE_CRITERESGENERAUX) : un geste, toutes les lignes
+    // affichees, et les parametres saisis (la periode, le tri) que l'ecrivain lit (EcrivainJournalCaisse.cs).
+    // Entree qui le fait echouer si la correction est fausse : deux groupes affiches a la fois (Espèces ET Chèque).
+    it('journal de caisse en « Tout » : un seul « Éditer », toutes les lignes affichees, la periode et le tri saisis', async () => {
+      const journal = descripteur({
+        forme: 'Etat', titre: 'Journal de caisse', gestes: ['Éditer'], groupes: ['Espèces', 'Chèque'],
+        colonnes: [champ('Encaissement'), champ('Date', 'Date'), champ('Montant', 'Montant')],
+        parametres: [champ('Période', 'Periode'), champ('Tri', 'Liste', ['Par mode de paiement', 'Par date'])],
+      })
+      const encaissement = (id: string, groupe: string, montant: string): LigneEcranVue =>
+        ({ nom: `Encaissement ${id}`, precisions: '', groupe, etat: 'Validee', faites: [], id, valeurs: [`Encaissement ${id}`, '2002-10-29', montant] })
+      const titre = 'Journal de caisse de la période du 29/10/2002 au 31/10/2002 : 3 encaissements, 60,00 €, placé dans la file des éditions.'
+      const pont = installerFauxPont({
+        'EcranGenere.Lignes': () => base([encaissement('152', 'Chèque', '20.00'), encaissement('7', 'Espèces', '10.00'), encaissement('153', 'Chèque', '30.00')]),
+        'EcranGenere.Geste': () => ({ fait: true, message: titre, sansEcrivain: false, ids: ['4445300'] }),
+      })
+      const { container } = render(<EcranGenere descripteur={journal} />)
+      const o = outils(container)
+      await waitFor(() => expect(container.querySelectorAll('tbody tr')).toHaveLength(3))
+      fireEvent.change(container.querySelector('aside input[aria-label="Période : du"]')!, { target: { value: '2002-10-29' } })
+      fireEvent.change(container.querySelector('aside input[aria-label="Période : au"]')!, { target: { value: '2002-10-31' } })
+      fireEvent.change(container.querySelector('aside select')!, { target: { value: 'Par date' } })
+      fireEvent.click(o.bouton('Éditer'))
+      await waitFor(() => expect(o.annonce()).toBe(titre))
+      expect(pont.appels.mock.calls.filter((c) => c[0] === 'EcranGenere.Geste')).toEqual(
+        [['EcranGenere.Geste', 'ECRAN_TEST', 'Chèque', 'Agir', 'Éditer', ['152', '7', '153'], { 'Période': '2002-10-29|2002-10-31', Tri: 'Par date' }]])
     })
 
     // Lot 13 du plan « RIG v3 100 % fonctionnel » : un geste ECRIT sur un Etat (« Lettrer » du lettrage) change les chiffres de la

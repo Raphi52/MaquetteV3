@@ -115,6 +115,11 @@ export function EcranDepotsJud({ ouvrirDossier, dossier = null }: ProprietesEcra
   const [relecture, setRelecture] = useState(0)
   // null tant que le pont n'a pas repondu (ou une fois la date effacee).
   const [dateEvenement, setDateEvenement] = useState<string | null>(null)
+  // La case « Editer un certificat de dépôt » de l'operation du depot (OPE_DEPOT.Designer.cs:109), decochee par defaut
+  // (OPE_EVENEMENT.Designer.cs:571) : cochee, le serveur pose le certificat dans la file des editions (lot 16 du plan-f4fb097f).
+  // fix-ok: pas un correctif a l'aveugle -- ecart mesure a la reception du lot 8 (capture lot8\depotjud-banc-2-depose-relu.png : « le
+  // certificat de dépôt et les éditions ne sont pas repris ») ; l'ecran n'avait pas la case de RIG v2, ajoutee ici (vitest rouge puis vert).
+  const [certificat, setCertificat] = useState(false)
   // La ligne depliee par son chevron (une a la fois).
   const [ouverte, setOuverte] = useState<string | null>(null)
   // null tant que le pont n'a pas repondu : aucune ligne, jamais la demonstration a la place de la base.
@@ -146,7 +151,7 @@ export function EcranDepotsJud({ ouvrirDossier, dossier = null }: ProprietesEcra
   async function deposer(role: string) {
     setEnvoi(true)
     try {
-      const r = await appeler<ResultatGesteVue>('EcranDepotsJud.Deposer', role, evenement, dateEvenement ?? '')
+      const r = await appeler<ResultatGesteVue>('EcranDepotsJud.Deposer', role, evenement, dateEvenement ?? '', certificat)
       setAnnonce(r.fait || r.sansEcrivain ? r.message : { refus: r.message })
       if (r.fait) setRelecture((n) => n + 1)
     } catch {
@@ -219,6 +224,10 @@ export function EcranDepotsJud({ ouvrirDossier, dossier = null }: ProprietesEcra
               <span className="rig-saisie-champ__libelle">Date de l'evenement</span>
               <input className="rig-saisie-champ__saisie" type="date" value={dateEvenement ?? ''}
                      onChange={(e) => setDateEvenement(e.target.value || null)} />
+            </label>
+            <label className="rig-tcw__case">
+              <input type="checkbox" checked={certificat} onChange={(e) => setCertificat(e.currentTarget.checked)} />
+              <span>Editer un certificat de dépôt</span>
             </label>
             {ouverte !== null && motifCodes !== null && <p className="rig-eg-note" role="note">{motifCodes}</p>}
             {ouverte !== null && (

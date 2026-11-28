@@ -97,11 +97,15 @@ describe('EcranDepotsJud', () => {
     const lectures = pont.appels.mock.calls.filter((c) => c[0] === 'EcranDepotsJud.Vue').length
     fireEvent.click(screen.getByRole('button', { name: 'Enregistrer le depot sur 2026J00121' }))
     expect((await screen.findByRole('status')).textContent).toBe('Dépôt DP3800001 enregistré sur l\'instance 2026J00121.')
-    expect(deposer).toHaveBeenCalledWith('2026J00121', 'DJ38', '2026-09-09')
+    // La case « Editer un certificat de dépôt » de RIG v2 (OPE_DEPOT.Designer.cs:109) est decochee par defaut (OPE_EVENEMENT.Designer.cs:571).
+    expect((screen.getByLabelText('Editer un certificat de dépôt') as HTMLInputElement).checked).toBe(false)
+    expect(deposer).toHaveBeenCalledWith('2026J00121', 'DJ38', '2026-09-09', false)
     await vi.waitFor(() => expect(pont.appels.mock.calls.filter((c) => c[0] === 'EcranDepotsJud.Vue').length).toBe(lectures + 1))
     fireEvent.change(screen.getByLabelText('Evenement survenu'), { target: { value: 'DJ39' } })
+    fireEvent.click(screen.getByLabelText('Editer un certificat de dépôt'))
     fireEvent.click(screen.getByRole('button', { name: 'Enregistrer le depot sur 2026J00121' }))
     expect((await screen.findByRole('alert')).textContent).toContain('n\'est pas un événement avec dépôt proposé')
+    expect(deposer).toHaveBeenLastCalledWith('2026J00121', 'DJ39', '2026-09-09', true)
     expect(pont.appels.mock.calls.filter((c) => c[0] === 'EcranDepotsJud.Vue').length).toBe(lectures + 1)
   })
 

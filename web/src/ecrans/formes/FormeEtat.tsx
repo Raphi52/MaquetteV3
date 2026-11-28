@@ -1,9 +1,13 @@
 // FORME « ETAT » : un journal, un livre, une statistique, un export. Les PARAMETRES de la fiche RIG v2 (la periode...)
 // dans le panneau de gauche, le TABLEAU de resultats aux colonnes de la fiche, et ses TOTAUX au pied : chaque colonne
 // montant ou nombre est totalisee, par groupe (le mode de paiement d'un journal de caisse) puis en tout. Les gestes de la
-// fiche (Editer, Generer, Exporter...) partent a l'ecrivain de la procedure (type Agir, son nom, les lignes AFFICHEES, un envoi
-// par groupe : un registre, un mode de paiement) quand les lignes viennent de la base ; sans ecrivain, ou sur des exemples, ils
-// ne produisent rien et le disent (plan « RIG v3 100 % fonctionnel », lot 6 : l'impression des registres judiciaires).
+// fiche (Editer, Generer, Exporter...) partent a l'ecrivain de la procedure (type Agir, son nom, les lignes AFFICHEES de la base,
+// et les PARAMETRES saisis : la periode du titre, le tri) quand les lignes viennent de la base ; sans ecrivain, ou sur des exemples,
+// ils ne produisent rien et le disent (plan « RIG v3 100 % fonctionnel », lot 6 : l'impression des registres judiciaires).
+// UN envoi par procedure, pas un par groupe (lot 16 du plan-f4fb097f, 28/11/2026) : RIG v2 edite le resultat en un clic -- un
+// journal de caisse trie par mode de paiement (OPE_METHODETRI.Editer, OPE_METHODETRI.cs:83-109), une demande par registre dans la
+// MEME validation (OPE_REGISTRE_ABSTRACT.cs:113-126, que l'ecrivain fait lui-meme). Seul un ecran reuni envoie un geste par
+// procedure membre (useGesteEnLot).
 // Une liste COUPEE au plafond du serveur (vue.plafonnees) n'est pas le registre : RIG v2 imprime le registre entier avec le
 // total de sa requete (OPE_RESULTATS.cs:35-39, :65-73 ; OPE_REGISTRE_GENERAL.cs:221) -- le geste est refuse, rien ne part.
 // LA BASE (lot 6) : quand le lecteur sait chercher (vue.recherche), le texte et les PARAMETRES (au libelle du descripteur)
@@ -18,8 +22,8 @@ import { dateCourte } from '../../criteres'
 import type { DescripteurEcranVue } from '../../plan/types'
 import { CasesSansValeurs, cellules, lisible, sansValeurs } from './FormeReferentiel'
 import {
-  Annonce, ChampSaisie, GroupesVides, NoteRecherche, Provenance, enExemple, Exemple, gestesDe, nombreDe, refus, synthese,
-  useAnnonce, useGesteEnLot, useLignes, useRecherche, type Saisies,
+  Annonce, ChampSaisie, GroupesVides, NoteRecherche, Provenance, deLaBase, enExemple, Exemple, gestesDe, nombreDe, refus, synthese,
+  useAnnonce, useGeste, useGesteEnLot, useLignes, useRecherche, type Saisies,
 } from './commun'
 
 const Tous = '\u0000tous'
@@ -31,6 +35,7 @@ export function FormeEtat({ d }: { d: DescripteurEcranVue }) {
   const [texte, poserTexte] = useState('')
   const [groupe, poserGroupe] = useState(Tous)
   const [annonce, annoncer] = useAnnonce()
+  const jouer = useGeste(d, vue, annoncer)
   const enLot = useGesteEnLot(d, vue, annoncer)
 
   // La periode (premier parametre de type Periode) borne la premiere colonne date du tableau.
@@ -55,6 +60,19 @@ export function FormeEtat({ d }: { d: DescripteurEcranVue }) {
   }
   const ecrire = (type: string, n: number | null) => (n === null ? '—' : type === 'Montant' ? montant(n) : n.toLocaleString('fr-FR'))
   const groupesVus = d.groupes.filter((g) => visibles.some((l) => l.groupe === g))
+  // Le geste g sur les lignes affichees (en tete) ; ecrit, l'Etat se relit (lot 13 : « Lettrer » change les sommes du lettrage).
+  // fix-ok: cause mesuree (vitest EcranGenere.test.tsx « journal de caisse en Tout », 28/11/2026 : rouge « Chèque : Journal… Espèces :
+  // Journal… ») -- l'Etat passait par useGesteEnLot, qui fait un envoi par GROUPE, et n'envoyait aucun parametre ({}) : deux editions
+  // au meme titre, sur les dates des lignes et non sur la periode saisie.
+  const agir = (g: string) => {
+    const demonstration = (n: number) => refus(g, `: aucun état n’est produit (${n} ligne${n > 1 ? 's' : ''} à l’écran)`)
+    if (d.membres.length > 0) return void enLot('Agir', g, visibles, parametres, demonstration, lues.relire)
+    // Les lignes d'exemple (un groupe sans lecteur) ne partent pas ; sans ligne de la base, la demonstration (useGeste).
+    const lignesBase = visibles.filter((l) => deLaBase(vue, l))
+    const visees = lignesBase.length > 0 ? lignesBase : visibles
+    void jouer({ type: 'Agir', nom: g, groupe: visees[0]?.groupe ?? d.titre, ids: visees.map((l) => l.id), valeurs: parametres },
+      demonstration(visibles.length), lues.relire)
+  }
 
   return (
     <div className="rig-proc__corps rig-eg" data-forme="Etat">
@@ -83,9 +101,7 @@ export function FormeEtat({ d }: { d: DescripteurEcranVue }) {
                                         + (enBase
                                           ? 'resserrez les paramètres, qui cherchent dans la base, pour qu’elles soient toutes à l’écran : rien n’est enregistré.'
                                           : 'RIG v3 ne lit que celles-ci, la période et le filtre ne portent que sur elles : rien n’est enregistré.') })
-                      // Ecrit, l'Etat se relit (lot 13 : « Lettrer » change les sommes du lettrage), comme une File.
-                      : void enLot('Agir', g, visibles, {},
-                          (n) => refus(g, `: aucun état n’est produit (${n} ligne${n > 1 ? 's' : ''} à l’écran)`), lues.relire))}>{g}</button>
+                      : agir(g))}>{g}</button>
           ))}
         </VuesListe>
         <Annonce texte={annonce} />

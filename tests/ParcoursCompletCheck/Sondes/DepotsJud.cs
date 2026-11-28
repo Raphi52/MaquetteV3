@@ -86,6 +86,35 @@ public sealed class SondeDepotsJud : ISondeEcran
         INSERT INTO v2.INSTANCE (INSTN_ID_INSTN, INSTN_NUM_ROLE, INSTN_NOM_COURANT, INSTN_ID_AFFRE, INSTN_CODE_AFFAIRE, INSTN_TYPE_INSTANCE, INSTN_DATE_ENROLEMENT)
             VALUES (3800501, ''2026R38005'', ''SONDE DEPOT JUDICIAIRE'', 3800511, ''OP38'', ''RP'', @aujourdhui);
         ', N'@aujourdhui datetime', @aujourdhui;
+        -- Lot 16 (le certificat de depot et les editions de l'evenement, EcritureDepotsJud.cs) : ce que les editions lisent et ecrivent,
+        -- aux types de RIG_DEV (INFORMATION_SCHEMA de SQL-DEV\DEV, lu le 28/11/2026), et le parametre DEPOT_INS de RIG_DEV (sa liste).
+        IF OBJECT_ID(N'v2.CEP_EDITION') IS NULL
+            CREATE TABLE v2.CEP_EDITION (CEPED_ID_CEPED int NOT NULL PRIMARY KEY, CEPED_CODE_EVE_PRO varchar(10) NOT NULL, CEPED_TYPE_EP varchar(1) NOT NULL,
+                CEPED_CODE_EDITION varchar(32) NOT NULL, CEPED_DESTI_MODE_ENVOI varchar(max) NULL);
+        IF COL_LENGTH('v2.CEP_EDITION', 'CEPED_CONDITION') IS NULL ALTER TABLE v2.CEP_EDITION ADD CEPED_CONDITION varchar(250) NULL;
+        IF COL_LENGTH('v2.CEP_EDITION', 'CEPED_AUTRE_PARAMETRE') IS NULL ALTER TABLE v2.CEP_EDITION ADD CEPED_AUTRE_PARAMETRE varchar(100) NULL;
+        IF OBJECT_ID(N'v2.DESTINATAIRE_INSTITUTIONNEL') IS NULL
+            CREATE TABLE v2.DESTINATAIRE_INSTITUTIONNEL (DTINS_CODE varchar(10) NOT NULL PRIMARY KEY, DTINS_LIBELLE varchar(100) NOT NULL,
+                DTINS_BLOC_ADRESSE varchar(150) NULL, DTINS_TYPE varchar(10) NOT NULL, DTINS_ADRESSE_MAIL varchar(1000) NULL, DTINS_NOM_COFFRE varchar(100) NULL,
+                DTINS_DATE_DEMARRAGE_COFFRE datetime NULL, DTINS_ACTIF bit NOT NULL);
+        IF OBJECT_ID(N'v2.PARAMETRE_EDITION') IS NULL
+            CREATE TABLE v2.PARAMETRE_EDITION (PRMED_CODE varchar(40) NOT NULL PRIMARY KEY, PRMED_LIBELLE varchar(100) NOT NULL,
+                PRMED_LISTE varchar(4000) NOT NULL DEFAULT '', PRMED_TYPE_GENERATION varchar(15) NULL, PRMED_CODE_MAQUETTE varchar(40) NULL);
+        IF COL_LENGTH('v2.PARAMETRE_EDITION', 'PRMED_CODE_DOCUMENT') IS NULL ALTER TABLE v2.PARAMETRE_EDITION ADD PRMED_CODE_DOCUMENT varchar(20) NULL;
+        IF COL_LENGTH('v2.PARAMETRE_EDITION', 'PRMED_IMPRESSION') IS NULL ALTER TABLE v2.PARAMETRE_EDITION ADD PRMED_IMPRESSION bit NOT NULL DEFAULT (0);
+        IF COL_LENGTH('v2.PARAMETRE_EDITION', 'PRMED_TYPE_GENERATION') IS NULL ALTER TABLE v2.PARAMETRE_EDITION ADD PRMED_TYPE_GENERATION varchar(15) NULL;
+        IF COL_LENGTH('v2.PARAMETRE_EDITION', 'PRMED_CODE_MAQUETTE') IS NULL ALTER TABLE v2.PARAMETRE_EDITION ADD PRMED_CODE_MAQUETTE varchar(40) NULL;
+        IF COL_LENGTH('v2.DEMANDE_EDITION', 'DMNED_CODE_ENTITE_SOURCE') IS NULL ALTER TABLE v2.DEMANDE_EDITION ADD DMNED_CODE_ENTITE_SOURCE varchar(16) NULL;
+        IF COL_LENGTH('v2.DEMANDE_EDITION', 'DMNED_VALEUR_ID_SOURCE') IS NULL ALTER TABLE v2.DEMANDE_EDITION ADD DMNED_VALEUR_ID_SOURCE varchar(40) NULL;
+        IF COL_LENGTH('v2.DEMANDE_EDITION', 'DMNED_ENVOI_AU_COFFRE') IS NULL ALTER TABLE v2.DEMANDE_EDITION ADD DMNED_ENVOI_AU_COFFRE bit NULL DEFAULT (0);
+        IF COL_LENGTH('v2.DEMANDE_EDITION', 'DMNED_PARAMETRE_GENERATION') IS NULL ALTER TABLE v2.DEMANDE_EDITION ADD DMNED_PARAMETRE_GENERATION varchar(max) NULL;
+        IF COL_LENGTH('v2.INSTANCE', 'INSTN_ID_PREVE') IS NULL ALTER TABLE v2.INSTANCE ADD INSTN_ID_PREVE int NULL;
+        EXEC sp_executesql N'
+        IF NOT EXISTS (SELECT 1 FROM v2.PARAMETRE_EDITION WHERE PRMED_CODE = ''DEPOT_INS'')
+            INSERT INTO v2.PARAMETRE_EDITION (PRMED_CODE, PRMED_LIBELLE, PRMED_LISTE, PRMED_TYPE_GENERATION, PRMED_CODE_MAQUETTE)
+            VALUES (''DEPOT_INS'', ''Certificat de dépot INS'', ''<PARAMETRES CODE_ENTITE_SOURCE="DEPOT_PC" CODE_MAQUETTE="3801_DEPOT_INS" CODE_PROCESSUS="EDIT_DEPOT" IMPRESSION="1" LIBELLE_DOCUMENT="Certificat de dépot INS" TYPE_GENERATION="FUSION_RIG" />'',
+                    ''FUSION_RIG'', ''3801_DEPOT_INS'');
+        ';
         """;
 
     public async Task<PreuveSonde> GesteAsync(ContexteSonde c)
@@ -94,7 +123,9 @@ public sealed class SondeDepotsJud : ISondeEcran
         var codes = await EcranDepotsJud.CodesAsync(c.Client, c.Greffe, Role);
         if (codes.Mode != "serveur" || codes.Codes.All(x => x.Code != CodeEvenement))
             return new(false, false, $"Les codes de l'instance {Role} : {codes.Mode} « {codes.Message} », {codes.Codes.Length} code(s), {CodeEvenement} absent");
-        var r = await EcranDepotsJud.EnregistrerAsync(c.Client, c.Greffe, Role, CodeEvenement, date);
+        // Lot 16 : « Editer un certificat de dépôt » coche (la case de RIG v2, OPE_DEPOT.Designer.cs:109) -- le certificat DEPOT_INS est
+        // pose dans la file des editions, rattache a la demande DEPOTJUD, source DEPOT_PC = le numero source du depot, au coffre.
+        var r = await EcranDepotsJud.EnregistrerAsync(c.Client, c.Greffe, Role, CodeEvenement, date, certificat: true);
         if (!r.Fait) return new(false, false, $"Déposer sur {Role} : {(r.SansEcrivain ? "démonstration" : "refusé")} « {r.Message} »");
         var vue = await EcranDepotsJud.VueAsync(c.Client, c.Greffe);
         var ligne = vue.Lignes.FirstOrDefault(l => l.Numero == Role);
@@ -103,9 +134,19 @@ public sealed class SondeDepotsJud : ISondeEcran
             SELECT TOP (1) d.DPTPC_NUM_DEPOT FROM v2.DEPOT_PC AS d JOIN v2.EVENEMENT_PROCEDURE AS e ON e.EVNPR_ID_EVNPR = d.DPTPC_ID_EVNPR
             WHERE e.EVNPR_ID_INSTN = 3800501 AND e.EVNPR_CODE_EVE_PRO = 'DJ38' AND d.DPTPC_CATEGORIE_DEPOT = 'S38'
             """);
+        var certificat = await c.Valeur($"""
+            SELECT COUNT(*) FROM v2.DEMANDE_EDITION AS de JOIN v2.DEMANDE AS dm ON dm.DMND_ID_DMND = de.DMNED_ID_DMND
+            JOIN v2.DEPOT_PC AS d ON d.DPTPC_NUMERO_SOURCE = de.DMNED_VALEUR_ID_SOURCE
+            WHERE de.DMNED_LIBELLE_DOCUMENT = N'Certificat de dépôt - {depot.Replace("'", "''", StringComparison.Ordinal)}' AND dm.DMND_CODE_PROSS = 'DEPOTJUD'
+              AND de.DMNED_CODE_ENTITE_SOURCE = 'DEPOT_PC' AND de.DMNED_ENVOI_AU_COFFRE = 1 AND de.DMNED_PHASE_TRAITEMENT = 'C'
+              AND d.DPTPC_NUM_DEPOT = N'{depot.Replace("'", "''", StringComparison.Ordinal)}'
+              AND CAST(de.DMNED_PARAMETRE_GENERATION AS xml).value('(/PARAMETRES/@CODE_MAQUETTE)[1]', 'varchar(40)') = '3801_DEPOT_INS'
+              AND CAST(de.DMNED_PARAMETRE_GENERATION AS xml).exist('/PARAMETRES/@LISTE_ENTITE_DESTINATION') = 1
+            """);
         return vue.Mode == "serveur" && ligne?.DernierEvenement == attendu && depot.StartsWith("DP38", StringComparison.Ordinal) && r.Message.Contains(depot, StringComparison.Ordinal)
                && r.Message.Contains("sans facture", StringComparison.Ordinal)
-            ? new(true, true, $"Déposer fait (« {r.Message} »), relu par le pont : dernier événement « {ligne.DernierEvenement} », dépôt {depot}")
-            : new(true, false, $"Déposer rendu fait, mais relu {vue.Mode} « {ligne?.DernierEvenement ?? "instance absente"} » (attendu « {attendu} »), dépôt « {depot} »");
+               && r.Message.Contains($"« Certificat de dépôt - {depot} » placé dans la file des éditions", StringComparison.Ordinal) && certificat == "1"
+            ? new(true, true, $"Déposer fait (« {r.Message} »), relu par le pont : dernier événement « {ligne.DernierEvenement} », dépôt {depot}, certificat relu dans la file des éditions")
+            : new(true, false, $"Déposer rendu fait, mais relu {vue.Mode} « {ligne?.DernierEvenement ?? "instance absente"} » (attendu « {attendu} »), dépôt « {depot} », certificat dans la file : {certificat} (« {r.Message} »)");
     }
 }

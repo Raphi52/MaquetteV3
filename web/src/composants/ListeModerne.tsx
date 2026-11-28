@@ -538,7 +538,12 @@ export function texteCsv(entetes: readonly string[], lignes: ReadonlyArray<reado
 
 /** Telecharge la liste en CSV (BOM UTF-8 : Excel lit les accents). */
 export function exporterCsv(nomFichier: string, entetes: readonly string[], lignes: ReadonlyArray<readonly string[]>): void {
-  const blob = new Blob(['﻿' + texteCsv(entetes, lignes)], { type: 'text/csv;charset=utf-8' })
+  telechargerTexte(nomFichier, '﻿' + texteCsv(entetes, lignes), 'text/csv;charset=utf-8')
+}
+
+/** Enregistre <texte> sur le poste sous <nomFichier> (le telechargement de la fenetre) : un export de liste, un fichier qu'un geste rend. */
+export function telechargerTexte(nomFichier: string, texte: string, type = 'text/plain;charset=utf-8'): void {
+  const blob = new Blob([texte], { type })
   const url = URL.createObjectURL(blob)
   const lien = document.createElement('a')
   lien.href = url

@@ -1777,6 +1777,10 @@ await new BancLot15((sql, p) => Sql(sql, p), Exiger, greffe.Connexion, client, h
 // Apres Lot20.cs (COMMANDE_WEB) et les sections 1a-1b (DEMANDE, MODE_ARRIVEE, ARRIVEE) : ses lignes s'y ajoutent, lues par leur numero.
 await new BancParcoursLot7((sql, p) => Sql(sql, p), Exiger, greffe.Connexion, client, http, json, Greffe, jour).JouerAsync();
 
+// ============================================================ 26. PARCOURS COMPLET, LOT 16 : le certificat de depot (ParcoursLot16.cs)
+// Apres la section 4 (INSTANCE, CODE_AFFAIRE, CODE_EVE_PRO) et la section 25 (DEMANDE) : une instance JROP a elle, gardee pour la capture.
+await new BancParcoursLot16((sql, p) => Sql(sql, p), Exiger, greffe.Connexion, client, Greffe, jour).JouerAsync();
+
 // BASES GARDEES pour une preuve a l'ecran (meme regle que tests/EcransGeneresBaseCheck/Program.cs, lot 12) : avec RIGV3_BANC_GARDER =
 // <fichier>, le banc ecrit dans ce fichier sa base commune, son greffe et son agent, puis attend que ce fichier disparaisse. Un serveur
 // lance a part sur cette base commune (ConnectionStrings__RigV3) sert alors a l'application les lignes des sections ci-dessus (une

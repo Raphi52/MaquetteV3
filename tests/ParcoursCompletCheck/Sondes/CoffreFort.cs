@@ -53,6 +53,8 @@ public sealed class SondeCoffreFort : ISondeEcran
         IF OBJECT_ID('v2.VIDIGED_INDEX') IS NULL
             CREATE TABLE v2.VIDIGED_INDEX (VGIDX_ID_VGIDX int NOT NULL PRIMARY KEY, VGIDX_TYPE_ENTITE varchar(50) NULL, VGIDX_GUID_DOCUMENT uniqueidentifier NULL);
         IF COL_LENGTH('v2.VIDIGED_INDEX', 'VGIDX_ID_EVNPR') IS NULL ALTER TABLE v2.VIDIGED_INDEX ADD VGIDX_ID_EVNPR int NULL;
+        -- Lot 16 : le compte rendu de la transmission, dans la file des editions (EcritureCoffreFort.cs) -- type de RIG_DEV (varchar(max)).
+        IF COL_LENGTH('v2.DEMANDE_EDITION', 'DMNED_PARAMETRE_GENERATION') IS NULL ALTER TABLE v2.DEMANDE_EDITION ADD DMNED_PARAMETRE_GENERATION varchar(max) NULL;
         EXEC sp_executesql N'
         INSERT INTO v2.DEMAT_ETAT (R_DEMATETAT_VALEUR, R_DEMATETAT_LIBELLE_ECRAN, R_DEMATETAT_SYNONYME, R_DEMATETAT_UTILISABLE_SAISIE, R_DEMATETAT_DEVELOPPE_EDIT)
         SELECT e.v, e.l, e.v, 1, e.d FROM (VALUES
@@ -96,10 +98,19 @@ public sealed class SondeCoffreFort : ISondeEcran
         var relu = await Depot("4000001");
         var controle = await c.Valeur("SELECT CONCAT(CAST(CFEC_GUID_DOCUMENT AS varchar(40)), '|', CFEC_USER_TRAITEMENT_RIG) FROM v2.DEMAT_CFEC WHERE CFEC_ID_CFEC = 4000001");
         var aujourdhui = c.Jour.ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        // Lot 16 : le compte rendu Word de RIG v2 (OPE_TREEVIEW_RETRANSMETTRE.cs:544-549, :622), relu dans la file des editions.
+        var compteRendu = await c.Valeur("""
+            SELECT COUNT(*) FROM v2.DEMANDE_EDITION
+            WHERE DMNED_LIBELLE_DOCUMENT LIKE N'Transmission EP[_]DJ le % à %h%m%s par banc[_]ecrans' AND DMNED_PHASE_TRAITEMENT = 'C'
+              AND CAST(DMNED_PARAMETRE_GENERATION AS xml).value('(/PARAMETRES/@TITRE)[1]', 'nvarchar(200)') LIKE N'Transmission effectuée le % à % par banc[_]ecrans (1 dépôts)'
+              AND CAST(DMNED_PARAMETRE_GENERATION AS xml).value('(/PARAMETRES/@TABLEAU)[1]', 'nvarchar(max)') LIKE N'%NUMERO_ENTITE="2026J00401" TYPE_DOCUMENT="ORDO" DESTINATAIRE="MJ"%'
+            """);
         return relu is { Etat: "2 - Traité par le greffe" } && relu.TraitementRig == aujourdhui
                && controle.Equals($"{Nouveau}|banc_ecrans", StringComparison.OrdinalIgnoreCase)
+               && compteRendu == "1" && r.Message.Contains("Compte rendu « Transmission EP_DJ le ", StringComparison.Ordinal)
             ? new(true, true, $"Re-transmettre fait (« {r.Message} »), relu par le pont : « {relu.Etat} », traité le {relu.TraitementRig}, dernier document GED "
-                              + $"et agent relus en base ; refus « {attente.Message} » et « {sansDocument.Message} »")
-            : new(true, false, $"Re-transmettre rendu fait, mais relu « {relu?.Etat ?? "absent"} » traité le {relu?.TraitementRig ?? "?"}, en base « {controle} »");
+                              + $"et agent relus en base, compte rendu relu dans la file des éditions ; refus « {attente.Message} » et « {sansDocument.Message} »")
+            : new(true, false, $"Re-transmettre rendu fait, mais relu « {relu?.Etat ?? "absent"} » traité le {relu?.TraitementRig ?? "?"}, en base « {controle} », "
+                               + $"compte rendu dans la file : {compteRendu} (« {r.Message} »)");
     }
 }

@@ -22,8 +22,8 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 ///     (CheminRepertoireCommun\XPILOTAGE\…) : rien en base ; RIG v3 n'a pas ce dossier : refuse, dit.
 /// LA V3 : la demande XPILOTAGE validee (EditionsV2.DemandeProcessusValideeAsync), et, comme toute edition de RIG v3, le classeur en demande
 /// d'edition dans la file (decision du plan, EditionsV2.SansParametre ; REPORT_SQL, le type de RIG v2 d'un tableau tire de requetes),
-/// rattachee a cette demande. La forme Etat envoie un geste PAR GROUPE (FormeEtat.tsx) : les deux feuilles a l'ecran donnent deux
-/// tableaux, « RCS » et « Judiciaire », la ou RIG v2 en fait un seul. NON REPRIS (nommes) : le classeur lui-meme (le modele XPILOTAGE.XLT,
+/// rattachee a cette demande. La forme Etat envoie toutes les lignes affichees en un geste
+/// (FormeEtat.tsx, lot 16 du plan-f4fb097f) : les deux feuilles a l'ecran donnent UN tableau « RCS et Judiciaire », comme RIG v2. NON REPRIS (nommes) : le classeur lui-meme (le modele XPILOTAGE.XLT,
 /// ses feuilles remplies, :215 et suivantes) et le suffixe « _n » d'un nom deja pris dans le dossier des archives (:188-199).
 /// Trace : famille « demande », la demande XPILOTAGE creee, « a cree ».
 /// </summary>

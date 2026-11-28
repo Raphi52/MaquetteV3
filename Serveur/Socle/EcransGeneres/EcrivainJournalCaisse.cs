@@ -24,9 +24,9 @@ namespace RigV3.Serveur.Socle.EcransGeneres;
 /// la V2 envoie « Par date » au mode 3 (ParMontant, ecart de la fiche, proc_jcaisse.md:291) ; la V3 fait ce que le libelle dit, comme son
 /// lecteur. REQUETE : la requete de GetData (:168-175), sur les encaissements edites. TOTAL : la somme des ENCMT_MONTANT, un encaissement
 /// compte une fois (le lecteur, en tete).
-/// LA PERIODE ET LE TRI : la saisie « Période » (« du|au ») et « Tri » si l'ecran les envoie ; l'Etat de la V3 n'envoie que les lignes
-/// affichees (FormeEtat.tsx, un geste par groupe) : la periode est alors celle des encaissements edites (du premier au dernier), le tri
-/// celui de la V2 par defaut. NON REPRIS (nommes) : la mention « (Utilisateur : nom prenom) » d'un journal a un seul agent coche
+/// LA PERIODE ET LE TRI : la saisie « Période » (« du|au ») et « Tri » si l'ecran les envoie ; l'Etat de la V3 les envoie avec toutes les
+/// lignes affichees, en un geste (FormeEtat.tsx, lot 16 du plan-f4fb097f : un seul journal, comme RIG v2) ; periode non saisie : celle des
+/// encaissements edites (du premier au dernier) ; tri non saisi : celui de la V2 par defaut. NON REPRIS (nommes) : la mention « (Utilisateur : nom prenom) » d'un journal a un seul agent coche
 /// (JournalCaisse.cs:187, oneUser) -- la V3 n'a pas la liste des agents coches.
 /// TRACE : famille « demande », « a cree », l'etat pose (titre, etat Crystal, nombre d'encaissements, total).
 /// </summary>

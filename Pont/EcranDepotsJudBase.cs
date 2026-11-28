@@ -51,14 +51,16 @@ public static partial class EcranDepotsJud
 
     /// <summary>
     /// « Nouvel événement survenu » de RIG v2 : l'evenement <paramref name="code"/> du <paramref name="date"/> (aaaa-mm-jj) et son depot
-    /// numerote, sur l'instance <paramref name="role"/>, ecrits par le serveur. Sans serveur, ou pour une instance d'exemple : rien
-    /// n'est ecrit, « Démonstration ».
+    /// numerote, sur l'instance <paramref name="role"/>, ecrits par le serveur, et les editions de RIG v2 dans la file des editions : celles
+    /// du code, et le certificat de depot si <paramref name="certificat"/> (la case de RIG v2, decochee par defaut). Sans serveur, ou pour
+    /// une instance d'exemple : rien n'est ecrit, « Démonstration ».
     /// </summary>
     [JSInvokable("EcranDepotsJud.Deposer")]
-    public static Task<ResultatGeste> Deposer(string role, string code, string date)
-        => EnregistrerAsync(ClientServeur.Actif, SessionAgent.CodeGreffe, role, code, date);
+    public static Task<ResultatGeste> Deposer(string role, string code, string date, bool certificat)
+        => EnregistrerAsync(ClientServeur.Actif, SessionAgent.CodeGreffe, role, code, date, certificat);
 
-    public static async Task<ResultatGeste> EnregistrerAsync(ClientServeur? serveur, string? greffe, string role, string code, string date)
+    public static async Task<ResultatGeste> EnregistrerAsync(ClientServeur? serveur, string? greffe, string role, string code, string date,
+        bool certificat = false)
     {
         if (serveur is null || greffe is null)
             return new ResultatGeste(false, $"{EcranGenere.Demonstration} : RIG n'est pas branché sur la base d'un greffe.") { SansEcrivain = true };
@@ -66,6 +68,7 @@ public static partial class EcranDepotsJud
         {
             [GesteEcran.Cle(DepotEvenement.Section, DepotEvenement.Code)] = code,
             [GesteEcran.Cle(DepotEvenement.Section, DepotEvenement.Date)] = date,
+            [GesteEcran.Cle(DepotEvenement.Section, DepotEvenement.Certificat)] = certificat ? "oui" : "non",
         };
         return await EcranGenere.EnvoyerGesteAsync(serveur, greffe, RoutesEcransMain.Pour(RoutesDepotsJud.Deposer, greffe),
             new GesteEcran(TypeGeste.Creer, [role], valeurs));

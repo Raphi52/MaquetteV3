@@ -17,7 +17,7 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from 'react'
 import { appeler } from '../../pont'
 import {
-  CelluleChevron, CelluleIdentite, MenuLigne, Pastille, PointEtat, normaliser, type ActionLigne, type Teinte,
+  CelluleChevron, CelluleIdentite, MenuLigne, Pastille, PointEtat, normaliser, telechargerTexte, type ActionLigne, type Teinte,
 } from '../../composants/ListeModerne'
 import type { ChampEcranVue, DescripteurEcranVue, EtatEcranVue, LigneEcranVue, MarcheEcranVue } from '../../plan/types'
 
@@ -61,7 +61,11 @@ export interface VueFicheEcran { mode: 'base' | 'exemple' | 'erreur'; message: s
 /** Les types de geste (Contrats/EcransGeneres/GesteEcran.cs, TypeGeste). */
 export type TypeGesteVue = 'Enregistrer' | 'Creer' | 'Ajouter' | 'Modifier' | 'Supprimer' | 'Agir' | 'Confirmer' | 'Decider'
 /** Ce que le geste a donne (ResultatGeste). */
-export interface ResultatGesteVue { fait: boolean; message: string; sansEcrivain: boolean; ids: string[] }
+export interface ResultatGesteVue {
+  fait: boolean; message: string; sansEcrivain: boolean; ids: string[]
+  /** Le fichier que le geste rend pour le poste (Contrats ResultatGeste.Fichier : un export que RIG v2 ecrit dans un dossier choisi). */
+  fichier?: { nom: string; contenu: string } | null
+}
 
 /** Les trois etats qui portent les gestes : le descripteur les nomme ainsi (EcransGeneresCheck le verifie). */
 export const AFAIRE = 'AFaire'
@@ -222,14 +226,18 @@ export interface DemandeGeste {
 
 /**
  * Joue un geste : au pont si la ligne vient de la base, sinon la phrase de demonstration, AUSSITOT (sans attendre).
- * Ecrit : le message de l'ecrivain, puis apres() (relire les lignes, la fiche). Refuse : le message de RIG v2. Sans
- * ecrivain ou pont en panne : la demonstration. Rend le resultat, null s'il n'est pas alle au serveur.
+ * Ecrit : le message de l'ecrivain, le FICHIER qu'il rend enregistre sur le poste (un export de RIG v2, lot 16 du plan-f4fb097f :
+ * « exportListeExcel_<type>.sql » des Listes Excel, OPE_LISTE.cs:125-136), puis apres() (relire les lignes, la fiche). Refuse : le
+ * message de RIG v2. Sans ecrivain ou pont en panne : la demonstration. Rend le resultat, null s'il n'est pas alle au serveur.
  */
 export function useGeste(d: DescripteurEcranVue, vue: VueLignesEcran | null, annoncer: (texte: CompteRendu) => void) {
   return async (g: DemandeGeste, demonstration: string, apres?: () => void): Promise<ResultatGesteVue | null> => {
     if (!versLaBase(vue, g)) { annoncer(demonstration); return null }
     const r = await envoyerGeste(d, g)
     annoncer(r === null || r.sansEcrivain ? demonstration : r.fait ? r.message : { refus: r.message })
+    // fix-ok: cause mesuree (vitest « un geste fait qui rend un fichier », rouge : aucun telechargement) -- le resultat d'un geste n'avait
+    // pas de fichier et l'ecran n'en enregistrait aucun : l'export des Listes Excel restait une demande jamais executee (reception lot 2).
+    if (r?.fait && r.fichier) telechargerTexte(r.fichier.nom, r.fichier.contenu)
     if (r?.fait) apres?.()
     return r
   }
