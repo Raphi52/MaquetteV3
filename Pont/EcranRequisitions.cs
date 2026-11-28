@@ -1,5 +1,7 @@
 using System.Globalization;
 using System.Text.Json;
+using RigV3.Contrats.EcransGeneres;
+using RigV3.Contrats.EcransMain;
 
 namespace RigV3Desktop.Pont;
 
@@ -84,9 +86,25 @@ public static class EcranRequisitions
     {
         var s = Sessions.Lire(session);
         if (geste == "Rechercher") await s.ChargerDeLaBaseAsync(serveur, greffe);
-        s.Agir(geste, valeur);
+        // « Terminer » un panier lu en base : le serveur ecrit la commande (EcritureRequisitions.cs), le pont la relit (lot 7 du plan
+        // « RIG v3 complet », 28/11/2026). Un panier de la demonstration garde l'apercu de Terminer().
+        // fix-ok: cause mesuree au banc ParcoursCompletCheck du 28/11/2026 -- PROC_REQUI rouge sur son geste : Terminer() n'ecrivait
+        // rien en base (apercu seul, TODO #275) ; ce branchement envoie le geste au serveur et relit la commande ecrite.
+        if (geste == "Terminer" && serveur is not null && !string.IsNullOrWhiteSpace(greffe) && s.TerminerEnBase() is { } demande)
+        {
+            var r = await EcranGenere.EnvoyerGesteAsync(serveur, greffe, RoutesEcransMain.Pour(RoutesTerminerRequisitions.Terminer, greffe), demande);
+            var relue = r.Fait && r.Ids is [var numero, ..] ? await LireCommandeAsync(serveur, greffe, numero) : null;
+            s.ApresTerminer(r, relue);
+        }
+        else s.Agir(geste, valeur);
         return s.Vue(session);
     }
+
+    /// <summary>La commande terminee <paramref name="numeroDemande"/> (numero de sa demande REQUI), relue dans la base du greffe.</summary>
+    public static Task<LectureEcranMain<CommandeRequiLue>> LireCommandeAsync(ClientServeur? serveur, string? greffe, string numeroDemande)
+        => LectureEcransMain.LireAsync(serveur, greffe, "la commande terminée", (s, g) =>
+            s.EnvoyerAsync<CommandeRequiDemandee, CommandeRequiLue>(RoutesEcransMain.Pour(RoutesTerminerRequisitions.Commande, g),
+                                                                   new CommandeRequiDemandee(numeroDemande)));
 
     /// <summary>Le geste sur la demonstration seule (sans lecture en base) : tests/RequiCheck le joue directement.</summary>
     public static VueRequisitions Agir(string session, string geste, JsonElement valeur)
@@ -699,5 +717,67 @@ public sealed partial class SessionRequisitions
                               CritGuichet, CritLimiteDossiers),
             RaisonSocialeInvalide, Volet, Panier.Count, Compteur, Message,
             trouvees, ARecherche, Interrompue, LimiteRetenue, panier, articles, ModeResultats, MessageResultats);
+    }
+}
+
+/// <summary>
+/// « Terminer » un panier LU EN BASE (lot 7 du plan « RIG v3 complet, mesuré par le banc du parcours complet », 28/11/2026) : le
+/// serveur ecrit la commande de RIG v2 sur sa branche sans facture remise au guichet (Serveur/Socle/EcransMain/EcritureRequisitions.cs,
+/// ses sources et ce qu'il ne reprend pas), le pont la relit (LireCommandeAsync). La V3 ne facture pas : la case « Non facturable » de
+/// la fenetre d'impression de RIG v2 (frmGestionImprimante.cs:398-400, ouverte a toute commande) vaut d'office ; la case « Guichet »
+/// est celle des criteres. Les commandes de la demonstration gardent l'apercu de Terminer().
+/// </summary>
+public sealed partial class SessionRequisitions
+{
+    /// <summary>Le geste du serveur pour le panier, quand ses commandes viennent de la base ; null sinon (Terminer() de la session).</summary>
+    internal GesteEcran? TerminerEnBase()
+    {
+        if (ModeResultats != "serveur" || Panier.Count == 0
+            || Panier.Any(c => !int.TryParse(c.Societe.Id, NumberStyles.Integer, CultureInfo.InvariantCulture, out _)))
+            return null;
+        static string N(int n) => n.ToString(CultureInfo.InvariantCulture);
+        var valeurs = new Dictionary<string, string> { [RoutesTerminerRequisitions.ChampGuichet] = CritGuichet ? "1" : "0" };
+        foreach (var c in Panier)
+        {
+            void Poser(string champ, string valeur) => valeurs[RoutesTerminerRequisitions.Cle(c.NumCommande, champ)] = valeur;
+            Poser(RoutesTerminerRequisitions.Dossier, c.Societe.Id);
+            Poser(RoutesTerminerRequisitions.Kbis, N(c.NbKBis));
+            Poser(RoutesTerminerRequisitions.Historique, N(c.NbHistorique));
+            Poser(RoutesTerminerRequisitions.Das, N(c.NbDAS));
+            Poser(RoutesTerminerRequisitions.CertifNonFaillite, N(c.NbCertifNonFaillite));
+            Poser(RoutesTerminerRequisitions.DateCertifNonFaillite, c.DateCnf.ToString(FormatDate, CultureInfo.InvariantCulture));
+            Poser(RoutesTerminerRequisitions.CertifNonRcs, N(c.NbCertifNonRcs));
+            Poser(RoutesTerminerRequisitions.CertifNonRsac, N(c.NbCertifNonRsac));
+            Poser(RoutesTerminerRequisitions.DateCertifNonRsac, c.DateCnRsac.ToString(FormatDate, CultureInfo.InvariantCulture));
+            Poser(RoutesTerminerRequisitions.Inscriptions, N(c.Inscriptions.Count > 0 ? c.NbInscr : 0));
+            Poser(RoutesTerminerRequisitions.AutresDocuments,
+                  N(c.NbCertifNonOppo + c.NbDjCopie + c.NbDjExpedition + c.NbNavire + c.NbBeInterne + c.NbBeExterne));
+        }
+        return new GesteEcran(TypeGeste.Creer, [], valeurs) { Nom = "Terminer" };
+    }
+
+    /// <summary>
+    /// Apres « Terminer » par le serveur : refuse, son message (le panier reste) ; fait, la commande RELUE en base est dite, et l'ecran
+    /// repart sur une commande neuve, comme la reponse « Oui » de RIG v2 a « Souhaitez-vous faire une autre commande ? » (RAZ,
+    /// frmREQUI.cs:2393-2399).
+    /// </summary>
+    internal void ApresTerminer(ResultatGeste r, LectureEcranMain<CommandeRequiLue>? relue)
+    {
+        Volet = "panier";
+        if (!r.Fait)
+        {
+            Message = r.Message;
+            return;
+        }
+        Panier.Clear();
+        CommandeEnCours = null;
+        ForcerNouvelleCommande = false;
+        Effacer();
+        Message = r.Message + " " + (relue?.Valeur is { Requi: { } requi } c
+            ? $"Relue en base : demande {requi.Numero} « {requi.Nom} » {(requi.Etat == "V" ? "validée" : $"à l'état {requi.Etat}")}, "
+              + $"commande {string.Join(", ", c.Lignes.Select(l => $"{l.Type} x{l.Quantite}"))}"
+              + string.Concat(c.Demandes.Select(d => $" ; {d.Numero} « {d.Nom} » : {string.Join(", ", d.Editions.Select(e => $"{e.Modele} x{e.Nombre}"))}"))
+              + "."
+            : $"La commande n'a pas pu être relue : {relue?.Message ?? "aucun numéro de demande rendu"}.");
     }
 }

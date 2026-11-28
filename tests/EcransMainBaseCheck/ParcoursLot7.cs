@@ -57,6 +57,103 @@ internal sealed record BancParcoursLot7(Func<string, (string Nom, object? Valeur
         await ArriveeAsync();
         await DemandesAsync();
         await CommandesWebAsync();
+        await RequisitionsAsync();
+    }
+
+    // ============================================================ D. TERMINER UNE COMMANDE DE REQUISITIONS (EcritureRequisitions.cs)
+    // Sur le dossier 2700001 « ALPHA BASE SARL » de Program.cs. Les tables que le geste ecrit, aux types de RIG_DEV ; le compteur DMD
+    // des jeux (PROC_CNI.sql). L'entree qui rend la section rouge si l'ecriture etait fausse : la commande SANS la case « Guichet »
+    // (frmGestionImprimante.cs:221-224) -- sans cette garde, elle serait ecrite sans client ni lettre d'envoi.
+    private async Task RequisitionsAsync()
+    {
+        await Sql("""
+            IF COL_LENGTH('v2.AFFAIRE', 'AFFRE_ID_UTLST_CREATION') IS NULL ALTER TABLE v2.AFFAIRE ADD AFFRE_ID_UTLST_CREATION int NULL;
+            IF COL_LENGTH('v2.DEMANDE', 'DMND_ID_AFFRE') IS NULL ALTER TABLE v2.DEMANDE ADD DMND_ID_AFFRE int NULL;
+            IF COL_LENGTH('v2.DEMANDE', 'DMND_ID_AUTRE') IS NULL ALTER TABLE v2.DEMANDE ADD DMND_ID_AUTRE int NULL;
+            IF COL_LENGTH('v2.DEMANDE', 'DMND_NOM_UTILISATEUR') IS NULL ALTER TABLE v2.DEMANDE ADD DMND_NOM_UTILISATEUR varchar(255) NULL;
+            IF OBJECT_ID('v2.COMMANDE') IS NULL
+                CREATE TABLE v2.COMMANDE (CMMDE_ID_CMMDE int IDENTITY(3700001, 1) NOT NULL PRIMARY KEY, CMMDE_DATE datetime NOT NULL,
+                    CMMDE_TYPE varchar(10) NULL, CMMDE_QTE smallint NULL, CMMDE_ID_DMND int NULL, CMMDE_ID_DSRCS int NULL, CMMDE_ID_NINSC int NULL,
+                    CMMDE_PROVENANCE varchar(10) NULL, CMMDE_GUICHET bit NULL);
+            IF OBJECT_ID('v2.PSEUDO_VARIABLE') IS NULL
+                CREATE TABLE v2.PSEUDO_VARIABLE (PSDVR_CPT int IDENTITY(3700001, 1) NOT NULL PRIMARY KEY, PSDVR_ID_DEMANDE int NOT NULL,
+                    PSDVR_NOM_VARIABLE varchar(50) NOT NULL, PSDVR_VALEUR_VARIABLE varchar(8000) NOT NULL);
+            IF OBJECT_ID('v2.LIGNE_EDITION') IS NULL
+                CREATE TABLE v2.LIGNE_EDITION (LGEDT_ID_LGEDT int IDENTITY(3700001, 1) NOT NULL PRIMARY KEY, LGEDT_ID_DMND int NULL,
+                    LGEDT_ID_UTLST int NULL, LGEDT_CODE_MODELE_DOC varchar(50) NOT NULL, LGEDT_TRANSMISSION varchar(20) NOT NULL,
+                    LGEDT_DESTINATION_PHYSIQUE varchar(50) NULL, LGEDT_NUM_ORDRE smallint NOT NULL, LGEDT_NOMBRE smallint NOT NULL,
+                    LGEDT_SCEAU varchar(255) NULL, LGEDT_IMP_BAC varchar(10) NULL, LGEDT_RECTO_VERSO bit NOT NULL);
+            IF NOT EXISTS (SELECT 1 FROM num.Compteur WHERE Type = 'DMD')
+                INSERT INTO num.Compteur (Type, Annee, Structure, CodageAnnee, Lettre, TailleChrono, Debut) VALUES ('DMD', YEAR(@aujourdhui), 'LAQC', 2, 'D', 5, 1);
+            """);
+        GesteEcran Commande(string guichet) => new(TypeGeste.Creer, [], new Dictionary<string, string>
+        {
+            [RoutesTerminerRequisitions.ChampGuichet] = guichet,
+            [RoutesTerminerRequisitions.Cle(1, RoutesTerminerRequisitions.Dossier)] = "2700001",
+            [RoutesTerminerRequisitions.Cle(1, RoutesTerminerRequisitions.Kbis)] = "2",
+            [RoutesTerminerRequisitions.Cle(1, RoutesTerminerRequisitions.CertifNonFaillite)] = "1",
+            [RoutesTerminerRequisitions.Cle(1, RoutesTerminerRequisitions.DateCertifNonFaillite)] = "2026-11-02",
+        }) { Nom = "Terminer" };
+        Task<string> Ecrit() => Valeur("SELECT CONCAT((SELECT COUNT(*) FROM v2.COMMANDE), '|', (SELECT COUNT(*) FROM v2.LIGNE_EDITION), '|', (SELECT COUNT(*) FROM v2.AFFAIRE))");
+
+        // Refus : sans « Guichet », rien d'ecrit, rien au journal.
+        var (avant, journal) = (await Ecrit(), await Journal());
+        var (s0, r0) = await Route(RoutesTerminerRequisitions.Terminer, Commande("0"));
+        Exiger(s0 == HttpStatusCode.UnprocessableEntity && r0 is { Fait: false, Message: EcritureRequisitions.SansGuichet }
+               && await Ecrit() == avant && await Journal() == journal,
+            $"Terminer sans « Guichet » : refus de RIG v2 (422 « {r0?.Message} »), rien d'ecrit ni journalise");
+
+        // Jumeau : au guichet -> la demande REQUI et la LPLURI validees, deux lignes de COMMANDE, deux editions, la date du certificat.
+        var (s1, r1) = await Route(RoutesTerminerRequisitions.Terminer, Commande("1"));
+        var numero = r1?.Ids.FirstOrDefault() ?? "";
+        Exiger(s1 == HttpStatusCode.OK && r1 is { Fait: true } && numero.StartsWith('D') && int.Parse(await Journal()) == int.Parse(journal) + 1,
+            $"Terminer au guichet : fait ({(int)s1} « {r1?.Message} »), demande {numero}, une ligne au journal");
+        Exiger(await Valeur($"""
+                SELECT STRING_AGG(CONCAT(c.CMMDE_TYPE, ' x', c.CMMDE_QTE, ' ', c.CMMDE_ID_DSRCS, ' ', c.CMMDE_PROVENANCE, ' ', CONVERT(int, c.CMMDE_GUICHET)), ', ')
+                    WITHIN GROUP (ORDER BY c.CMMDE_ID_CMMDE)
+                FROM v2.COMMANDE AS c JOIN v2.DEMANDE AS d ON d.DMND_ID_DMND = c.CMMDE_ID_DMND WHERE d.DMND_NUM_DEMANDE = '{numero}'
+                """) == "KBIS x2 2700001 REQUI 1, CNF x1 2700001 REQUI 1",
+            "Terminer : les lignes de COMMANDE de RIG v2 (InsererCommande, frmREQUI.cs:2528-2543) sur la demande REQUI");
+        Exiger(await Valeur($"""
+                SELECT STRING_AGG(CONCAT(l.LGEDT_CODE_MODELE_DOC, ' ', l.LGEDT_TRANSMISSION, ' ', l.LGEDT_NUM_ORDRE, ' x', l.LGEDT_NOMBRE, ' ', l.LGEDT_IMP_BAC), ', ')
+                    WITHIN GROUP (ORDER BY l.LGEDT_NUM_ORDRE)
+                FROM v2.LIGNE_EDITION AS l JOIN v2.DEMANDE AS d ON d.DMND_ID_DMND = l.LGEDT_ID_DMND
+                WHERE d.DMND_CODE_PROSS = 'LPLURI' AND d.DMND_NOM LIKE 'REQUI de la {numero} - %'
+                """) == "KBISXML_1_PDF PDF 1 x2 SECURISE, ACNF_1_IMP IMP 2 x1 SECURISE"
+               && await Valeur($"""
+                SELECT p.PSDVR_VALEUR_VARIABLE FROM v2.PSEUDO_VARIABLE AS p JOIN v2.DEMANDE AS d ON d.DMND_ID_DMND = p.PSDVR_ID_DEMANDE
+                WHERE p.PSDVR_NOM_VARIABLE = 'DATE_CERTIFICAT' AND d.DMND_NOM LIKE 'REQUI de la {numero} - %'
+                """) == "02/11/2026",
+            "Terminer : les editions de la demande LPLURI (KBISXML_1_PDF puis ACNF_1_IMP, transmission tiree du code) et la date du certificat");
+
+        // Relue par la route, puis par le pont.
+        var reponse = await Http.PostAsJsonAsync(RoutesEcransMain.Pour(RoutesTerminerRequisitions.Commande, Greffe), new CommandeRequiDemandee(numero), Json);
+        var corps = await reponse.Content.ReadAsStringAsync();
+        var lue = reponse.IsSuccessStatusCode ? JsonSerializer.Deserialize<CommandeRequiLue>(corps, Json) : null;
+        Exiger(lue is { Requi: { Etat: "V", EnCours: false, IdDossier: 2700001 } requi, Demandes: [{ Etat: "V", EnCours: false } lpluri] }
+               && requi.Nom == lpluri.Numero && lpluri.Nom == $"REQUI de la {numero} - ALPHA BASE SARL"
+               && string.Join(", ", lue.Lignes.Select(l => $"{l.Type} x{l.Quantite}")) == "KBIS x2, CNF x1",
+            $"Relecture de la commande {numero} : REQUI validee, nommee de sa LPLURI, sur le dossier ({(int)reponse.StatusCode} {(lue is null ? corps[..Math.Min(400, corps.Length)] : "")})");
+
+        static JsonElement V(object? v) => JsonSerializer.SerializeToElement(v);
+        var vue = EcranRequisitions.Ouvrir();
+        try
+        {
+            await EcranRequisitions.AgirAsync(Client, Greffe, vue.Session, "Critere", V(new { champ = "CritRaisonSociale", valeur = "ALPHA BASE" }));
+            var trouvee = await EcranRequisitions.AgirAsync(Client, Greffe, vue.Session, "Rechercher", V(null));
+            var rang = trouvee.Trouvees.First(t => t.Designation == "ALPHA BASE SARL").Rang;
+            await EcranRequisitions.AgirAsync(Client, Greffe, vue.Session, "AjouterAuPanier", V(rang));
+            await EcranRequisitions.AgirAsync(Client, Greffe, vue.Session, "Article", V(new { champ = "NbHistorique", valeur = "1" }));
+            var sansGuichet = await EcranRequisitions.AgirAsync(Client, Greffe, vue.Session, "Terminer", V(null));
+            Exiger(sansGuichet.Message == EcritureRequisitions.SansGuichet && sansGuichet.NbPanier == 1,
+                $"pont Requisitions, Terminer sans « Guichet » : le refus du serveur, le panier reste (« {sansGuichet.Message} »)");
+            await EcranRequisitions.AgirAsync(Client, Greffe, vue.Session, "BasculerCritere", V("CritGuichet"));
+            var fin = await EcranRequisitions.AgirAsync(Client, Greffe, vue.Session, "Terminer", V(null));
+            Exiger(fin.Message.StartsWith("Votre commande est terminée", StringComparison.Ordinal) && fin.Message.Contains("commande HISTO x1", StringComparison.Ordinal)
+                   && fin.Message.Contains("CHISTO_1_IMP x1", StringComparison.Ordinal) && fin.NbPanier == 0,
+                $"pont Requisitions, Terminer au guichet : ecrit par le serveur, relu par le pont, panier vide (« {fin.Message} »)");
+        }
+        finally { EcranRequisitions.Fermer(vue.Session); }
     }
 
     // ============================================================ A. ENREGISTRER UNE ARRIVEE (EcritureArrivee.cs)
