@@ -37,6 +37,11 @@
 // d'examen (le serveur les applique) ; sans serveur, les affaires d'exemple ci-dessous, marquees ; en panne, le motif et
 // aucune ligne. Ce que la base ne porte pas (chambre, audience, classement, huissier : les choix de l'enrolement) reste
 // vide ; « Forfait » est alors la case de RIG v2 (au forfait : jamais facture), pas un montant.
+//
+// LE GESTE (plan « RIG v3 complet, mesuré par le banc du parcours complet », lot 11, 28/11/2026) : « Courrier aux débiteurs », le mode
+// de clôture 5 de RIG v2 (OPE_SELECT_PC.cs:1761-1775 ; écrit par Serveur/Socle/EcransMain/EcritureCloture.cs) sur les PC affichées --
+// les cases que RIG v2 coche par défaut dans ce mode (:962-968) ; « Dernier courrier envoyé » (ligne dépliée) se relit à sa date.
+// fix-ok: pas un correctif -- trois retouches d'un même ajout (bouton, annonce, relecture), mesuré au 28/11 : PROC_CLOT sans geste.
 
 import { Fragment, useEffect, useState } from 'react'
 import { appeler } from '../pont'
@@ -47,6 +52,7 @@ import {
 } from '../composants/ListeModerne'
 import type { ContexteDossierVue } from '../plan/types'
 import { ProvenanceEcran, type ModeLecture } from '../provenance'
+import { Annonce, type CompteRendu, type ResultatGesteVue } from './formes/commun'
 
 interface LigneClot {
   role: string
@@ -76,6 +82,8 @@ interface LigneClot {
   facturation: string
   /** Lue en base : la PC est au forfait (PRCLL_FORFAIT_FACTURE) ; absent ou null en demonstration (le forfait est un montant). */
   auForfait?: boolean | null
+  /** Lue en base : l'identifiant de la PC, que le courrier aux debiteurs envoie ; absent en demonstration. */
+  id?: number | null
 }
 
 /** Ce que rend le pont (Pont/EcranClotureBase.cs, VueCloture). */
@@ -187,13 +195,17 @@ export function EcranCloture({ ouvrirDossier, dossier = null }: ProprietesEcranC
   const [vue, setVue] = useState<VueCloture | null>(null)
   // La ligne depliee par son chevron (etape « Selection PC »).
   const [ouverte, setOuverte] = useState<string | null>(null)
+  // Ce que le courrier aux debiteurs a repondu ; un geste fait relit les procedures (leur dernier courrier).
+  const [annonce, setAnnonce] = useState<CompteRendu>(null)
+  const [relecture, setRelecture] = useState(0)
+  const [envoi, setEnvoi] = useState(false)
 
   // Du / Au sont les dates de la recherche de RIG v2 : en base, chaque changement relit les procedures.
   useEffect(() => {
     let perime = false
     void appeler<VueCloture>('EcranCloture.Affaires', critDu, critAu).then((v) => { if (!perime) setVue(v) })
     return () => { perime = true }
-  }, [critDu, critAu])
+  }, [critDu, critAu, relecture])
   const aujourdhui = vue?.aujourdhui ?? null
   const enBase = vue?.mode === 'serveur'
   // La base en mode « serveur », les exemples en demonstration ; rien quand la base n'a pas repondu.
@@ -202,6 +214,22 @@ export function EcranCloture({ ouvrirDossier, dossier = null }: ProprietesEcranC
 
   const enRetard = enRetardLe(aujourdhui)
   const criteres: CriteresCloture = { critAffaire, critChambre, critDu, critAu, critAFacturer, critExamenDepasse, critTypes }
+
+  /** « Courrier aux débiteurs » (mode de clôture 5 de RIG v2, cases cochées par défaut : les PC affichées) : écrit par le serveur ;
+   *  fait, les procédures sont relues (leur dernier courrier). */
+  async function courrierDebiteurs() {
+    setEnvoi(true)
+    try {
+      const ids = trouvees.map((l) => l.id).filter((id): id is number => typeof id === 'number')
+      const r = await appeler<ResultatGesteVue>('EcranCloture.CourrierDebiteurs', ids, false)
+      setAnnonce(r.fait || r.sansEcrivain ? r.message : { refus: r.message })
+      if (r.fait) setRelecture((n) => n + 1)
+    } catch {
+      setAnnonce({ refus: "Le pont n'a pas répondu : rien n'est enregistré." })
+    } finally {
+      setEnvoi(false)
+    }
+  }
 
   function basculer(t: string) {
     setCritTypes((avant) => {
@@ -292,7 +320,13 @@ export function EcranCloture({ ouvrirDossier, dossier = null }: ProprietesEcranC
 
         <div className="rig-criteres__actions">
           <button className="rig-bouton" onClick={effacer}>Effacer</button>
+          {enBase && (
+            <button className="rig-bouton rig-bouton--fort" disabled={envoi || trouvees.length === 0}
+                    title="Mode de clôture « Courrier aux débiteurs » de RIG v2 : l'évènement, la demande et le courrier de chaque PC affichée"
+                    onClick={() => void courrierDebiteurs()}>Courrier aux débiteurs</button>
+          )}
         </div>
+        <Annonce texte={annonce} />
       </aside>
 
       <ListeModerne etiquette="Procedures collectives a cloturer">

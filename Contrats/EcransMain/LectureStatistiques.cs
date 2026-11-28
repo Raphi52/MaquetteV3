@@ -7,6 +7,18 @@ namespace RigV3.Contrats.EcransMain;
 public static class RoutesStatistiques
 {
     public const string Statistiques = "/ecrans-main/{greffe}/statistiques";
+
+    /// <summary>
+    /// POST un geste (<c>RigV3.Contrats.EcransGeneres.GesteEcran</c>, Type = Agir, Ids vide) : le bouton « Excel » de RIG v2
+    /// (OPE_STATISTIQUES_BASE._UltToolbarExcel_ButtonClick, :65-72 ; OPE_STATS_SEMESTRIELLES._GenererRapport, :103-132), le classeur
+    /// du volet sur sa période (<see cref="ChampVolet"/>, <see cref="ChampDebut"/>, <see cref="ChampFin"/>) posé dans la file des
+    /// éditions ; rend un <c>ResultatGeste</c> dont Ids = [la demande d'édition] (422 : le refus de RIG v2). Écriture :
+    /// Serveur/Socle/EcransMain/EcritureStatistiques.cs (lot 11 du plan du parcours complet).
+    /// </summary>
+    public const string Excel = "/ecrans-main/{greffe}/statistiques/excel";
+
+    /// <summary>Les clés du volet et de sa période dans les Valeurs du geste (dates aaaa-mm-jj).</summary>
+    public const string ChampVolet = "Volet", ChampDebut = "Date de début", ChampFin = "Date de fin";
 }
 
 /// <summary>Les six volets de PROC_STAT (OPE_STATS_INTERNES.Designer.cs, OPE_STATS_SEMESTRIELLES), au mot pres ceux de l'ecran.</summary>

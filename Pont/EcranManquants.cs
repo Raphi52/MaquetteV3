@@ -1,5 +1,7 @@
 using System.Net.Http;
 using System.Text.Json;
+using RigV3.Contrats.EcransGeneres;
+using RigV3.Contrats.EcransMain;
 using RigV3.Contrats.Numerotation;
 
 namespace RigV3Desktop.Pont;
@@ -20,10 +22,46 @@ public sealed record VueEcranManquants(
 /// manquants », roles RCSNIV01 et RCSNIV05) ; la route exige la meme fonction. La liste vient de la vue
 /// num.NumeroManquant (lot 6) : les manquants repris de la V2 et ceux declares par la V3, sans ceux rendus depuis.
 /// Le greffe : celui de la session (<see cref="SessionAgent.CodeGreffe"/>, lot 10).
+///
+/// LE GESTE (plan « RIG v3 complet, mesuré par le banc du parcours complet », lot 11, 28/11/2026) : « Éditer la liste », l'etape ALNUMCM
+/// de LNUMCM -- <see cref="CreerEditionAsync"/>, ecrit par le serveur (Serveur/Socle/EcransMain/EcritureManquants.cs : la demande LNUMCM
+/// et sa ligne d'edition a imprimer), reserve a la fonction LNUMCM. Sans serveur, rien n'est ecrit (« Démonstration »).
 /// </summary>
 public static class EcranManquants
 {
     public const string NomEcran = "Numéros manquants";
+
+    [JSInvokable("EcranManquants.Editer")]
+    public static Task<ResultatGeste> Editer() => CreerEditionAsync(ClientServeur.Actif, SessionAgent.CodeGreffe);
+
+    /// <summary>La liste a imprimer, sur <paramref name="serveur"/> et le greffe <paramref name="greffe"/> : sans eux, « Démonstration » ;
+    /// sans la fonction LNUMCM, le refus du serveur. Le resultat porte la demande creee (Ids).</summary>
+    public static async Task<ResultatGeste> CreerEditionAsync(ClientServeur? serveur, string? greffe)
+    {
+        if (serveur is null || string.IsNullOrWhiteSpace(greffe))
+            return new ResultatGeste(false, $"{EcranGenere.Demonstration} : RIG n'est pas branché sur la base d'un greffe.") { SansEcrivain = true };
+        try
+        {
+            return await serveur.EnvoyerAsync<GesteEcran, ResultatGeste>(RoutesEcransMain.Pour(RoutesManquants.Editer, greffe),
+                new GesteEcran(TypeGeste.Agir, [], new Dictionary<string, string>()) { Nom = "Éditer la liste" });
+        }
+        catch (ErreurServeur e) when (e.CodeHttp is 403 or 422 && LireResultat(e.Corps) is { } refus)
+        {
+            return refus;
+        }
+        catch (Exception e) when (e is ErreurServeur or HttpRequestException or TaskCanceledException)
+        {
+            return new ResultatGeste(false, $"Rien n'est enregistré : le serveur de RIG ne répond pas ({serveur.Adresse}, " +
+                                            $"{(e as ErreurServeur)?.CodeHttp.ToString() ?? e.GetType().Name}).");
+        }
+    }
+
+    private static ResultatGeste? LireResultat(string? corps)
+    {
+        if (string.IsNullOrWhiteSpace(corps)) return null;
+        try { return JsonSerializer.Deserialize<ResultatGeste>(corps, new JsonSerializerOptions(JsonSerializerDefaults.Web)); }
+        catch (JsonException) { return null; }
+    }
 
     [JSInvokable("EcranManquants.Ouvrir")]
     public static Task<VueEcranManquants> Ouvrir() => OuvrirAsync(ClientServeur.Actif, SessionAgent.CodeGreffe);

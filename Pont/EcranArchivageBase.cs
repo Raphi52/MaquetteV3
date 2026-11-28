@@ -1,4 +1,5 @@
 using System.Globalization;
+using RigV3.Contrats.EcransGeneres;
 using RigV3.Contrats.EcransMain;
 
 namespace RigV3Desktop.Pont;
@@ -18,13 +19,35 @@ public sealed record VueArchivage(string Mode, string? Message, LigneArchivage[]
 ///
 /// Branche au serveur, l'ecran montre les dossiers radies dans la periode, du type RCS choisi (ou de la liste de numeros), qui
 /// n'ont pas encore leur « Historique des FORMALITES » en GED : ceux que compte la recherche de RIG v2
-/// (Serveur/Socle/EcransMain/LectureArchivage.cs). « Preparer le bordereau » N'ECRIT PAS : RIG v2 cree une demande par dossier,
-/// ses editions de bordereau et l'annexe GED (PROC_ARCHIRAD.cs:44-61, :150-200), que la V3 n'edite pas encore ; l'ecran le
-/// dit (web/src/ecrans/EcranArchivage.tsx, SansBordereau), sans appel au pont. SANS serveur : mode « demo », aucune ligne
-/// (l'ecran garde ses exemples, marques). En panne : le motif et aucune ligne.
+/// (Serveur/Socle/EcransMain/LectureArchivage.cs). SANS serveur : mode « demo », aucune ligne (l'ecran garde ses exemples, marques).
+/// En panne : le motif et aucune ligne.
+///
+/// LE GESTE (plan « RIG v3 complet, mesuré par le banc du parcours complet », lot 11, 28/11/2026) : « Preparer le bordereau », un
+/// bordereau par dossier comme RIG v2 par defaut (PROC_ARCHIRAD.cs:155-217) -- <see cref="CreerBordereauAsync"/>, ecrit par le serveur
+/// (Serveur/Socle/EcransMain/EcritureArchivage.cs : l'annexe « Historique des FORMALITES », la demande du dossier et son bordereau a
+/// imprimer) ; le dossier dote de son annexe sort de la liste. Sans serveur, rien n'est ecrit (« Démonstration »).
 /// </summary>
 public static class EcranArchivage
 {
+    /// <summary>« Preparer le bordereau » sur les dossiers des criteres de la recherche.</summary>
+    [JSInvokable("EcranArchivage.Bordereau")]
+    public static Task<ResultatGeste> Bordereau(string? du, string? au, string? typeRcs, string? liste)
+        => CreerBordereauAsync(ClientServeur.Actif, SessionAgent.CodeGreffe, new RechercheArchivage(Jour(du), Jour(au), typeRcs, liste));
+
+    /// <summary>Le geste sur <paramref name="serveur"/> et le greffe <paramref name="greffe"/> : sans eux, « Démonstration ».</summary>
+    public static async Task<ResultatGeste> CreerBordereauAsync(ClientServeur? serveur, string? greffe, RechercheArchivage recherche)
+    {
+        if (serveur is null || string.IsNullOrWhiteSpace(greffe))
+            return new ResultatGeste(false, $"{EcranGenere.Demonstration} : RIG n'est pas branché sur la base d'un greffe.") { SansEcrivain = true };
+        static string Iso(DateOnly? d) => d?.ToString("yyyy-MM-dd", CultureInfo.InvariantCulture) ?? "";
+        return await EcranGenere.EnvoyerGesteAsync(serveur, greffe, RoutesEcransMain.Pour(RoutesArchivage.Bordereau, greffe),
+            new GesteEcran(TypeGeste.Agir, [], new Dictionary<string, string>
+            {
+                [RoutesArchivage.ChampDu] = Iso(recherche.Du), [RoutesArchivage.ChampAu] = Iso(recherche.Au),
+                [RoutesArchivage.ChampType] = recherche.TypeRcs?.Trim() ?? "", [RoutesArchivage.ChampListe] = recherche.Liste?.Trim() ?? "",
+            }) { Nom = "Préparer le bordereau" });
+    }
+
     [JSInvokable("EcranArchivage.Dossiers")]
     public static Task<VueArchivage> Dossiers(string? du, string? au, string? typeRcs, string? liste)
         => DossiersAsync(ClientServeur.Actif, SessionAgent.CodeGreffe, new RechercheArchivage(Jour(du), Jour(au), typeRcs, liste));

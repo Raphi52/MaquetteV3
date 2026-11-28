@@ -10,8 +10,14 @@
 // remise a « Toutes »), serie et origine en pastilles, un pied. Six colonnes : pas de ligne depliee. Les libelles
 // existants de l'ecran gardent leurs accents. Les criteres, les messages de refus et la demonstration ne changent pas.
 
+// LE GESTE (plan « RIG v3 complet, mesuré par le banc du parcours complet », lot 11, 28/11/2026) : « Éditer la liste », l'étape
+// ALNUMCM de LNUMCM, écrite par le serveur (Pont/EcranManquants.cs, Serveur/Socle/EcransMain/EcritureManquants.cs : la demande
+// LNUMCM et sa ligne d'édition ALNUMCM_1_IMP à imprimer) ; son compte rendu s'affiche, son refus en alerte.
+// fix-ok: pas un correctif -- trois retouches d'un même ajout (état, bouton, import), mesuré au 28/11 : PROC_NUMEROS_MANQUANTS sans geste.
+
 import { useEffect, useState } from 'react'
 import { appeler } from '../pont'
+import { Annonce, type CompteRendu, type ResultatGesteVue } from './formes/commun'
 import { quand } from './EcranComptes'
 import { EnteteListe, ListeModerne, Pastille, PiedListe, PointEtat, VuesListe, normaliser, type Teinte } from '../composants/ListeModerne'
 
@@ -50,6 +56,20 @@ export function EcranManquants() {
   const [annee, setAnnee] = useState(Toutes)
   // « Aller à un numéro… » (Ctrl K) : filtre la liste AFFICHEE.
   const [filtreRapide, setFiltreRapide] = useState('')
+  // « Éditer la liste » (étape ALNUMCM de LNUMCM) : écrit par le serveur, réservé à la fonction LNUMCM.
+  const [annonce, setAnnonce] = useState<CompteRendu>(null)
+  const [envoi, setEnvoi] = useState(false)
+  async function editer() {
+    setEnvoi(true)
+    try {
+      const r = await appeler<ResultatGesteVue>('EcranManquants.Editer')
+      setAnnonce(r.fait || r.sansEcrivain ? r.message : { refus: r.message })
+    } catch {
+      setAnnonce({ refus: "Le pont n'a pas répondu : rien n'est enregistré." })
+    } finally {
+      setEnvoi(false)
+    }
+  }
 
   useEffect(() => {
     let vivant = true
@@ -98,6 +118,11 @@ export function EcranManquants() {
             {annees.map((a) => <option key={a} value={String(a)}>{a}</option>)}
           </select>
         </label>
+        <div className="rig-criteres__actions">
+          <button className="rig-bouton rig-bouton--fort" disabled={envoi} onClick={() => void editer()}
+                  title="La liste des numéros chrono manquants à imprimer, comme la procédure LNUMCM de RIG v2">Éditer la liste</button>
+        </div>
+        <Annonce texte={annonce} />
       </aside>
 
       <ListeModerne etiquette="Numéros manquants">

@@ -251,3 +251,47 @@ describe('EcranCloture branche sur la base', () => {
     expect(container.querySelector('.rig-tcw__exemple')!.textContent).toBe('exemple')
   })
 })
+
+// Le geste (plan « RIG v3 complet, mesuré par le banc du parcours complet », lot 11) : « Courrier aux débiteurs », écrit par le
+// serveur (Serveur/Socle/EcransMain/EcritureCloture.cs, prouvé par tests/ParcoursCompletCheck/Sondes/Cloture.cs) sur les PC affichées ;
+// fait, la base est relue (le dernier courrier) ; refusé, l'alerte ; sans serveur, aucun bouton.
+describe('EcranCloture : le courrier aux debiteurs', () => {
+  const pc = (courrier: string) => ({
+    role: 'P4100101', affaire: 'SONDE', demandeur: '', defendeur: 'SONDE', chambre: '', audience: '', heureAppel: '', classement: '',
+    limiteExamen: '2026-12-08', aFacturer: true, dernierCourrier: courrier, dossier: '', numPc: 'P4100101', heureDebut: '', dirigeants: '',
+    liquidateurs: 'Maitre SONDE', forfait: '', huissier: '', codePostalVille: '', acteSaisine: '', depot: '', facturation: '', auForfait: false,
+    id: 4100101,
+  })
+
+  it('envoie les PC affichees au pont, annonce le compte rendu et relit la base', async () => {
+    let fait = false
+    const pont = installerFauxPont({
+      'EcranCloture.Affaires': () => ({ mode: 'serveur', message: null, lignes: [pc(fait ? '28/11/2026' : '')], total: 1, aujourdhui: '2026-11-28' }),
+      'EcranCloture.CourrierDebiteurs': () => {
+        fait = true
+        return { fait: true, sansEcrivain: false, ids: ['4100101'], message: 'Courrier aux débiteurs : 1 procédure(s) collective(s) traitée(s) (P4100101).' }
+      },
+    })
+    render(<EcranCloture ouvrirDossier={vi.fn()} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Courrier aux débiteurs' }))
+    expect((await screen.findByRole('status')).textContent).toContain('1 procédure(s) collective(s) traitée(s)')
+    expect(pont.appels).toHaveBeenCalledWith('EcranCloture.CourrierDebiteurs', [4100101], false)
+    await vi.waitFor(() => expect(pont.appels.mock.calls.filter((c) => c[0] === 'EcranCloture.Affaires').length).toBe(2))
+  })
+
+  it('refuse par le serveur : le refus en alerte ; sans serveur : pas de bouton', async () => {
+    installerFauxPont({
+      'EcranCloture.Affaires': () => ({ mode: 'serveur', message: null, lignes: [pc('')], total: 1, aujourdhui: '2026-11-28' }),
+      'EcranCloture.CourrierDebiteurs': () => ({ fait: false, sansEcrivain: false, ids: [],
+        message: 'Le courrier aux débiteurs n\'est pas paramétré (réglage CLOT_EVE_PRO_INCITR) : RIG v2 n\'écrit alors rien. Rien n\'est enregistré.' }),
+    })
+    render(<EcranCloture ouvrirDossier={vi.fn()} />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Courrier aux débiteurs' }))
+    expect((await screen.findByRole('alert')).textContent).toContain('CLOT_EVE_PRO_INCITR')
+    cleanup(); retirerFauxPont()
+    installerFauxPont({ 'EcranCloture.Affaires': () => Demonstration })
+    render(<EcranCloture ouvrirDossier={vi.fn()} />)
+    await screen.findByText('SARL BOULANGERIE DUVAL')
+    expect(screen.queryByRole('button', { name: 'Courrier aux débiteurs' })).toBeNull()
+  })
+})

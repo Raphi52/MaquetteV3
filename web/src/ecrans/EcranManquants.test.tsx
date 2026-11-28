@@ -113,3 +113,24 @@ describe('EcranManquants en liste moderne', () => {
     expect(screen.getByText('Aucun des 3 numéros ne contient « zzz ».')).toBeTruthy()
   })
 })
+
+// Le geste (lot 11 du plan du parcours complet) : « Éditer la liste », l'etape ALNUMCM de LNUMCM, ecrite par le serveur
+// (Serveur/Socle/EcransMain/EcritureManquants.cs, prouvee par tests/ParcoursCompletCheck/Sondes/Manquants.cs).
+describe('EcranManquants : editer la liste', () => {
+  it('le geste part au pont et son compte rendu s affiche ; le refus du serveur en alerte', async () => {
+    let refuser = false
+    const pont = installerFauxPont({
+      'EcranManquants.Ouvrir': () => vue(),
+      'EcranManquants.Editer': () => refuser
+        ? { fait: false, sansEcrivain: false, ids: [], message: 'Refuse : le compte x n\'a pas la fonction LNUMCM (Liste des numeros chrono manquants) dans le greffe 3801.' }
+        : { fait: true, sansEcrivain: false, ids: ['4100601'], message: 'Liste des numéros chrono manquants à imprimer (demande D2633200046).' },
+    })
+    render(<EcranManquants />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Éditer la liste' }))
+    expect((await screen.findByRole('status')).textContent).toContain('à imprimer (demande D2633200046)')
+    expect(pont.appels).toHaveBeenCalledWith('EcranManquants.Editer')
+    refuser = true
+    fireEvent.click(screen.getByRole('button', { name: 'Éditer la liste' }))
+    expect((await screen.findByRole('alert')).textContent).toContain("n'a pas la fonction LNUMCM")
+  })
+})

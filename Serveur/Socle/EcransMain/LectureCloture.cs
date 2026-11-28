@@ -1,3 +1,5 @@
+// fix-ok: pas un correctif -- lot 11 du plan-f4fb097f (28/11/2026) : la grille lit « Dernier courrier envoyé » (le geste du courrier
+// aux débiteurs, EcritureCloture.cs, l'écrit) et partage son filtre AExaminer avec ce geste ; trois retouches d'un même ajout.
 using System.Data;
 using System.Globalization;
 using Microsoft.Data.SqlClient;
@@ -26,9 +28,11 @@ namespace RigV3.Serveur.Socle.EcransMain;
 ///     (:686), jamais facturé (OPE_SELECT_PC.cs:2006) ; les liquidateurs en mission (ListeMandatairesPC_PCFiltre("LIQ"),
 ///     :525-542, :624-626) -- sans liquidateur, la V2 montre la PC, bloquée (« Pas de liquidateur présent… », :534).
 ///   - Le dossier ouvert par le clic : celui de la PC (PRCLL_ID_DSRCS, fiche rec.DossierRcs).
+///   - « Dernier courrier envoyé » (:678-682) : la plus grande date des évènements de la PC au code du mode de clôture
+///     (ParamCLOT_CodeEvePro, PROC_CLOT.cs:208-247) -- celui du courrier aux débiteurs (CLOT_EVE_PRO_INCITR, :232), le seul mode que
+///     l'écran V3 joue (EcritureCloture.cs, lot 11 du plan du parcours complet, 28/11/2026).
 /// NON LU : chambre, date et heure d'audience, type de classement, huissier -- ce sont les choix de l'agent dans la grille
-/// d'enrôlement (OPE_SELECT_PC.cs:827, RechercheAudienceCabinet :1398), pas des données de la base ; « Dernier courrier » (:678-682)
-/// dépend du mode de clôture choisi (ParamCLOT_CodeEvePro, PROC_CLOT.cs:208-244), que l'écran V3 ne propose pas ; les
+/// d'enrôlement (OPE_SELECT_PC.cs:827, RechercheAudienceCabinet :1398), pas des données de la base ; les
 /// dirigeants (ListeDirigeantsPC) ; l'étape « Enrôlement / requête » (OPE_ENROLEMENT_REQUETE, mode 2-3).
 /// </summary>
 public static class LectureCloture
@@ -49,21 +53,35 @@ public static class LectureCloture
         e.EVNPR_ID_PRCLL = p.PRCLL_ID_PRCLL AND e.EVNPR_CODE_EVE_PRO LIKE '4CLO%' AND e.EVNPR_SURVENU = 0 AND e.EVNPR_DELAI_EXPIRE = 0
         """;
 
+    /// <summary>Une PC de la grille, sans borne de date (:441-454) : du greffe, non clôturée, un 4CLO futur, aucune instance de clôture
+    /// (@code1 à @code3) -- aussi le contrôle du courrier aux débiteurs (EcritureCloture.cs) sur les PC cochées.</summary>
+    internal static readonly string AExaminer = $"""
+        p.PRCLL_EXTERIEUR = 0 AND p.PRCLL_CODE_CLOTURE IS NULL
+          AND EXISTS (SELECT 1 FROM v2.EVENEMENT_PROCEDURE AS e WHERE {Evenement4Clo})
+          AND NOT EXISTS (SELECT 1 FROM v2.INSTANCE AS i
+                          WHERE i.INSTN_ID_PRCLL = p.PRCLL_ID_PRCLL AND i.INSTN_CODE_AFFAIRE IN (@code1, @code2, @code3))
+        """;
+
+    // « Dernier courrier envoyé » (:678-682) : la plus grande date des évènements de la PC au code du courrier aux débiteurs
+    // (@courrier, réglage CLOT_EVE_PRO_INCITR : le seul mode de clôture que l'écran V3 joue, EcritureCloture.cs).
     private static readonly string Requete = $"""
         SELECT TOP (@plafond) p.PRCLL_ID_PRCLL, p.PRCLL_NUM_PC, p.PRCLL_NOM_AFFAIRE, p.PRCLL_FORFAIT_FACTURE, d.NumeroGestion,
-               lim.Limite, {OrganesPc.MandatairesEnFonction("p", "'LIQ'")} AS Liquidateurs, COUNT(*) OVER () AS Total
+               lim.Limite, {OrganesPc.MandatairesEnFonction("p", "'LIQ'")} AS Liquidateurs, COUNT(*) OVER () AS Total,
+               (SELECT MAX(c.EVNPR_DATE) FROM v2.EVENEMENT_PROCEDURE AS c
+                WHERE c.EVNPR_ID_PRCLL = p.PRCLL_ID_PRCLL AND c.EVNPR_CODE_EVE_PRO = @courrier) AS DernierCourrier
         FROM v2.PROCEDURE_COLLECTIVE AS p
         CROSS APPLY (SELECT TOP (1) {Limite} AS Limite FROM v2.EVENEMENT_PROCEDURE AS e
                      WHERE {Evenement4Clo} ORDER BY e.EVNPR_DATE DESC, e.EVNPR_ID_EVNPR DESC) AS lim
         LEFT JOIN rec.DossierRcs AS d ON d.Id = p.PRCLL_ID_DSRCS
-        WHERE p.PRCLL_EXTERIEUR = 0 AND p.PRCLL_CODE_CLOTURE IS NULL
+        WHERE {AExaminer}
           AND EXISTS (SELECT 1 FROM v2.EVENEMENT_PROCEDURE AS e
                       WHERE {Evenement4Clo}
                         AND (@au IS NULL OR (@du IS NULL AND {Limite} < @au) OR (@du IS NOT NULL AND {Limite} BETWEEN @du AND @au)))
-          AND NOT EXISTS (SELECT 1 FROM v2.INSTANCE AS i
-                          WHERE i.INSTN_ID_PRCLL = p.PRCLL_ID_PRCLL AND i.INSTN_CODE_AFFAIRE IN (@code1, @code2, @code3))
         ORDER BY p.PRCLL_NUM_PC, p.PRCLL_ID_PRCLL
         """;
+
+    /// <summary>Le code de l'évènement du courrier aux débiteurs (ParamCLOT_CodeEvePro, mode 5 : PROC_CLOT.cs:232).</summary>
+    internal static readonly LectureReglage CodeCourrier = new(EcritureCloture.ReglageEvenement, "", "PROC_CLOT.cs:232");
 
     /// <summary>Les procédures à examiner pour <paramref name="recherche"/>, au plus <paramref name="plafond"/>.</summary>
     public static async Task<AffairesClotureLues> LireAsync(SqlConnection baseGreffe, RechercheCloture recherche, CancellationToken ct,
@@ -79,14 +97,15 @@ public static class LectureCloture
             new SqlParameter("@plafond", SqlDbType.Int) { Value = plafond },
             new SqlParameter("@du", SqlDbType.DateTime) { Value = Jour(recherche.Du) },
             new SqlParameter("@au", SqlDbType.DateTime) { Value = Jour(recherche.Au) },
-            await Code("@code1", CodeAffaireSo), await Code("@code2", CodeAffaire), await Code("@code3", CodeAffaireAv2006));
+            await Code("@code1", CodeAffaireSo), await Code("@code2", CodeAffaire), await Code("@code3", CodeAffaireAv2006),
+            await Code("@courrier", CodeCourrier));
         while (await r.ReadAsync(ct))
         {
             total = Convert.ToInt32(r["Total"], CultureInfo.InvariantCulture);
             lignes.Add(new AffaireClotureLue(Convert.ToInt32(r["PRCLL_ID_PRCLL"], CultureInfo.InvariantCulture),
                 FormeLigne.Texte(r, "PRCLL_NUM_PC").Trim(), FormeLigne.Texte(r, "PRCLL_NOM_AFFAIRE").Trim(),
                 FormeLigne.Texte(r, "NumeroGestion").Trim(), FormeLigne.DateDe(r, "Limite"), r["PRCLL_FORFAIT_FACTURE"] is true,
-                FormeLigne.Texte(r, "Liquidateurs").Trim()));
+                FormeLigne.Texte(r, "Liquidateurs").Trim(), FormeLigne.DateDe(r, "DernierCourrier")));
         }
         return new AffairesClotureLues([.. lignes], total);
     }
