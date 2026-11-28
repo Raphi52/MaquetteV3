@@ -113,4 +113,50 @@ describe('EcranExperts', () => {
     expect(choisi(container)).toBe('EXB')
     expect(screen.getByText('M14-1')).toBeTruthy()
   })
+
+  // « Enregistrer la fiche » (lot 9 du parcours complet) : en base, la saisie et les participants coches partent au pont ; faite, la
+  // fiche relit la base ; refusee, le motif de RIG v2. La demonstration reste en lecture, sans bouton.
+  it('en base, « Enregistrer la fiche » envoie la saisie et les participants coches, puis relit la base', async () => {
+    const expert = (nom: string, tel: string) => ({ abrege: 'EXB', civilite: 'MR', nom, complementNom: '', naissance: '', adresse: '',
+      tel, fax: '', mail: '', qualif: 'EC', actif: true, cle: '8' })
+    const mesure = (nom: string) => ({ expert: '8', numMesure: 'M14-1', civilite: 'MR', nomParticipant: nom, complementNom: '', qualifProf: 'EC',
+      adresse: '', enCours: true, participant: '81' })
+    let fait = false
+    const enregistrer = vi.fn(() => { fait = true; return { fait: true, message: 'Expert EXB enregistré, 1 participant(s) mis à jour.', sansEcrivain: false, ids: ['8'] } })
+    const pont = installerFauxPont({
+      'EcranExperts.Experts': () => ({ mode: 'serveur', message: null, total: 1,
+        experts: [fait ? expert('EXB NOUVEAU', '0123456789') : expert('EXB Paul', '')], mesures: [mesure(fait ? 'EXB NOUVEAU' : 'EXB Paul')] }),
+      'EcranExperts.Enregistrer': enregistrer,
+    })
+    render(<EcranExperts />)
+    await vi.waitFor(() => expect(pont.appels).toHaveBeenCalledWith('EcranExperts.Experts'))
+    const nom = await screen.findByLabelText('Nom') as HTMLInputElement
+    expect(nom.readOnly).toBe(false)
+    fireEvent.change(nom, { target: { value: 'EXB NOUVEAU' } })
+    fireEvent.change(screen.getByLabelText('Telephone'), { target: { value: '0123456789' } })
+    fireEvent.click(screen.getByLabelText('Reporter la fiche sur M14-1'))
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer la fiche' }))
+    expect((await screen.findByRole('status')).textContent).toBe('Expert EXB enregistré, 1 participant(s) mis à jour.')
+    expect(enregistrer).toHaveBeenCalledWith('8', { nom: 'EXB NOUVEAU', complementNom: '', tel: '0123456789', fax: '', mail: '', participants: ['81'] })
+    await vi.waitFor(() => expect((screen.getByLabelText('Telephone') as HTMLInputElement).value).toBe('0123456789'))
+    expect(screen.getAllByText('EXB NOUVEAU').length).toBeGreaterThan(0)
+  })
+
+  it('en base, un refus de RIG v2 est dit, rien n\'est relu ; la demonstration reste en lecture', async () => {
+    const pont = installerFauxPont({
+      'EcranExperts.Experts': () => ({ mode: 'serveur', message: null, total: 1, mesures: [],
+        experts: [{ abrege: 'EXB', civilite: 'MR', nom: 'EXB', complementNom: '', naissance: '', adresse: '', tel: '', fax: '', mail: '', qualif: '', actif: true, cle: '8' }] }),
+      'EcranExperts.Enregistrer': () => ({ fait: false, message: '« Téléphone » : Numéro de téléphone invalide.', sansEcrivain: false, ids: [] }),
+    })
+    render(<EcranExperts />)
+    fireEvent.change(await screen.findByLabelText('Telephone'), { target: { value: '12' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Enregistrer la fiche' }))
+    expect((await screen.findByRole('alert')).textContent).toBe('Refus « Téléphone » : Numéro de téléphone invalide.')
+    expect(pont.appels.mock.calls.filter((a) => a[0] === 'EcranExperts.Experts')).toHaveLength(1)
+    cleanup()
+    retirerFauxPont()
+    await ouvrir()
+    expect((screen.getByLabelText('Nom') as HTMLInputElement).readOnly).toBe(true)
+    expect(screen.queryByRole('button', { name: 'Enregistrer la fiche' })).toBeNull()
+  })
 })

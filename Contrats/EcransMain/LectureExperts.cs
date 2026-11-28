@@ -18,7 +18,12 @@ public sealed record ExpertLu(int Id, string Abrege, string Civilite, string Nom
 /// ULT_LISTVIEW_MESURES_EXPERT ; <paramref name="EnCours"/> = participant actif sur une mesure non clôturée.
 /// </summary>
 public sealed record MesureExpertLue(int IdExpert, string NumMesure, string Civilite, string NomParticipant, string ComplementNom,
-                                     string Qualification, string Adresse, bool EnCours);
+                                     string Qualification, string Adresse, bool EnCours)
+{
+    /// <summary>Le participant (PRTCP_ID_PRTCP) : la ligne que « Enregistrer la fiche » met à jour quand l'agent la coche (RoutesFicheExpert,
+    /// plan « parcours complet », lot 9).</summary>
+    public int IdParticipant { get; init; }
+}
 
 /// <summary>Les experts (au plus le plafond), par abrégé, leurs mesures, et le total des experts.</summary>
 public sealed record ExpertsLus(ExpertLu[] Experts, MesureExpertLue[] Mesures, int Total);

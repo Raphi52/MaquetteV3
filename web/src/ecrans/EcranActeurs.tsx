@@ -29,12 +29,17 @@
 //
 // BRANCHE SUR LA BASE (plan « RIG v3 100 % fonctionnel », lot 14, 27/11/2026) : les acteurs viennent du pont
 // (Pont/EcranActeursBase.cs) -- les six types de RIG v2 lus dans la base du greffe (Serveur/Socle/EcransMain/LectureActeurs.cs),
-// filtres ici comme dans OPE_RECHERCHE_ACTEUR (nom ou abrege, chambre, statut, actifs). L'ecran n'ecrit rien (champs en lecture).
-// Sans serveur, les acteurs d'exemple ci-dessous, marques ; en panne, le motif et aucun acteur.
+// filtres ici comme dans OPE_RECHERCHE_ACTEUR (nom ou abrege, chambre, statut, actifs). Sans serveur, les acteurs d'exemple ci-dessous,
+// marques (en lecture) ; en panne, le motif et aucun acteur.
+//
+// « ENREGISTRER LES COORDONNEES » (plan « RIG v3 complet, mesure par le banc du parcours complet », lot 9, 28/11/2026) : en base, le
+// telephone, le fax et le courriel de la fiche se saisissent (les autres champs restent en lecture) ; le serveur les ecrit avec les
+// controles de RIG v2 de la fiche du type (Serveur/Socle/EcransMain/EcritureActeurs.cs) ; fait, l'ecran relit la base ; refuse, le motif.
 // check: branchement neuf (lot 14), pas un correctif -- plusieurs remplacements cibles, prouves par EcranActeurs.test.tsx (vitest).
 
 import { useEffect, useState } from 'react'
 import { appeler } from '../pont'
+import { Annonce, type CompteRendu, type ResultatGesteVue } from './formes/commun'
 import { ProvenanceEcran, type ModeLecture } from '../provenance'
 import { contientSansCasse, dateCourte, distinctsTries, estBlanc } from '../criteres'
 
@@ -130,6 +135,32 @@ export function EcranActeurs() {
   if (actifsSeuls) trouves = trouves.filter((a) => a.actif)
   const a = selection
 
+  // Les coordonnees saisies de l'acteur choisi (en base seulement) : son brouillon, sinon ses valeurs lues.
+  const enBase = vue?.mode === 'serveur'
+  const [brouillon, setBrouillon] = useState<{ cle: string; tel: string; fax: string; mail: string } | null>(null)
+  const [annonce, setAnnonce] = useState<CompteRendu>(null)
+  const [envoi, setEnvoi] = useState(false)
+  const coordonnees = a === null ? null : brouillon?.cle === cleDe(a) ? brouillon : { cle: cleDe(a), tel: a.tel, fax: a.fax, mail: a.mail }
+  const saisir = (champ: 'tel' | 'fax' | 'mail', valeur: string) => { if (coordonnees) setBrouillon({ ...coordonnees, [champ]: valeur }) }
+
+  /** Le geste : ecrit par le serveur (controles de RIG v2) ; fait, l'ecran relit la base. */
+  async function enregistrer() {
+    if (!coordonnees) return
+    setEnvoi(true)
+    try {
+      const r = await appeler<ResultatGesteVue>('EcranActeurs.EnregistrerCoordonnees', coordonnees.cle, coordonnees.tel, coordonnees.fax, coordonnees.mail)
+      setAnnonce(r.fait || r.sansEcrivain ? r.message : { refus: r.message })
+      if (r.fait) {
+        setVue(await appeler<VueActeurs>('EcranActeurs.Acteurs'))
+        setBrouillon(null)
+      }
+    } catch {
+      setAnnonce({ refus: "Le pont n'a pas répondu : rien n'est enregistré." })
+    } finally {
+      setEnvoi(false)
+    }
+  }
+
   return (
     <div className="rig-proc__corps">
 
@@ -218,17 +249,26 @@ export function EcranActeurs() {
               <div className="rig-criteres__paire">
                 <label className="rig-saisie-champ">
                   <span className="rig-saisie-champ__libelle">Telephone</span>
-                  <input className="rig-saisie-champ__saisie" value={a.tel} readOnly />
+                  <input className="rig-saisie-champ__saisie" value={coordonnees?.tel ?? a.tel} readOnly={!enBase} maxLength={15}
+                         onChange={(ev) => saisir('tel', ev.target.value)} />
                 </label>
                 <label className="rig-saisie-champ">
                   <span className="rig-saisie-champ__libelle">Fax</span>
-                  <input className="rig-saisie-champ__saisie" value={a.fax} readOnly />
+                  <input className="rig-saisie-champ__saisie" value={coordonnees?.fax ?? a.fax} readOnly={!enBase} maxLength={15}
+                         onChange={(ev) => saisir('fax', ev.target.value)} />
                 </label>
               </div>
               <label className="rig-saisie-champ">
                 <span className="rig-saisie-champ__libelle">E-mail</span>
-                <input className="rig-saisie-champ__saisie" value={a.mail} readOnly />
+                <input className="rig-saisie-champ__saisie" value={coordonnees?.mail ?? a.mail} readOnly={!enBase}
+                       onChange={(ev) => saisir('mail', ev.target.value)} />
               </label>
+              {enBase && (
+                <div className="rig-criteres__actions">
+                  <button className="rig-bouton rig-bouton--fort" onClick={() => void enregistrer()} disabled={envoi}>Enregistrer les coordonnees</button>
+                </div>
+              )}
+              <Annonce texte={annonce} />
             </div>
 
             <div className="rig-criteres__bloc" style={{ padding: 'var(--rig-esp-3)' }}>

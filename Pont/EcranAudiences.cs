@@ -6,7 +6,15 @@ public sealed record LigneAudience(string Date, string Heure, string Type, strin
 /// <summary>Ce que l'ecran montre : les audiences a venir, les listes de la creation, d'ou elles viennent (Pont/LectureEcranMain.cs)
 /// et le total des audiences.</summary>
 public sealed record VueAudiences(LigneAudience[] Lignes, string[] Types, string[] Chambres, string[] Sections, string[] Classements,
-                                  string Mode = "demo", string? Message = null, int Total = 0);
+                                  string Mode = "demo", string? Message = null, int Total = 0)
+{
+    /// <summary>Les valeurs des listes avec leur code, celui que « Créer l'audience » envoie (EcranAudiencesBase.cs) ; vide dans la
+    /// demonstration, qui n'ecrit rien.</summary>
+    public OptionAudienceVue[] Options { get; init; } = [];
+}
+
+/// <summary>Une valeur d'une liste de la creation : sa liste (« type », « chambre », « section », « classement »), son code, son libelle.</summary>
+public sealed record OptionAudienceVue(string Liste, string Code, string Libelle);
 
 /// <summary>
 /// Pont de l'ecran PROC_AUDIENCE (web/src/ecrans/EcranAudiences.tsx).
@@ -22,10 +30,13 @@ public sealed record VueAudiences(LigneAudience[] Lignes, string[] Types, string
 /// </summary>
 public static partial class EcranAudiences
 {
-    /// <summary>JeuDemo.Aujourdhui + 7 jours, au format d'un &lt;input type="date"&gt; (aaaa-mm-jj).</summary>
+    /// <summary>Le jour + 7, au format d'un &lt;input type="date"&gt; (aaaa-mm-jj) : celui du jeu de demonstration sans serveur, le vrai
+    /// jour branche a la base -- la date de demonstration (septembre 2026) etait deja passee, et une audience creee a cette date
+    /// n'entrait pas dans les audiences a venir que l'ecran relit (lot 9 du parcours complet, 28/11/2026).</summary>
     [JSInvokable("EcranAudiences.DateProposee")]
     public static string DateProposee() =>
-        JeuDemo.Aujourdhui.AddDays(7).ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
+        (ClientServeur.Actif is null ? JeuDemo.Aujourdhui : DateTime.Today).AddDays(7)
+            .ToString("yyyy-MM-dd", System.Globalization.CultureInfo.InvariantCulture);
 
     /// <summary>Les listes et les trois audiences de demonstration (celles que l'ecran declarait), sans serveur.</summary>
     public static VueAudiences Exemple() => new(

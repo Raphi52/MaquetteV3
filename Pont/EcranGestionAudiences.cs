@@ -1,10 +1,13 @@
 namespace RigV3Desktop.Pont;
 
 /// <summary>Une ligne de l'ecran (les champs de « Audience » dans web/src/ecrans/EcranGestionAudiences.tsx) ; date = jj/mm/aaaa.
-/// <see cref="Cabinet"/> : null dans la demonstration (elle ne distingue pas les modes), sinon le mode de RIG v2.</summary>
+/// <see cref="Cabinet"/> : null dans la demonstration (elle ne distingue pas les modes), sinon le mode de RIG v2. Les codes
+/// (<see cref="CodeChambre"/>, <see cref="CodeCab"/>, <see cref="IdJuge"/>) : ceux que la recherche du serveur recoit (vides dans la
+/// demonstration).</summary>
 public sealed record LigneGestionAudience(string Jour, string Date, string Heure, string Type, string CodeCabinet, string TypeCabinet,
                                           string Juge, string Section, string Chambre, string Greffier, string TypeClassement, bool Public,
-                                          string AuteurSuppression, string DateSuppression, string EnvoiSuppression, bool? Cabinet = null);
+                                          string AuteurSuppression, string DateSuppression, string EnvoiSuppression, bool? Cabinet = null,
+                                          string CodeChambre = "", string CodeCab = "", int? IdJuge = null);
 
 /// <summary>Ce que l'ecran montre : ses lignes, d'ou elles viennent (Pont/LectureEcranMain.cs) et leur total.</summary>
 public sealed record VueGestionAudiences(LigneGestionAudience[] Lignes, string Mode = "demo", string? Message = null, int Total = 0);

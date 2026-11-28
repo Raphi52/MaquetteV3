@@ -154,6 +154,40 @@ describe('EcranGestionAudiences', () => {
     expect(rangees(container).map((r) => r.querySelectorAll('td')[1]!.textContent)).toEqual(['Jeudi'])
   })
 
+  // En base, la recherche de RIG v2 est faite par le serveur (lot 9 du parcours complet) : « Rechercher » envoie les CODES (chambre,
+  // classement, juge par son numero) et les dates ; les lignes affichees sont celles qu'il rend, sans filtre de l'ecran.
+  it('en base, « Rechercher » envoie les criteres en codes au serveur et montre ce qu\'il rend ; sans date de debut, son motif', async () => {
+    const audience = { ...l('Mardi', '10/03/2026', '09:00', 'AU', '', '', '', 'K.A', 'K - Chambre K', '', 'R1;X1', true, 'agent.y', '11/03/2026', '', false),
+                       codeChambre: 'K', codeCab: '', idJuge: null }
+    const autre = { ...l('Jeudi', '12/03/2026', '10:00', 'AU', '', '', '', 'H.A', 'H - Chambre H', '', 'X1', true, 'agent.y', '13/03/2026', '', false),
+                    codeChambre: 'H', codeCab: '', idJuge: null }
+    const rechercher = vi.fn((...args: unknown[]) => (args[0] as { audienceDu: string | null }).audienceDu === null
+      ? { mode: 'serveur', message: 'Aucune recherche : RIG v2 cherche à partir d\'une date de début, d\'audience ou de suppression.', total: 0, lignes: [] }
+      : { mode: 'serveur', message: null, total: 1, lignes: [audience] })
+    installerFauxPont({
+      'EcranGestionAudiences.Vue': () => ({ mode: 'serveur', message: null, total: 2, lignes: [audience, autre] }),
+      'EcranGestionAudiences.Rechercher': rechercher,
+    })
+    const { container } = render(<EcranGestionAudiences />)
+    fireEvent.click(await screen.findByRole('button', { name: 'Recherche par cabinets' }))
+    expect(rangees(container)).toHaveLength(2)
+    // Les criteres portent les codes : la chambre « K », chaque classement admis separement.
+    const valeurs = (libelle: string) => [...(screen.getByLabelText(libelle) as HTMLSelectElement).options].map((o) => [o.value, o.textContent])
+    expect(valeurs('Chambre')).toEqual([['', 'Toutes'], ['H', 'H - Chambre H'], ['K', 'K - Chambre K']])
+    expect(valeurs('Type de classement')).toEqual([['', 'Tous'], ['R1', 'R1'], ['X1', 'X1']])
+    fireEvent.click(screen.getByRole('button', { name: 'Rechercher' }))
+    expect((await screen.findByRole('status')).textContent).toContain('Aucune recherche')
+    expect(container.querySelector('.rig-table__vide')!.textContent).toBe('Aucune audience ne repond a ces criteres.')
+    fireEvent.change(screen.getByLabelText('Du'), { target: { value: '2026-03-01' } })
+    fireEvent.change(screen.getByLabelText('Au'), { target: { value: '2026-03-31' } })
+    fireEvent.change(screen.getByLabelText('Chambre'), { target: { value: 'K' } })
+    fireEvent.change(screen.getByLabelText('Type de classement'), { target: { value: 'R1' } })
+    fireEvent.click(screen.getByRole('button', { name: 'Rechercher' }))
+    await vi.waitFor(() => expect(rangees(container).map((r) => r.querySelectorAll('td')[1]!.textContent)).toEqual(['Mardi']))
+    expect(rechercher).toHaveBeenLastCalledWith({ cabinets: false, audienceDu: '2026-03-01', audienceAu: '2026-03-31', suppressionDu: null,
+      suppressionAu: null, type: null, chambre: 'K', section: null, juge: null, codeCabinet: null, typeClassement: 'R1', max: 100 })
+  })
+
   it('base injoignable : le motif, aucune ligne', async () => {
     const { container } = await ouvrir({ mode: 'erreur', message: 'Le serveur ne répond pas.', total: 0, lignes: [] })
     expect(screen.getByRole('alert').textContent).toContain('Le serveur ne répond pas.')

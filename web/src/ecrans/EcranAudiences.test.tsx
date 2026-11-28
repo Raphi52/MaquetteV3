@@ -71,7 +71,8 @@ describe('EcranAudiences', () => {
   it('les bascules s\'allument et s\'eteignent : publique allumee, classement admis par defaut', async () => {
     await ouvrir()
     const publique = screen.getByRole('button', { name: 'Audience publique' })
-    const web = screen.getByRole('button', { name: 'Publiee sur le web' })
+    // La case de RIG v2 : « Non disponible dans les choix d'Audience WEB », decochee par defaut (lot 9 du parcours complet).
+    const web = screen.getByRole('button', { name: 'Non disponible dans les choix d\'audience web' })
     expect(publique.className).toBe('rig-bascule rig-bascule--actif')
     expect(web.className).toBe('rig-bascule')
     expect(screen.getByRole('button', { name: 'Insuffisance d\'actif' }).className).toBe('rig-bascule rig-bascule--actif')
@@ -92,25 +93,71 @@ describe('EcranAudiences', () => {
     expect(synthese(container)).toBe('3 audiences · 2 publiques · 29 affaires')
   })
 
-  it('branche a la base : ses listes et ses audiences, aucune mention d\'exemple ; « Creer » dit que rien n\'est enregistre', async () => {
-    const pont = installerFauxPont({
-      'EcranAudiences.DateProposee': () => '2026-09-16',
-      'EcranAudiences.Vue': () => ({
-        mode: 'serveur', message: null, total: 1,
-        lignes: [{ date: '2026-12-01', heure: '14:00', type: 'Audience contentieuse', chambre: 'Chambre 1', section: '', publique: true, web: false, nbAffaires: 3 }],
-        types: ['Audience contentieuse'], chambres: ['Chambre 1'], sections: [], classements: ['Renvoi'],
-      }),
-    })
+  // La base du greffe : les listes portent leur code (options du pont), la section se choisit dans celles de la chambre (RIG v2).
+  const enBase = (lignes: unknown[]) => ({
+    mode: 'serveur', message: null, total: lignes.length, lignes,
+    types: ['Audience contentieuse'], chambres: ['Chambre 1', 'Plaidoiries'], sections: ['audience interactive', 'plaidoirie lundi'],
+    classements: ['Renvoi'],
+    options: [
+      { liste: 'type', code: 'CX', libelle: 'Audience contentieuse' },
+      { liste: 'chambre', code: 'INT', libelle: 'Chambre 1' }, { liste: 'chambre', code: 'PLD', libelle: 'Plaidoiries' },
+      { liste: 'section', code: 'INT.LU', libelle: 'audience interactive' }, { liste: 'section', code: 'INT.VE', libelle: 'audience interactive' },
+      { liste: 'section', code: 'PLD.LU', libelle: 'plaidoirie lundi' },
+      { liste: 'classement', code: 'RE', libelle: 'Renvoi' },
+    ],
+  })
+  const existante = { date: '2026-12-01', heure: '14:00', type: 'Audience contentieuse', chambre: 'Chambre 1', section: '', publique: true, web: false, nbAffaires: 3 }
+
+  it('branche a la base : ses listes par code, les sections de la chambre, aucune mention d\'exemple', async () => {
+    const pont = installerFauxPont({ 'EcranAudiences.DateProposee': () => '2026-09-16', 'EcranAudiences.Vue': () => enBase([existante]) })
     const { container } = render(<EcranAudiences />)
     await vi.waitFor(() => expect(pont.appels).toHaveBeenCalledWith('EcranAudiences.Vue'))
     await vi.waitFor(() => expect(lignes(container)).toEqual([['', '01/12/2026', '14:00', 'Audience contentieuse', 'Chambre 1', 'oui', '3']]))
     expect(screen.queryByRole('note')).toBeNull()
-    expect([...(screen.getByLabelText('Chambre') as HTMLSelectElement).options].map((o) => o.value)).toEqual(['Chambre 1'])
+    expect([...(screen.getByLabelText('Chambre') as HTMLSelectElement).options].map((o) => [o.value, o.text]))
+      .toEqual([['INT', 'Chambre 1'], ['PLD', 'Plaidoiries']])
+    // Les deux sections « audience interactive » de la chambre INT, distinguees par leur code ; PLD.LU n'est pas de cette chambre.
+    expect([...(screen.getByLabelText('Section') as HTMLSelectElement).options].map((o) => o.value)).toEqual(['', 'INT.LU', 'INT.VE'])
+    fireEvent.change(screen.getByLabelText('Chambre'), { target: { value: 'PLD' } })
+    expect([...(screen.getByLabelText('Section') as HTMLSelectElement).options].map((o) => o.value)).toEqual(['', 'PLD.LU'])
     expect(screen.getByRole('button', { name: 'Renvoi' }).className).toBe('rig-bascule rig-bascule--actif')
+  })
+
+  it('« Creer l\'audience » : la saisie part au pont en codes ; faite, la liste relit la base et montre l\'audience', async () => {
+    let creee = false
+    const creer = vi.fn(() => { creee = true; return { fait: true, message: 'Audience créée : Audience contentieuse du 16/09/2026 à 10:30, Chambre 1.', sansEcrivain: false, ids: ['77'] } })
+    const pont = installerFauxPont({
+      'EcranAudiences.DateProposee': () => '2026-09-16',
+      'EcranAudiences.Vue': () => enBase(creee
+        ? [existante, { date: '2026-09-16', heure: '10:30', type: 'Audience contentieuse', chambre: 'Chambre 1', section: 'audience interactive', publique: true, web: true, nbAffaires: 0 }]
+        : [existante]),
+      'EcranAudiences.Creer': creer,
+    })
+    const { container } = render(<EcranAudiences />)
     await screen.findByDisplayValue('2026-09-16')
+    await vi.waitFor(() => expect(lignes(container)).toHaveLength(1))
+    fireEvent.change(container.querySelector('input[type="time"]')!, { target: { value: '10:30' } })
+    fireEvent.change(screen.getByLabelText('Section'), { target: { value: 'INT.VE' } })
     fireEvent.click(screen.getByRole('button', { name: 'Creer l\'audience' }))
-    expect(screen.getByRole('status').textContent).toContain('n\'est pas enregistrée')
+    expect((await screen.findByRole('status')).textContent).toBe('Audience créée : Audience contentieuse du 16/09/2026 à 10:30, Chambre 1.')
+    expect(creer).toHaveBeenCalledWith({ date: '2026-09-16', heure: '10:30', type: 'CX', chambre: 'INT', section: 'INT.VE', classements: ['RE'],
+                                         publique: true, nonDisponibleWeb: false })
+    await vi.waitFor(() => expect(lignes(container).map((l) => [l[1], l[2]])).toEqual([['01/12/2026', '14:00'], ['16/09/2026', '10:30']]))
+    expect(pont.appels.mock.calls.filter((a) => a[0] === 'EcranAudiences.Vue')).toHaveLength(2)
+  })
+
+  it('« Creer l\'audience » refusee par RIG v2 : le motif, rien d\'ajoute ni de relu', async () => {
+    const pont = installerFauxPont({
+      'EcranAudiences.DateProposee': () => '2026-09-16',
+      'EcranAudiences.Vue': () => enBase([existante]),
+      'EcranAudiences.Creer': () => ({ fait: false, message: 'L\'audience saisie existe déjà. Merci de vérifier votre saisie.', sansEcrivain: false, ids: [] }),
+    })
+    const { container } = render(<EcranAudiences />)
+    await vi.waitFor(() => expect(lignes(container)).toHaveLength(1))
+    fireEvent.click(screen.getByRole('button', { name: 'Creer l\'audience' }))
+    expect((await screen.findByRole('alert')).textContent).toBe('Refus L\'audience saisie existe déjà. Merci de vérifier votre saisie.')
     expect(synthese(container)).toBe('1 audience · 1 publique · 3 affaires')
+    expect(pont.appels.mock.calls.filter((a) => a[0] === 'EcranAudiences.Vue')).toHaveLength(1)
   })
 
   it('base injoignable : le motif, aucune audience ni liste', async () => {

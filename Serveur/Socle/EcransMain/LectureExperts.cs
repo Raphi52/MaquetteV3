@@ -7,7 +7,8 @@ namespace RigV3.Serveur.Socle.EcransMain;
 
 /// <summary>
 /// « Experts » (PROC_EXPERT, web/src/ecrans/EcranExperts.tsx) : les experts du greffe et les mesures où ils participent, lus dans la base
-/// V3 du greffe. LECTURE SEULE (LectureV2) : l'écran V3 n'édite pas. Plan « RIG v3 100 % fonctionnel », lot 14, 27/11/2026, marche du lot 17.
+/// V3 du greffe. LECTURE SEULE (LectureV2). Plan « RIG v3 100 % fonctionnel », lot 14, 27/11/2026, marche du lot 17. Le geste « Enregistrer
+/// la fiche » : EcritureExperts.cs (plan « parcours complet », lot 9, 28/11/2026), qui met à jour les participants cochés (IdParticipant).
 ///
 /// SOURCE (ancien RIG) : D:\RigApplication\Source\RIG\DLL\Processus\PROC_EXPERT\PROC_EXPERT.
 ///   - LA LISTE : Recherche\OPE_RECHERCHE_EXPERT -- tous les experts (table EXPERT, RigBaseGreffe\GREFFE\EXPERT.cs), filtres a l'ecran
@@ -37,7 +38,7 @@ public static class LectureExperts
         """;
 
     private static readonly string RequeteMesures = $"""
-        SELECT p.PRTCP_ID_EXPRT, m.MSINS_NUM_MESURE, p.PRTCP_CIVILITE, p.PRTCP_NOM, p.PRTCP_COMPLEMENT_NOM, p.PRTCP_QUALIF_PROFESSION,
+        SELECT p.PRTCP_ID_PRTCP, p.PRTCP_ID_EXPRT, m.MSINS_NUM_MESURE, p.PRTCP_CIVILITE, p.PRTCP_NOM, p.PRTCP_COMPLEMENT_NOM, p.PRTCP_QUALIF_PROFESSION,
                {string.Format(CultureInfo.InvariantCulture, AdresseSql, "p.PRTCP_ID_ADRBS")} AS Adresse,
                CAST(CASE WHEN p.PRTCP_ACTIF = 1 AND m.MSINS_DATE_CLOTURE IS NULL THEN 1 ELSE 0 END AS bit) AS EnCours
         FROM v2.PARTICIPANT AS p INNER JOIN v2.MESURE AS m ON p.PRTCP_ID_MSINS = m.MSINS_ID_MSINS
@@ -73,7 +74,7 @@ public static class LectureExperts
                 while (await r.ReadAsync(ct))
                     mesures.Add(new MesureExpertLue(Convert.ToInt32(r["PRTCP_ID_EXPRT"], CultureInfo.InvariantCulture), T(r, "MSINS_NUM_MESURE"),
                         T(r, "PRTCP_CIVILITE"), T(r, "PRTCP_NOM"), T(r, "PRTCP_COMPLEMENT_NOM"), T(r, "PRTCP_QUALIF_PROFESSION"), T(r, "Adresse"),
-                        r["EnCours"] is true));
+                        r["EnCours"] is true) { IdParticipant = Convert.ToInt32(r["PRTCP_ID_PRTCP"], CultureInfo.InvariantCulture) });
         return new ExpertsLus([.. experts], [.. mesures], total);
     }
 }

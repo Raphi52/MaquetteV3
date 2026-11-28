@@ -18,11 +18,18 @@
 // LA BASE DU GREFFE (plan « RIG v3 100 % fonctionnel », lot 7, 26/11/2026, marche du lot 17) : les listes de la creation (types
 // d'audience, chambres, sections, types de classement) et les audiences a venir viennent du pont (Pont/EcranAudiencesBase.cs →
 // Serveur/Socle/EcransMain/LectureAudiences.cs). Sans serveur, la demonstration du pont, marquee « exemple » (ProvenanceEcran) ;
-// en panne, le motif et aucune ligne. « Creer l'audience » n'ecrit rien (aucune ecriture d'audience branchee) : il le dit, et
-// n'ajoute plus de ligne a la liste -- une ligne ajoutee a l'ecran seul aurait ete un faux succes.
+// en panne, le motif et aucune ligne.
+//
+// « CREER L'AUDIENCE » (plan « RIG v3 complet, mesure par le banc du parcours complet », lot 9, 28/11/2026) : la saisie part au pont
+// (EcranAudiences.Creer) et le serveur l'ecrit avec les controles de RIG v2 (Serveur/Socle/EcransMain/EcritureAudiences.cs) ; les
+// listes envoient leur CODE (options du pont : deux sections de RIG_DEV portent le meme libelle), la section se choisit dans celles de
+// la chambre (leur code contient celui de la chambre, OPE_CREATION_AUDIENCE.cs:84-98). Fait : la liste relit la base et montre
+// l'audience creee ; refuse : le motif de RIG v2, rien d'ajoute. La case de RIG v2 est « Non disponible dans les choix d'Audience WEB »
+// (decochee par defaut, AUDIENCE_CABINET.cs:271) : l'ecran la reprend telle quelle. Sans serveur, rien n'est enregistre et l'ecran le dit.
 
 import { Fragment, useEffect, useState } from 'react'
 import { appeler } from '../pont'
+import { Annonce, type CompteRendu, type ResultatGesteVue } from './formes/commun'
 import { ProvenanceEcran, type ModeLecture } from '../provenance'
 import { dateCourte } from '../criteres'
 import {
@@ -48,9 +55,25 @@ interface VueAudiences {
   chambres: string[]
   sections: string[]
   classements: string[]
+  /** Les valeurs des listes avec leur code (vide dans la demonstration) : ce que « Creer l'audience » envoie. */
+  options?: OptionAudience[]
   mode?: ModeLecture
   message?: string | null
   total: number
+}
+
+/** Une valeur d'une liste de la creation (Pont/EcranAudiences.cs, OptionAudienceVue). */
+interface OptionAudience { liste: 'type' | 'chambre' | 'section' | 'classement'; code: string; libelle: string }
+
+/** Une valeur proposee par un choix : la valeur envoyee (le code, ou le libelle dans la demonstration) et son libelle. */
+interface Choix { valeur: string; libelle: string }
+
+/** Les choix d'une liste : les options du pont (codes) quand il en rend, sinon les libelles de la demonstration. */
+function choixDe(vue: VueAudiences | null, liste: OptionAudience['liste'], libelles: string[]): Choix[] {
+  const options = vue?.options ?? []
+  return options.length > 0
+    ? options.filter((o) => o.liste === liste).map((o) => ({ valeur: o.code, libelle: o.libelle }))
+    : libelles.map((l) => ({ valeur: l, libelle: l }))
 }
 
 // Le @bind d'un TimeOnly ecrit « HH:mm:ss » dans <input type="time"> ; une
@@ -70,8 +93,10 @@ export function EcranAudiences() {
   // null tant que le pont n'a pas repondu : aucune ligne ni liste, jamais la demonstration a la place de la base.
   const [vue, setVue] = useState<VueAudiences | null>(null)
   const programmees = vue?.lignes ?? []
-  const TypesAudience = vue?.types ?? []
-  const Classements = vue?.classements ?? []
+  const avecCodes = (vue?.options ?? []).length > 0
+  const TypesAudience = choixDe(vue, 'type', vue?.types ?? [])
+  const Chambres = choixDe(vue, 'chambre', vue?.chambres ?? [])
+  const Classements = choixDe(vue, 'classement', vue?.classements ?? [])
   // null tant que le pont n'a pas repondu (ou une fois la date effacee).
   const [dateAudience, setDateAudience] = useState<string | null>(null)
   const [heureTexte, setHeureTexte] = useState('09:00:00')
@@ -81,25 +106,38 @@ export function EcranAudiences() {
   const [chambre, setChambre] = useState('')
   const [section, setSection] = useState('')
   const [publique, setPublique] = useState(true)
-  const [choixWeb, setChoixWeb] = useState(false)
+  // « Non disponible dans les choix d'Audience WEB » (ULTCheckBChoixWeb de RIG v2) : decochee par defaut.
+  const [nonWeb, setNonWeb] = useState(false)
   const mailActif = true
   const [admis, setAdmis] = useState<ReadonlySet<string>>(new Set())
-  const [annonce, setAnnonce] = useState('')
+  const [annonce, setAnnonce] = useState<CompteRendu>(null)
+  const [envoi, setEnvoi] = useState(false)
+
+  // Les sections de la chambre choisie : leur code contient celui de la chambre (RIG v2) ; dans la demonstration, toutes.
+  const Sections = choixDe(vue, 'section', vue?.sections ?? []).filter((s) => !avecCodes || chambre === '' || s.valeur.includes(chambre))
+
+  function recevoir(v: VueAudiences) {
+    setVue(v)
+    const premier = (liste: OptionAudience['liste'], libelles: string[]) => choixDe(v, liste, libelles)[0]?.valeur ?? ''
+    setTypeAudience((avant) => avant || premier('type', v.types))
+    setChambre((avant) => avant || premier('chambre', v.chambres))
+    setSection((avant) => avant || ((v.options ?? []).length > 0 ? '' : premier('section', v.sections)))
+    setAdmis((avant) => (avant.size > 0 || v.classements.length === 0 ? avant : new Set([premier('classement', v.classements)])))
+  }
 
   useEffect(() => {
     let perime = false
     void appeler<string>('EcranAudiences.DateProposee')
       .then((d) => { if (!perime) setDateAudience((avant) => avant ?? d) })
-    void appeler<VueAudiences>('EcranAudiences.Vue').then((v) => {
-      if (perime) return
-      setVue(v)
-      setTypeAudience((avant) => avant || (v.types[0] ?? ''))
-      setChambre((avant) => avant || (v.chambres[0] ?? ''))
-      setSection((avant) => avant || (v.sections[0] ?? ''))
-      setAdmis((avant) => (avant.size > 0 || v.classements.length === 0 ? avant : new Set([v.classements[0]!])))
-    })
+    void appeler<VueAudiences>('EcranAudiences.Vue').then((v) => { if (!perime) recevoir(v) })
     return () => { perime = true }
   }, [])
+
+  // Une section qui n'est pas de la chambre choisie ne reste pas choisie.
+  const sectionValable = section === '' || Sections.some((s) => s.valeur === section)
+  useEffect(() => {
+    if (avecCodes && !sectionValable) setSection('')
+  }, [avecCodes, sectionValable])
 
   function saisirHeure(texte: string) {
     setHeureTexte(texte)
@@ -115,12 +153,25 @@ export function EcranAudiences() {
     })
   }
 
-  // Aucune ecriture d'audience n'est branchee : le geste le dit, rien ne s'ajoute a la liste (jamais un faux succes).
-  function creer() {
-    if (!dateAudience) return
-    setAnnonce(vue?.mode === 'serveur'
-      ? `La création d'une audience n'est pas encore branchée sur la base du greffe : l'audience du ${dateCourte(dateAudience)} à ${heure} n'est pas enregistrée.`
-      : 'Démonstration : rien n\'est enregistré.')
+  /** Le geste : ecrit par le serveur (controles de RIG v2) ; fait, la liste relit la base. Sans serveur : rien n'est enregistre. */
+  async function creer() {
+    if (vue?.mode !== 'serveur') {
+      setAnnonce('Démonstration : rien n\'est enregistré.')
+      return
+    }
+    setEnvoi(true)
+    try {
+      const r = await appeler<ResultatGesteVue>('EcranAudiences.Creer', {
+        date: dateAudience ?? '', heure, type: typeAudience, chambre, section,
+        classements: Classements.filter((c) => admis.has(c.valeur)).map((c) => c.valeur), publique, nonDisponibleWeb: nonWeb,
+      })
+      setAnnonce(r.fait || r.sansEcrivain ? r.message : { refus: r.message })
+      if (r.fait) recevoir(await appeler<VueAudiences>('EcranAudiences.Vue'))
+    } catch {
+      setAnnonce({ refus: "Le pont n'a pas répondu : rien n'est enregistré." })
+    } finally {
+      setEnvoi(false)
+    }
   }
 
   // La ligne depliee par son chevron (une a la fois) : l'audience elle-meme, son rang change a chaque creation.
@@ -159,7 +210,7 @@ export function EcranAudiences() {
           <span className="rig-saisie-champ__libelle">Type d'audience</span>
           <select className="rig-saisie-champ__saisie" value={typeAudience}
                   onChange={(e) => setTypeAudience(e.target.value)}>
-            {TypesAudience.map((t) => <option key={t} value={t}>{t}</option>)}
+            {TypesAudience.map((t) => <option key={t.valeur} value={t.valeur}>{t.libelle}</option>)}
           </select>
         </label>
 
@@ -167,13 +218,14 @@ export function EcranAudiences() {
           <label className="rig-saisie-champ">
             <span className="rig-saisie-champ__libelle">Chambre</span>
             <select className="rig-saisie-champ__saisie" value={chambre} onChange={(e) => setChambre(e.target.value)}>
-              {(vue?.chambres ?? []).map((c) => <option key={c}>{c}</option>)}
+              {Chambres.map((c) => <option key={c.valeur} value={c.valeur}>{c.libelle}</option>)}
             </select>
           </label>
           <label className="rig-saisie-champ">
             <span className="rig-saisie-champ__libelle">Section</span>
             <select className="rig-saisie-champ__saisie" value={section} onChange={(e) => setSection(e.target.value)}>
-              {(vue?.sections ?? []).map((s) => <option key={s}>{s}</option>)}
+              {avecCodes && <option value="">—</option>}
+              {Sections.map((s) => <option key={s.valeur} value={s.valeur}>{s.libelle}</option>)}
             </select>
           </label>
         </div>
@@ -184,29 +236,28 @@ export function EcranAudiences() {
             <span className="rig-bascule__temoin"></span>
             <span>Audience publique</span>
           </button>
-          <button className={`rig-bascule${choixWeb ? ' rig-bascule--actif' : ''}`}
-                  onClick={() => setChoixWeb(!choixWeb)}>
+          <button className={`rig-bascule${nonWeb ? ' rig-bascule--actif' : ''}`}
+                  onClick={() => setNonWeb(!nonWeb)}>
             <span className="rig-bascule__temoin"></span>
-            <span>Publiee sur le web</span>
+            <span>Non disponible dans les choix d'audience web</span>
           </button>
         </div>
 
         <div className="rig-criteres__bloc">
           <div className="rig-kicker">Types de classement admis</div>
           {Classements.map((c) => (
-            <button key={c} className={`rig-bascule${admis.has(c) ? ' rig-bascule--actif' : ''}`}
-                    onClick={() => basculerAdmis(c)}>
+            <button key={c.valeur} className={`rig-bascule${admis.has(c.valeur) ? ' rig-bascule--actif' : ''}`}
+                    onClick={() => basculerAdmis(c.valeur)}>
               <span className="rig-bascule__temoin"></span>
-              <span>{c}</span>
+              <span>{c.libelle}</span>
             </button>
           ))}
         </div>
 
         <div className="rig-criteres__actions">
-          <button className="rig-bouton rig-bouton--fort" onClick={creer}>Creer l'audience</button>
+          <button className="rig-bouton rig-bouton--fort" onClick={() => void creer()} disabled={envoi}>Creer l'audience</button>
         </div>
-        {/* fix-ok: la classe d'annonce du socle est rig-eg-annonce (formes/commun.tsx:343) ; « rig-annonce » n'existe pas. */}
-        {annonce !== '' && <p className="rig-eg-annonce" role="status">{annonce}</p>}
+        <Annonce texte={annonce} />
         <span className={`rig-etat rig-etat--${mailActif ? 'ok' : 'attente'}`}>
           {mailActif ? 'Envoi de mail actif' : 'Envoi de mail inactif'}
         </span>
