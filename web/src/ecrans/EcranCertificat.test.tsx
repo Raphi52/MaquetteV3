@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it } from 'vitest'
-import { cleanup, render, screen } from '@testing-library/react'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { EcranCertificat, pastilleCertificat, type Certificat, type EtatCertificat, type VueEcranCertificat } from './EcranCertificat'
 import { installerFauxPont, retirerFauxPont } from '../test/faux-pont'
 
@@ -93,6 +93,43 @@ describe('EcranCertificat', () => {
     render(<EcranCertificat />)
     expect((await screen.findByRole('alert')).textContent).toContain('Accès refusé')
     expect(screen.queryByRole('table')).toBeNull()
+  })
+
+  // Lot 13 du plan « RIG v3 complet » : Amitel enregistre le certificat depuis l'ecran (SOC-019 T03) ; un agent de greffe ne le peut pas.
+  // fix-ok: aucun ecran n'offrait l'enregistrement (PUT joue par tests/SocleBetaCheck seul) ; ces tests tiennent le formulaire.
+  it('un agent de greffe ne voit pas le formulaire d enregistrement', async () => {
+    installerFauxPont({ 'EcranCertificat.Ouvrir': () => vue({ peutEnregistrer: false }) })
+    render(<EcranCertificat />)
+    await screen.findByLabelText('État du certificat')
+    expect(screen.queryByRole('button', { name: 'Enregistrer le certificat' })).toBeNull()
+  })
+
+  it('Amitel enregistre le certificat recu ; un refus du serveur est dit, la fiche reste', async () => {
+    const sans = vue({ peutEnregistrer: true, etat: etat({ etat: 'certification en cours', certificat: null, enregistreLe: null }) })
+    const reponses: VueEcranCertificat[] = [
+      vue({ mode: 'refuse', message: 'Le certificat n\'est pas enregistré : Certificat incomplet (accréditation).', etat: null }),
+      vue({ peutEnregistrer: true, message: 'Certificat n°NF525-V3-2027-001 enregistré : chaque greffe le retrouve ici.' }),
+    ]
+    const pont = installerFauxPont({ 'EcranCertificat.Ouvrir': () => sans, 'EcranCertificat.Enregistrer': () => reponses.shift() })
+    render(<EcranCertificat />)
+    const bouton = await screen.findByRole('button', { name: 'Enregistrer le certificat' }) as HTMLButtonElement
+    expect(bouton.disabled).toBe(true)
+    const saisir = (libelle: string, valeur: string) => fireEvent.change(screen.getByLabelText(libelle), { target: { value: valeur } })
+    saisir('Organisme', 'AFNOR Certification'); saisir('Accréditation', 'COFRAC 5-0012'); saisir('Numéro du certificat', 'NF525-V3-2027-001')
+    saisir('Délivré le', '2026-12-01'); saisir('Valide jusqu\'au', '2029-11-30')
+    expect(bouton.disabled).toBe(false)
+
+    fireEvent.click(bouton)
+    expect((await screen.findByText(/Certificat incomplet/)).textContent).toContain('accréditation')
+    expect(screen.getByLabelText('État du certificat').textContent).toBe('Certification en cours')
+
+    fireEvent.click(bouton)
+    await vi.waitFor(() => expect(screen.getByLabelText('État du certificat').textContent).toBe('Valide'))
+    expect(screen.getByText(/enregistré : chaque greffe le retrouve ici/)).toBeTruthy()
+    expect(pont.appels).toHaveBeenCalledWith('EcranCertificat.Enregistrer', {
+      logiciel: 'V3', organisme: 'AFNOR Certification', accreditation: 'COFRAC 5-0012', numero: 'NF525-V3-2027-001',
+      referentiel: 'NF525', versionCouverte: '2026.1', delivreLe: '2026-12-01', valideJusquau: '2029-11-30',
+    })
   })
 
   it('chaque etat a sa pastille et sa phrase', () => {

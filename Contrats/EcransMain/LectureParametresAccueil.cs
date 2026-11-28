@@ -8,6 +8,11 @@ namespace RigV3.Contrats.EcransMain;
 public static class RoutesParametresAccueil
 {
     public const string Parametres = "/ecrans-main/{greffe}/parametres-accueil";
+
+    /// <summary>POST d'un GesteEcran « Enregistrer » : les réglages d'accueil de L'AGENT appelant, par clé ConsoleAccueil_* (Valeurs),
+    /// écrits dans PARAMETRE_UTILISATEUR comme RIG v2 à la fermeture de l'onglet (Serveur/Socle/EcransMain/EcritureParametresAccueil.cs).
+    /// Plan « RIG v3 complet, mesuré par le banc du parcours complet », lot 13, 28/11/2026.</summary>
+    public const string Enregistrer = "/ecrans-main/{greffe}/parametres-accueil/enregistrer";
 }
 
 /// <summary>

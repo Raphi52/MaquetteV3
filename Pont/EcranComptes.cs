@@ -50,8 +50,12 @@ public static class EcranComptes
     public static Task<VueEcranComptes> Ouvrir() => OuvrirAsync(ClientServeur.Actif);
 
     [JSInvokable("EcranComptes.Creer")]
-    public static Task<VueEcranComptes> Creer(DemandeCompte demande)
-        => GesteAsync(ClientServeur.Actif, RoutesComptes.Creer, demande with { Id = null, Ecran = NomEcran }, "Compte créé");
+    public static Task<VueEcranComptes> Creer(DemandeCompte demande) => CreerAsync(ClientServeur.Actif, demande);
+
+    /// <summary>« Créer un compte » sur <paramref name="serveur"/> (null : la demonstration), puis l'ecran relu. Le banc du parcours
+    /// complet le joue au nom d'un agent qui a le role de gestion des droits (tests/ParcoursCompletCheck/Sondes/Comptes.cs).</summary>
+    public static Task<VueEcranComptes> CreerAsync(ClientServeur? serveur, DemandeCompte demande)
+        => GesteAsync(serveur, RoutesComptes.Creer, demande with { Id = null, Ecran = NomEcran }, "Compte créé");
 
     [JSInvokable("EcranComptes.Modifier")]
     public static Task<VueEcranComptes> Modifier(DemandeCompte demande)
